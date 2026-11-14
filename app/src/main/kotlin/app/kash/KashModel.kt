@@ -118,12 +118,12 @@ class KashModel(
 
     fun service(id: ServiceId): Service? = services.firstOrNull { it.id == id }
 
-    /** What is unread in each service: WhatsApp's conversations as its page sends them (`whatsapp.js`), a custom application's total in its title. */
+    /** What is unread in each service: a known service's conversations as its page sends them (`services/`), a custom application's total in its title. */
     val unread: Map<ServiceId, ServiceUnread>
         get() = services.associate { service ->
             service.id to when (service.kind) {
                 ServiceKind.CUSTOM -> ServiceUnread(total = titles[service.id]?.let(UnreadCount::fromTitle))
-                ServiceKind.WHATSAPP -> ServiceUnread(conversations = conversations[service.id].orEmpty())
+                ServiceKind.WHATSAPP, ServiceKind.GOOGLE_CHAT -> ServiceUnread(conversations = conversations[service.id].orEmpty())
             }
         }
 

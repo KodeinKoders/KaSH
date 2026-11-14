@@ -17,11 +17,13 @@ toc::[]
 
 == Services
 
-WhatsApp is in the catalog, and any web application can be added as a custom service, by its address.
+WhatsApp and Google Chat are in the catalog, and any web application can be added as a custom service, by its address.
 A custom service shows its unread count when its page puts it at the start of its title, as `(3) My application` does.
 
 KaSH reads WhatsApp's unread conversations: each one is a row of the *Unread* tab, which opens it in WhatsApp, and they make the badge of its tab.
 As in WhatsApp, the muted and the archived conversations are not counted.
+
+KaSH reads Google Chat's unread conversations the same way, as Google Chat counts them: the direct messages and the message requests, and the spaces where the user is mentioned.
 
 The same service can be added several times, for several accounts: a label under its icon tells them apart.
 

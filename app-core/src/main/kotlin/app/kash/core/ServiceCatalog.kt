@@ -18,8 +18,11 @@ public data class ServicePreset(
 public object ServiceCatalog {
     public val whatsApp: ServicePreset = ServicePreset(ServiceKind.WHATSAPP, "WhatsApp", "https://web.whatsapp.com/", "WA", "#1A7F4B")
 
+    /** Google Chat alone, without Gmail: where `chat.google.com` sends to. */
+    public val googleChat: ServicePreset = ServicePreset(ServiceKind.GOOGLE_CHAT, "Google Chat", "https://mail.google.com/chat/u/0/", "GC", "#188038")
+
     /** The known services, in the order of the catalog. More are added as KaSH learns to read their pages. */
-    public val presets: List<ServicePreset> = listOf(whatsApp)
+    public val presets: List<ServicePreset> = listOf(whatsApp, googleChat)
 
     /** The square of a custom application: the design's default blue. */
     public const val CUSTOM_COLOR: String = "#3058CF"

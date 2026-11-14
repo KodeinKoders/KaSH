@@ -41,6 +41,7 @@ public value class ServiceId(public val value: String) {
 @Serializable
 public enum class ServiceKind {
     WHATSAPP,
+    GOOGLE_CHAT,
     CUSTOM,
 }
 
