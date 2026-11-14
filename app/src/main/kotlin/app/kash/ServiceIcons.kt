@@ -1,0 +1,193 @@
+package app.kash
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.kash.core.KashDirectories
+import app.kash.core.Service
+import app.kash.core.ServiceCatalog
+import app.kash.core.ServiceIcon
+import app.kash.core.ServiceKind
+import app.kash.core.SquareColors
+import app.kash.ui.Kash
+import app.kash.ui.KashIcon
+import app.kash.ui.KashIcons
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.jetbrains.jewel.ui.component.Text
+import org.slf4j.LoggerFactory
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.file.Files
+import java.nio.file.Path
+import java.time.Duration
+import org.jetbrains.skia.Image as SkiaImage
+
+private val logger = LoggerFactory.getLogger(ServiceIcons::class.java)
+
+/**
+ * The images of the services' icons: the sites' own icons ([ServiceIcon.Favicon]), fetched once from their address and kept on disk, and the images
+ * that the user chose ([ServiceIcon.Image]). Both are read off Swing's thread; until they are there, a tile shows the service's square.
+ */
+class ServiceIcons(private val directories: KashDirectories) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val favicons = mutableStateMapOf<String, ImageBitmap>()
+    private val images = mutableStateMapOf<String, ImageBitmap>()
+    private val requested = HashSet<String>()
+
+    // A browser's User-Agent: some sites answer another one with a page that has no icon ("your browser is not supported").
+    private val client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(10)).build()
+
+    /** The icon of the site at [url], or null while it is fetched, or when it has none. */
+    fun favicon(url: String): ImageBitmap? {
+        val host = runCatching { URI(url).host }.getOrNull()?.lowercase() ?: return null
+        if (requested.add("favicon:$host")) {
+            scope.launch {
+                withContext(Dispatchers.IO) { loadFavicon(host, url) }?.let { favicons[host] = it }
+            }
+        }
+        return favicons[host]
+    }
+
+    /** The image [file] of [KashDirectories.icons], or null while it is read, or when it cannot be. */
+    fun image(file: String): ImageBitmap? {
+        if (requested.add("image:$file")) {
+            scope.launch {
+                withContext(Dispatchers.IO) { decode(directories.icons.resolve(file)) }?.let { images[file] = it }
+            }
+        }
+        return images[file]
+    }
+
+    /** Copies the image [source] in [KashDirectories.icons], and returns its name there; null when it is not an image that can be shown. */
+    fun import(source: Path): String? {
+        val bytes = runCatching { Files.readAllBytes(source) }.getOrNull() ?: return null
+        val bitmap = decode(bytes) ?: return null
+        val extension = source.fileName.toString().substringAfterLast('.', "img").lowercase()
+        val name = "icon-${System.currentTimeMillis()}.$extension"
+        Files.createDirectories(directories.icons)
+        Files.write(directories.icons.resolve(name), bytes)
+        images[name] = bitmap
+        requested += "image:$name"
+        return name
+    }
+
+    private fun loadFavicon(host: String, url: String): ImageBitmap? {
+        val cached = directories.favicons.resolve("$host.icon")
+        decode(cached)?.let { return it }
+        for (candidate in candidates(url)) {
+            val bytes = get(candidate)?.takeIf { it.isNotEmpty() } ?: continue
+            val bitmap = decode(bytes) ?: continue
+            Files.createDirectories(directories.favicons)
+            Files.write(cached, bytes)
+            return bitmap
+        }
+        logger.info("No icon for {}", host)
+        return null
+    }
+
+    /** Where the site's icon may be: the large icons its page names first (`apple-touch-icon`), then the others, then `/favicon.ico`. */
+    private fun candidates(url: String): List<String> {
+        val base = URI(url)
+        val html = get(url)?.toString(Charsets.UTF_8).orEmpty()
+        val links = LINK.findAll(html).map { it.value }.mapNotNull { tag ->
+            val rel = REL.find(tag)?.groupValues?.get(1)?.lowercase() ?: return@mapNotNull null
+            val href = HREF.find(tag)?.groupValues?.get(1) ?: return@mapNotNull null
+            if ("icon" !in rel) null else rel to runCatching { base.resolve(href.replace("&amp;", "&")).toString() }.getOrNull()
+        }.filter { it.second != null }.toList()
+        val touch = links.filter { "apple-touch-icon" in it.first }.map { it.second!! }
+        val others = links.filter { "apple-touch-icon" !in it.first }.map { it.second!! }
+        return (touch + others + base.resolve("/favicon.ico").toString()).distinct()
+    }
+
+    private fun get(url: String): ByteArray? = try {
+        val request = HttpRequest.newBuilder(URI(url)).timeout(Duration.ofSeconds(10)).header("User-Agent", USER_AGENT).GET().build()
+        client.send(request, HttpResponse.BodyHandlers.ofByteArray()).takeIf { it.statusCode() in 200..299 }?.body()
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun decode(path: Path): ImageBitmap? = if (Files.isRegularFile(path)) runCatching { decode(Files.readAllBytes(path)) }.getOrNull() else null
+
+    /** Decoded by Skia (PNG, ICO, JPEG, WebP, GIF…); SVG is not, and an SVG icon is skipped for the next candidate. */
+    private fun decode(bytes: ByteArray): ImageBitmap? = runCatching { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+
+    private companion object {
+        val LINK = Regex("<link\\b[^>]*>", RegexOption.IGNORE_CASE)
+        val REL = Regex("rel\\s*=\\s*[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+        val HREF = Regex("href\\s*=\\s*[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+        const val USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+    }
+}
+
+/** What a tile draws, decided from a service or from the Add window's draft. */
+sealed interface TileContent {
+    data class Picture(val bitmap: ImageBitmap) : TileContent
+    data class Square(val color: String, val text: String) : TileContent
+    data object Globe : TileContent
+    data object Image : TileContent
+}
+
+/** What the tile of [service] draws: its icon when it is there, else its square (a known service's colors, or a globe for a custom application). */
+@Composable
+fun tileContent(service: Service, icons: ServiceIcons): TileContent = tileContent(service.kind, service.name, service.url, service.icon, icons)
+
+@Composable
+fun tileContent(kind: ServiceKind, name: String, url: String, icon: ServiceIcon, icons: ServiceIcons): TileContent = when (icon) {
+    is ServiceIcon.Square -> TileContent.Square(icon.color, icon.text)
+    is ServiceIcon.Image -> icons.image(icon.file)?.let { TileContent.Picture(it) } ?: TileContent.Image
+    ServiceIcon.Favicon -> icons.favicon(url)?.let { TileContent.Picture(it) }
+        ?: ServiceCatalog.preset(kind)?.let { TileContent.Square(it.color, it.mono) }
+        ?: TileContent.Globe
+}
+
+/** The tile of [service]: its icon on a rounded square of [size]. */
+@Composable
+fun ServiceTile(service: Service, icons: ServiceIcons, size: Dp, modifier: Modifier = Modifier) {
+    Tile(tileContent(service, icons), size, modifier)
+}
+
+/** A rounded square of [size] that draws [content]: the radius and the text grow with it as in the design (40 → 10 dp, 14 sp). */
+@Composable
+fun Tile(content: TileContent, size: Dp, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(size / 4)
+    val base = modifier.size(size).clip(shape)
+    when (content) {
+        is TileContent.Picture -> Image(content.bitmap, contentDescription = null, modifier = base, contentScale = ContentScale.Crop)
+        is TileContent.Square -> Box(base.background(Color(0xFF000000 or SquareColors.rgb(content.color).toLong())), contentAlignment = Alignment.Center) {
+            Text(
+                content.text,
+                color = if (SquareColors.whiteTextOn(content.color)) Color.White else Color(0xFF1E1F22),
+                fontSize = (size.value * 0.35f).sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+        }
+        TileContent.Globe -> Box(base.background(Kash.colors.neutral), contentAlignment = Alignment.Center) {
+            KashIcon(KashIcons.Globe, Kash.colors.text, size = size * 0.55f)
+        }
+        TileContent.Image -> Box(base.background(Kash.colors.neutral), contentAlignment = Alignment.Center) {
+            KashIcon(KashIcons.Picture, Kash.colors.text, size = size * 0.55f)
+        }
+    }
+}

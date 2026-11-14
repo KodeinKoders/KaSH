@@ -1,0 +1,199 @@
+package app.kash
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.kash.core.ConversationKind
+import app.kash.core.Inbox
+import app.kash.core.InboxRow
+import app.kash.core.InboxSort
+import app.kash.core.UnreadCount
+import app.kash.ui.CountPill
+import app.kash.ui.Kash
+import app.kash.ui.KashIcon
+import app.kash.ui.KashIcons
+import app.kash.ui.dashedBorder
+import app.kash.ui.hoverBackground
+import app.kash.ui.strings
+import org.jetbrains.jewel.ui.component.Link
+import org.jetbrains.jewel.ui.component.OutlinedButton
+import org.jetbrains.jewel.ui.component.SegmentedControl
+import org.jetbrains.jewel.ui.component.SegmentedControlButtonData
+import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.TextField
+import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
+
+/**
+ * The Unread tab: every conversation with unread messages of the services that tell them, by count or by service, filtered by name.
+ *
+ * @param rows Every row, before filtering (see [Inbox.rows]).
+ */
+@Composable
+fun InboxScreen(rows: List<InboxRow>, defaultSort: InboxSort, icons: ServiceIcons, onRefresh: () -> Unit, onOpen: (InboxRow) -> Unit) {
+    var sort by remember(defaultSort) { mutableStateOf(defaultSort) }
+    val query = rememberTextFieldState()
+    val filtered = Inbox.filter(rows, query.text.toString())
+    val total = rows.sumOf { it.count }
+    VerticallyScrollableContainer(rememberScrollState(), Modifier.fillMaxSize().background(Kash.colors.background)) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+            Column(
+                Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 40.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(strings.inbox, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                        Text(strings.inboxSummary(total, rows.size), color = Kash.colors.muted)
+                    }
+                    OutlinedButton(onClick = onRefresh) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            KashIcon(KashIcons.Refresh, Kash.colors.text)
+                            Text(strings.refresh)
+                        }
+                    }
+                }
+                if (rows.isEmpty()) {
+                    EmptyInbox()
+                    return@Column
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextField(
+                        state = query,
+                        modifier = Modifier.weight(1f),
+                        placeholder = { Text(strings.filterPlaceholder, color = Kash.colors.faint) },
+                        leadingIcon = { KashIcon(KashIcons.Search, Kash.colors.muted, Modifier.padding(end = 8.dp)) },
+                    )
+                    SegmentedControl(
+                        listOf(
+                            SegmentedControlButtonData(sort == InboxSort.BY_COUNT, { Text(strings.byCount) }, { sort = InboxSort.BY_COUNT }),
+                            SegmentedControlButtonData(sort == InboxSort.BY_SERVICE, { Text(strings.byService) }, { sort = InboxSort.BY_SERVICE }),
+                        ),
+                    )
+                }
+                when {
+                    filtered.isEmpty() -> NoResults(query.text.toString())
+                    sort == InboxSort.BY_COUNT -> RowsCard(Inbox.byCount(filtered)) { row -> InboxRowView(row, icons, withService = true) { onOpen(row) } }
+                    else -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        for (group in Inbox.byService(filtered)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ServiceTile(group.service, icons, 20.dp)
+                                    Text(group.service.title, fontWeight = FontWeight.SemiBold)
+                                    Text(strings.unread(group.count), color = Kash.colors.muted)
+                                    Box(Modifier.weight(1f))
+                                    Link(strings.open(group.service.name), onClick = { onOpen(group.rows.first().copy(conversation = null)) })
+                                }
+                                RowsCard(group.rows) { row -> InboxRowView(row, icons, withService = false) { onOpen(row) } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Rows in a rounded card, separated by a line of 1 dp. */
+@Composable
+private fun RowsCard(rows: List<InboxRow>, row: @Composable (InboxRow) -> Unit) {
+    val shape = RoundedCornerShape(8.dp)
+    Column(
+        Modifier.fillMaxWidth().clip(shape).background(Kash.colors.line).border(1.dp, Kash.colors.line, shape),
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        for (r in rows) row(r)
+    }
+}
+
+/**
+ * A conversation: its service's tile (in the flat list), its name, its context and its service, its count. A row of a custom application is its
+ * total, which says so.
+ */
+@Composable
+private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolean, onClick: () -> Unit) {
+    val context = when (row.kind) {
+        null -> strings.unreadMessages
+        ConversationKind.DIRECT -> strings.directConversation
+        ConversationKind.GROUP -> strings.groupConversation
+        ConversationKind.CHANNEL -> strings.channelConversation
+    }
+    val name = row.name.ifBlank { if (row.kind == ConversationKind.GROUP) strings.unnamedGroup else strings.unnamedConversation }
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = if (withService) 56.dp else 48.dp)
+            .background(Kash.colors.card)
+            .hoverBackground(Kash.colors.rowHover, RoundedCornerShape(0.dp))
+            .clickable(onClick = onClick)
+            // The hand of a link: a click opens the conversation.
+            .pointerHoverIcon(PointerIcon.Hand)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (withService) ServiceTile(row.service, icons, 32.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // The start of the last message, as the service shows it; what the conversation is when there is none.
+            Text(
+                row.preview.ifBlank { if (withService) "$context · ${row.service.title}" else context },
+                fontSize = 12.sp, color = Kash.colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        // When the last message came, over the count, as WhatsApp's list shows it.
+        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            row.time?.let { Text(strings.timeLabel.of(it), fontSize = 11.sp, color = Kash.colors.muted, maxLines = 1) }
+            CountPill(UnreadCount.badge(row.count))
+        }
+        KashIcon(KashIcons.ChevronRight, Kash.colors.faint)
+    }
+}
+
+@Composable
+private fun NoResults(query: String) {
+    Box(
+        Modifier.fillMaxWidth().dashedBorder(Kash.colors.control, 1.dp, 8.dp).padding(vertical = 40.dp, horizontal = 16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(strings.noResults(query.trim()), color = Kash.colors.muted, textAlign = TextAlign.Center)
+    }
+}
+
+/** No conversation to show: not in the design, drawn as its "no results" box. */
+@Composable
+private fun EmptyInbox() {
+    Column(
+        Modifier.fillMaxWidth().dashedBorder(Kash.colors.control, 1.dp, 8.dp).padding(vertical = 40.dp, horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        KashIcon(KashIcons.Inbox, Kash.colors.faint, size = 36.dp)
+        Text(strings.emptyTitle, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(strings.emptyHint, color = Kash.colors.muted, textAlign = TextAlign.Center)
+    }
+}

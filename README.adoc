@@ -1,0 +1,56 @@
+= KaSH
+:toc: macro
+:toclevels: 2
+:idprefix:
+:idseparator: -
+:icons: font
+:source-highlighter: highlight.js
+
+*Your messaging services in one window, each in its own isolated browser.*
+
+KaSH shows the web versions of messaging services in tabs, in the manner of Ferdium.
+Each service runs in a Chromium profile of its own: two services share nothing, not a cookie, not a cache entry, not an IndexedDB database, and each one keeps its data on disk, so it is still logged in at the next launch.
+An unread badge on each tab, and the *Unread* tab, show what waits in every service.
+
+toc::[]
+
+
+== Services
+
+WhatsApp is in the catalog, and any web application can be added as a custom service, by its address.
+A custom service shows its unread count when its page puts it at the start of its title, as `(3) My application` does.
+
+KaSH reads WhatsApp's unread conversations: each one is a row of the *Unread* tab, which opens it in WhatsApp, and they make the badge of its tab.
+As in WhatsApp, the muted and the archived conversations are not counted.
+
+The same service can be added several times, for several accounts: a label under its icon tells them apart.
+
+Each service's "…" menu opens Chrome's DevTools on it, resets its cache, erases all its data (it is then logged out), or deletes it.
+
+
+== Building
+
+KaSH only builds and runs on macOS for now.
+
+JCEF is built from sources, from the `jcef` git submodule: JetBrains publishes the jar of JCEF, but not its native libraries.
+The build needs CMake, Ninja, pkg-config and a recent bison, which Homebrew provides:
+
+[source,bash]
+----
+git submodule update --init --recursive
+brew install cmake ninja pkgconf bison
+./gradlew :app:run
+----
+
+The Xcode command line tools are enough: full Xcode is not needed.
+Gradle downloads Apache Ant and the JetBrains Runtime itself.
+The first build of JCEF downloads CEF and builds the dependencies of JCEF with vcpkg, which takes several minutes.
+
+`./gradlew :app:createDistributable` makes `KaSH.app`, in `app/build/compose/binaries/main/app`.
+The notifications of the macOS Notification Center and the launch at login only work in it.
+
+[IMPORTANT]
+====
+KaSH needs a JetBrains Runtime *without* JCEF.
+A JetBrains Runtime that has its own JCEF (`jbr_jcef`, `jbrsdk_jcef`) would use its classes instead of the ones built with KaSH's native libraries, and KaSH refuses to start on it.
+====

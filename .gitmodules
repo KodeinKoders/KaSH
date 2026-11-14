@@ -1,0 +1,6 @@
+[submodule "jcef"]
+	path = jcef
+	url = https://github.com/JetBrains/jcef.git
+	branch = dev
+	shallow = true
+	ignore = untracked
