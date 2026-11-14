@@ -2,8 +2,16 @@ package app.kash.browser
 
 import java.net.URI
 
-/** Where a link of a service's page opens: in KaSH (the page itself, or a window of KaSH in the service's profile), or in the system's browser. */
-internal enum class LinkTarget { KASH, SYSTEM }
+/**
+ * Where a link of a service's page opens: in KaSH (the page itself, or a window of KaSH in the service's profile), in the system's browser, or
+ * nowhere (an address of another application, which KaSH does not load: the page stays where it is).
+ */
+internal enum class LinkTarget { KASH, SYSTEM, NOWHERE }
+
+// The schemes that a page of KaSH loads: the web's, and those of Chromium's own pages and of what a page makes itself. Any other one is an
+// application's (`slack://`, `zoommtg://`), which Chromium cannot load ("ERR_UNKNOWN_URL_SCHEME" in place of the page): Slack sends there after
+// signing in, to open its desktop application, and its page offers to stay in the browser when it is not.
+private val PAGE_SCHEMES = setOf("http", "https", "about", "data", "blob", "javascript", "chrome", "chrome-error", "devtools")
 
 // The schemes that another application of the system handles: the mail, the phone, the messages.
 private val SYSTEM_SCHEMES = setOf("mailto", "tel", "sms", "facetime", "facetime-audio")
@@ -73,20 +81,27 @@ internal fun isSignIn(target: URI): Boolean {
  */
 internal fun popupTarget(url: String, serviceUrl: String): LinkTarget {
     val target = uri(url)?.let(::unwrapped) ?: return LinkTarget.KASH
-    if (target.scheme?.lowercase() in SYSTEM_SCHEMES) return LinkTarget.SYSTEM
+    val scheme = target.scheme?.lowercase()
+    if (scheme in SYSTEM_SCHEMES) return LinkTarget.SYSTEM
+    if (scheme != null && scheme !in PAGE_SCHEMES) return LinkTarget.NOWHERE
     if (!target.isWeb()) return LinkTarget.KASH
     return if (sameSite(target, uri(serviceUrl)) || isSignIn(target)) LinkTarget.KASH else LinkTarget.SYSTEM
 }
 
 /**
- * Where a navigation of a service's page goes: in the system's browser when the user clicked a link (a gesture, a `GET`, not a redirect) to another
+ * Where a navigation of a service's page goes: nowhere when it is an application's address (see PAGE_SCHEMES); in the system's browser when the
+ * user clicked a link (a gesture, a `GET`, not a redirect) to another
  * site than the service's at [serviceUrl] and than the page's at [pageUrl], which is not a sign-in page; in KaSH otherwise. What the site does
  * itself (its redirects, a form that it posts, as when signing in) stays in KaSH.
  */
 internal fun navigationTarget(url: String, serviceUrl: String, pageUrl: String?, userGesture: Boolean, isRedirect: Boolean, method: String?): LinkTarget {
-    if (!userGesture || isRedirect || !method.equals("GET", ignoreCase = true)) return LinkTarget.KASH
     val target = uri(url)?.let(::unwrapped) ?: return LinkTarget.KASH
-    if (target.scheme?.lowercase() in SYSTEM_SCHEMES) return LinkTarget.SYSTEM
+    val scheme = target.scheme?.lowercase()
+    val clicked = userGesture && !isRedirect
+    // The mail and the phone when the user clicked; an application's address never, even when the site sends there itself.
+    if (scheme in SYSTEM_SCHEMES) return if (clicked) LinkTarget.SYSTEM else LinkTarget.NOWHERE
+    if (scheme != null && scheme !in PAGE_SCHEMES) return LinkTarget.NOWHERE
+    if (!clicked || !method.equals("GET", ignoreCase = true)) return LinkTarget.KASH
     if (!target.isWeb()) return LinkTarget.KASH
     val page = pageUrl?.let(::uri)
     return if (sameSite(target, uri(serviceUrl)) || sameSite(target, page) || isSignIn(target)) LinkTarget.KASH else LinkTarget.SYSTEM

@@ -85,9 +85,12 @@ public class BrowserEngine private constructor(
             // or DevTools opens is theirs.
             override fun onBeforePopup(browser: CefBrowser, frame: CefFrame?, targetUrl: String?, targetFrameName: String?): Boolean {
                 val tab = tabs[browser] ?: return false
-                if (targetUrl == null || popupTarget(targetUrl, tab.initialUrl) == LinkTarget.KASH) return false
-                openInSystem(targetUrl)
-                return true
+                if (targetUrl == null) return false
+                return when (popupTarget(targetUrl, tab.initialUrl)) {
+                    LinkTarget.KASH -> false
+                    LinkTarget.SYSTEM -> true.also { openInSystem(targetUrl) }
+                    LinkTarget.NOWHERE -> true.also { notLoaded(targetUrl) }
+                }
             }
         })
         // A link that the user clicks in a service's page, to another site: it goes to the system's browser, and the page stays (see
@@ -95,11 +98,14 @@ public class BrowserEngine private constructor(
         client.addRequestHandler(object : CefRequestHandlerAdapter() {
             override fun onBeforeBrowse(browser: CefBrowser, frame: CefFrame, request: CefRequest, userGesture: Boolean, isRedirect: Boolean): Boolean {
                 val tab = tabs[browser] ?: return false
-                if (!frame.isMain) return false
                 val target = navigationTarget(request.url, tab.initialUrl, frame.url, userGesture, isRedirect, request.method)
-                if (target == LinkTarget.KASH) return false
-                openInSystem(request.url)
-                return true
+                // A frame of the page only loads what it can: an application's address, which some pages open in a hidden frame, is not.
+                if (!frame.isMain) return (target == LinkTarget.NOWHERE).also { if (it) notLoaded(request.url) }
+                return when (target) {
+                    LinkTarget.KASH -> false
+                    LinkTarget.SYSTEM -> true.also { openInSystem(request.url) }
+                    LinkTarget.NOWHERE -> true.also { notLoaded(request.url) }
+                }
             }
         })
         client.addLoadHandler(object : CefLoadHandlerAdapter() {
@@ -144,6 +150,11 @@ public class BrowserEngine private constructor(
         } else {
             logger.warn("Chromium did not stop in {}", timeout)
         }
+    }
+
+    /** Logs that a page was not sent to [url], an application's address: its scheme only, the rest is the user's (a sign-in's token). */
+    private fun notLoaded(url: String) {
+        logger.info("An address of another application ({}:) was not loaded", url.substringBefore(':').take(32))
     }
 
     /**

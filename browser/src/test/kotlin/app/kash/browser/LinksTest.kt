@@ -53,6 +53,20 @@ class LinksTest {
     }
 
     @Test
+    fun anApplicationsAddressIsNotLoadedEvenWhenTheSiteSendsThere() {
+        val slack = "https://mon-equipe.slack.com/"
+        // Slack sends to its desktop application after signing in, without a click.
+        assertEquals(LinkTarget.NOWHERE, navigationTarget("slack://T0/magic-login/1?id=1", slack, slack, userGesture = false, isRedirect = true, method = "GET"))
+        assertEquals(LinkTarget.NOWHERE, navigationTarget("zoommtg://zoom.us/join?confno=1", slack, slack, userGesture = true, isRedirect = false, method = "GET"))
+        assertEquals(LinkTarget.NOWHERE, popupTarget("slack://open", slack))
+        // The mail and the phone go to the system only when the user clicked.
+        assertEquals(LinkTarget.SYSTEM, navigationTarget("mailto:a@example.com", slack, slack, userGesture = true, isRedirect = false, method = "GET"))
+        assertEquals(LinkTarget.NOWHERE, navigationTarget("mailto:a@example.com", slack, slack, userGesture = false, isRedirect = false, method = "GET"))
+        // What a page makes itself is loaded.
+        assertEquals(LinkTarget.KASH, navigationTarget("about:blank", slack, slack, userGesture = false, isRedirect = false, method = "GET"))
+    }
+
+    @Test
     fun aClickToAnotherSiteInThePageGoesToTheSystem() {
         assertEquals(LinkTarget.SYSTEM, navigationTarget("https://kodein.net/", whatsApp, whatsApp, userGesture = true, isRedirect = false, method = "GET"))
     }
