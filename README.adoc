@@ -29,6 +29,8 @@ The same service can be added several times, for several accounts: a label under
 
 Each service's "…" menu opens Chrome's DevTools on it, resets its cache, erases all its data (it is then logged out), or deletes it.
 
+The window opens again where it was, as big and in the mode it was in (floating, maximized, full screen) when KaSH was closed.
+
 
 == Building
 

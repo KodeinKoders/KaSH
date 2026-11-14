@@ -22,7 +22,7 @@ The automatic updates of the design (Settings › General › Updates) are not d
 | Module | Package | Role |
 | --- | --- | --- |
 | `app` | `app.kash` | The application: the main window (`MainWindow.kt`: title bar, `ServiceRail`, `InboxScreen` or a service's page; the selected service's header, `ServiceTitle` and `ServiceButtons` of `ServiceScreen.kt`, is in the title bar, so that its page has the whole height), `AddServiceWindow` (also Edit), `SettingsWindow`, `ConfirmDialog`, `ToastWindow`. `KashModel` holds the state and the loaded services, `Notifier` the notifications, `ServiceIcons` the favicons and images. `ui/` has the theme (`KashTheme`, `KashColors`: the design's colors), the icons (`KashIcons`: the design's SVGs) and the strings (`Strings`: French and English). |
-| `app-core` | `app.kash.core` | What is kept and decided, with no Compose and no JCEF, unit-tested: `Model.kt` (`Service`, `Settings`, `KashState`, `ProfileId`), `StateFile`, `KashDirectories`, `ServiceCatalog`, `Inbox` (the rows, sorts, filter and badges of the Unread tab), `UnreadCount`, `NotificationPolicy`, `SquareColors`. |
+| `app-core` | `app.kash.core` | What is kept and decided, with no Compose and no JCEF, unit-tested: `Model.kt` (`Service`, `Settings`, `KashState`, `ProfileId`), `StateFile`, `WindowGeometry` (`WindowFile`), `KashDirectories`, `ServiceCatalog`, `Inbox` (the rows, sorts, filter and badges of the Unread tab), `UnreadCount`, `NotificationPolicy`, `SquareColors`. |
 | `browser` | `app.kash.browser` | Chromium behind a small API: `BrowserEngine` (starts and stops CEF, the message router, remote debugging), `BrowserProfile` (one request context on disk), `BrowserTab` (a page, its init scripts, the messages it sends, its `StateFlow`s, its AWT view). |
 | `jcef-native` | (no code) | Builds JCEF from the submodule (`buildJcef`: CMake and Ninja), lays out the native bundle (`jcefBundle`), and exposes `jcef.jar` as its `api`. |
 | `macos` | `app.kash.macos` | What macOS does that Java cannot: the Notification Center and the login item (SMAppService), in `native/kash_macos.m`, compiled into `libkash_macos.dylib` by `buildMacosLibrary` (clang of the Command Line Tools) and called through FFM. Only works in an application bundle (`inAppBundle`). |
@@ -91,6 +91,10 @@ The option is given only to the run task, as a system property (Compose replaces
 `Notifier` applies `NotificationPolicy` (notifications on, Do Not Disturb off, service enabled, not muted, its notifications on), then posts to macOS's Notification Center (`MacosNotifications`) when KaSH runs as KaSH.app, or shows `ToastWindow` (a window at the top right of the screen that never takes the focus) otherwise.
 The Notification Center needs the bundle to be **launched by Launch Services** (`open`, the Finder, the Dock): launched by running its executable from a terminal, macOS answers "Notifications are not allowed for this application" without asking.
 Its log never says what a notification says: that is the user's messages.
+
+## The window
+
+The main window opens where it was, as big and in the mode it was in when KaSH was closed, as KaTTY's does (the same code): `WindowFile` keeps it in `window.json`, apart from `state.json`, since it changes whenever the window moves. `keepWindowGeometry` (`WindowPersistence.kt`) writes it 500 ms after the last change and when KaSH quits. The position and the size kept are the floating window's, also while it is maximized or full screen (what it goes back to); a minimized window changes nothing, and a place that is on no screen any more (`sanitized`) becomes the platform's.
 
 ## Threads
 

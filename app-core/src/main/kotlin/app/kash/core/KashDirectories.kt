@@ -12,6 +12,9 @@ public class KashDirectories(public val support: Path) {
     /** What is saved of the services and the settings. */
     public val stateFile: Path get() = support.resolve("state.json")
 
+    /** Where the main window was, how big and in which mode: apart from [stateFile], since it changes whenever the window moves. */
+    public val windowFile: Path get() = support.resolve("window.json")
+
     /**
      * The root of the browser profiles: Chromium's `root_cache_path`, which also holds what is not a profile's (the components it downloads,
      * the GPU caches), and the lock that keeps a second KaSH from using the same profiles.

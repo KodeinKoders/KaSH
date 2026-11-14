@@ -70,6 +70,8 @@ dependencies {
 
     // Prints the logs of the libraries that log with SLF4J.
     runtimeOnly(libs.slf4j.simple)
+
+    testImplementation(libs.kotlin.test.junit)
 }
 
 // The icon of the application is the logo of the repository on a rounded square of this colour, the shape that macOS wants: since macOS 26 it puts

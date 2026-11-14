@@ -7,8 +7,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -19,6 +17,8 @@ import app.kash.core.KashDirectories
 import app.kash.core.ServiceKind
 import app.kash.core.StateFile
 import app.kash.core.ThemeMode
+import app.kash.core.WindowFile
+import app.kash.core.WindowGeometry
 import app.kash.core.deleteClosedProfiles
 import app.kash.macos.inAppBundle
 import app.kash.ui.KashTheme
@@ -80,9 +80,12 @@ fun main() {
             ServiceKind.CUSTOM -> listOf(shim)
         }
     }
+    // The main window opens where it was, as big and in the mode it was in when KaSH was closed, on a screen that is still there.
+    val windowFile = WindowFile(directories.windowFile)
+    val geometry = windowFile.load().sanitized(screens())
     application {
         val model = remember { KashModel(state, file, directories, engine, scriptsFor, initialColorScheme(state.settings.theme)) }
-        Kash(engine, model, ServiceIcons(directories).let { remember { it } })
+        Kash(engine, model, ServiceIcons(directories).let { remember { it } }, windowFile, geometry)
     }
 }
 
@@ -141,7 +144,10 @@ private fun jcefBundle(): Path {
 }
 
 @Composable
-private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons: ServiceIcons) {
+private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons: ServiceIcons, windowFile: WindowFile, geometry: WindowGeometry) {
+    val windowState = rememberWindowState(placement = geometry.mode.toPlacement(), position = geometry.toPosition(), size = geometry.toSize())
+    // Where the window is, how big and in which mode is kept as it changes, and a last time when KaSH quits.
+    val flushWindow = keepWindowGeometry(windowState, windowFile, geometry)
     val scope = rememberCoroutineScope()
     val notifier = remember { Notifier(model) }
     // Once, whichever asks first: the window's close button, or the system's Quit (⌘Q, the Dock, logging out).
@@ -150,6 +156,7 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
         if (!quitting[0]) {
             quitting[0] = true
             model.save()
+            flushWindow()
             scope.launch {
                 // Chromium writes what the profiles still hold, then stops: off Swing's thread, which JCEF finishes the shutdown on.
                 withContext(Dispatchers.IO) { engine.shutdown() }
@@ -194,7 +201,7 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                 onCloseRequest = quit,
                 title = "KaSH",
                 icon = remember { AppIcon.painter() },
-                state = rememberWindowState(size = DpSize(1360.dp, 860.dp)),
+                state = windowState,
             ) {
                 DisposableEffect(window) {
                     model.activateWindow = {
