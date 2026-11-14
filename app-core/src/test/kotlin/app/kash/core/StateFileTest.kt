@@ -32,6 +32,27 @@ class StateFileTest {
     }
 
     @Test
+    fun theSortOfTheUnreadTabIsKept() {
+        val file = StateFile(directory.resolve("state.json"))
+
+        file.save(KashState(settings = Settings(inboxSort = InboxSort.BY_SERVICE)))
+
+        assertEquals(InboxSort.BY_SERVICE, file.load().settings.inboxSort)
+    }
+
+    @Test
+    fun theSortByCountThatEarlierVersionsSavedAsTheirDefaultIsNotReadAndTheTabIsByDate() {
+        val path = directory.resolve("state.json")
+        path.writeText("""{"services": [], "settings": {"inboxSort": "BY_COUNT", "showLabels": false}}""")
+
+        val settings = StateFile(path).load().settings
+
+        assertEquals(InboxSort.BY_DATE, settings.inboxSort)
+        // The other settings are still read.
+        assertFalse(settings.showLabels)
+    }
+
+    @Test
     fun noFileIsAnEmptyState() {
         assertEquals(KashState(), StateFile(directory.resolve("none.json")).load())
     }

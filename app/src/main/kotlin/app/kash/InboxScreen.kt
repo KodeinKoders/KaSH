@@ -54,10 +54,10 @@ import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
  * The Unread tab: every conversation with unread messages of the services that tell them, by count or by service, filtered by name.
  *
  * @param rows Every row, before filtering (see [Inbox.rows]).
+ * @param sort How the rows are sorted, which [onSort] changes: kept in the settings, so that it is the same at the next launch.
  */
 @Composable
-fun InboxScreen(rows: List<InboxRow>, defaultSort: InboxSort, icons: ServiceIcons, onRefresh: () -> Unit, onOpen: (InboxRow) -> Unit) {
-    var sort by remember(defaultSort) { mutableStateOf(defaultSort) }
+fun InboxScreen(rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Unit, icons: ServiceIcons, onRefresh: () -> Unit, onOpen: (InboxRow) -> Unit) {
     val query = rememberTextFieldState()
     val filtered = Inbox.filter(rows, query.text.toString())
     val total = rows.sumOf { it.count }
@@ -92,9 +92,9 @@ fun InboxScreen(rows: List<InboxRow>, defaultSort: InboxSort, icons: ServiceIcon
                     )
                     SegmentedControl(
                         listOf(
-                            SegmentedControlButtonData(sort == InboxSort.BY_DATE, { Text(strings.byDate) }, { sort = InboxSort.BY_DATE }),
-                            SegmentedControlButtonData(sort == InboxSort.BY_COUNT, { Text(strings.byCount) }, { sort = InboxSort.BY_COUNT }),
-                            SegmentedControlButtonData(sort == InboxSort.BY_SERVICE, { Text(strings.byService) }, { sort = InboxSort.BY_SERVICE }),
+                            SegmentedControlButtonData(sort == InboxSort.BY_DATE, { Text(strings.byDate) }, { onSort(InboxSort.BY_DATE) }),
+                            SegmentedControlButtonData(sort == InboxSort.BY_COUNT, { Text(strings.byCount) }, { onSort(InboxSort.BY_COUNT) }),
+                            SegmentedControlButtonData(sort == InboxSort.BY_SERVICE, { Text(strings.byService) }, { onSort(InboxSort.BY_SERVICE) }),
                         ),
                     )
                 }

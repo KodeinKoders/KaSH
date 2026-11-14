@@ -96,7 +96,7 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
     val content: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize().background(Kash.colors.background)) {
             if (selected == null) {
-                InboxScreen(rows, settings.inboxSort, icons, onRefresh = { /* the counts are read as they change */ }, onOpen = { row -> model.openConversation(row.service, row.conversation) })
+                InboxScreen(rows, settings.inboxSort, { sort -> model.updateSettings { it.copy(inboxSort = sort) } }, icons, onRefresh = { /* the counts are read as they change */ }, onOpen = { row -> model.openConversation(row.service, row.conversation) })
             } else {
                 key(selected.id) { ServicePage(selectedTab) }
             }

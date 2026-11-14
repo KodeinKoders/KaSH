@@ -134,6 +134,9 @@ public data class Settings(
     val notifications: Boolean = true,
     val sound: Boolean = true,
     val dockBadge: DockBadge = DockBadge.TOTAL,
+    // The sort of the Unread tab, as the user last chose it. Named `unreadSort` in the file: the KaSH before it wrote its default under `inboxSort`,
+    // by count, which is not read any more, so that every one is by date once.
+    @SerialName("unreadSort")
     val inboxSort: InboxSort = InboxSort.BY_DATE,
     val openInboxOnLaunch: Boolean = true,
     val skipMuted: Boolean = true,
