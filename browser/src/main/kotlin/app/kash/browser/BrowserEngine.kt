@@ -70,6 +70,7 @@ public class BrowserEngine private constructor(
             }
         })
         client.addMessageRouter(router)
+        client.addKeyboardHandler(EditShortcuts)
         client.addLifeSpanHandler(object : CefLifeSpanHandlerAdapter() {
             override fun onAfterCreated(browser: CefBrowser) {
                 tabs[browser]?.created()

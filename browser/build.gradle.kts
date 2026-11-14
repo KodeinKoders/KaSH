@@ -15,4 +15,6 @@ dependencies {
     api(libs.kotlinx.coroutines)
 
     implementation(libs.slf4j.api)
+
+    testImplementation(libs.kotlin.test.junit)
 }
