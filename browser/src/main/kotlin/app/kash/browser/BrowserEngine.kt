@@ -14,13 +14,18 @@ import org.cef.handler.CefDisplayHandlerAdapter
 import org.cef.handler.CefLifeSpanHandlerAdapter
 import org.cef.handler.CefLoadHandlerAdapter
 import org.cef.handler.CefMessageRouterHandlerAdapter
+import org.cef.handler.CefRequestHandlerAdapter
+import org.cef.network.CefRequest
 import org.slf4j.LoggerFactory
+import java.awt.Desktop
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -75,14 +80,35 @@ public class BrowserEngine private constructor(
             override fun onAfterCreated(browser: CefBrowser) {
                 tabs[browser]?.created()
             }
+
+            // A window that a service's page opens: a link to another site goes to the system's browser (see popupTarget). A window that a popup
+            // or DevTools opens is theirs.
+            override fun onBeforePopup(browser: CefBrowser, frame: CefFrame?, targetUrl: String?, targetFrameName: String?): Boolean {
+                val tab = tabs[browser] ?: return false
+                if (targetUrl == null || popupTarget(targetUrl, tab.initialUrl) == LinkTarget.KASH) return false
+                openInSystem(targetUrl)
+                return true
+            }
+        })
+        // A link that the user clicks in a service's page, to another site: it goes to the system's browser, and the page stays (see
+        // navigationTarget).
+        client.addRequestHandler(object : CefRequestHandlerAdapter() {
+            override fun onBeforeBrowse(browser: CefBrowser, frame: CefFrame, request: CefRequest, userGesture: Boolean, isRedirect: Boolean): Boolean {
+                val tab = tabs[browser] ?: return false
+                if (!frame.isMain) return false
+                val target = navigationTarget(request.url, tab.initialUrl, frame.url, userGesture, isRedirect, request.method)
+                if (target == LinkTarget.KASH) return false
+                openInSystem(request.url)
+                return true
+            }
         })
         client.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadingStateChange(browser: CefBrowser, isLoading: Boolean, canGoBack: Boolean, canGoForward: Boolean) {
                 tabs[browser]?.loadingStateChanged(isLoading, canGoBack, canGoForward)
             }
         })
-        // Popups are not handled: Chromium opens them in a window of their own, in the request context of the page that opened them, so in the same
-        // environment, and with `window.opener`, which sign-in popups need.
+        // The popups that stay in KaSH (the service's site, sign-in pages) are Chromium's windows, in the request context of the page that opened
+        // them, so in the same profile, and with `window.opener`, which sign-in popups need.
     }
 
     /**
@@ -117,6 +143,20 @@ public class BrowserEngine private constructor(
             logger.info("Chromium stopped after {} ms", elapsed())
         } else {
             logger.warn("Chromium did not stop in {}", timeout)
+        }
+    }
+
+    /**
+     * Opens [url] in the system's browser (or the application of its scheme: the mail, the phone), off Chromium's thread: the system can take its
+     * time. The address is not logged: it is the user's.
+     */
+    private fun openInSystem(url: String) {
+        val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return logger.warn("A link that is not an address was not opened")
+        thread(isDaemon = true, name = "KaSH-open-link") {
+            runCatching {
+                check(Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) { "The system cannot open links" }
+                Desktop.getDesktop().browse(uri)
+            }.onFailure { logger.warn("A {} link could not be opened in the system", uri.scheme, it) }
         }
     }
 

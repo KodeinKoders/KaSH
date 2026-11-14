@@ -19,7 +19,7 @@ public enum class ColorScheme { LIGHT, DARK }
 /** A page of a [BrowserProfile], shown by its [component]. */
 public class BrowserTab internal constructor(
     internal val browser: CefBrowser,
-    private val initialUrl: String,
+    internal val initialUrl: String,
     private val initScripts: List<String>,
     private val onClose: (BrowserTab) -> Unit,
 ) {

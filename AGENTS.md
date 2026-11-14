@@ -117,7 +117,7 @@ A service's page is Chromium's native view (`CefRendering.DEFAULT`) in a `SwingP
 - A confirmation is a dialog window (`ConfirmDialog`), never something drawn over the page.
 
 Every enabled service is loaded at launch (`KashModel`), hidden, so that it notifies before it is first shown: its view is created by `CefBrowser.createImmediately()` and moved into the `SwingPanel` of whichever screen shows it.
-Popups that a page opens (`window.open`) are native windows of Chromium, in the same profile. DevTools open in a window of their own (the "…" menu).
+**Links open in the system's browser** (`Links.kt`, the user's choice): a window that a service's page opens (`target=_blank`, `window.open`; `onBeforePopup`) to another site than the service's goes to the system's browser (`Desktop.browse`), and so does a click in the page to another site than the service's and the page's (`onBeforeBrowse`: a gesture, a `GET`, not a redirect). What stays in KaSH: the service's site (`siteOf`: the last two labels of the host, three under `co.uk` and the like, with no public suffix list), the sign-in pages of Google, Microsoft, Apple, Facebook and GitHub (a popup that signs in reports to its opener, in the service's profile), what the site does itself (redirects, forms that it posts), and what is not an address of the web (`about:blank`, `blob:`). `mailto:` and `tel:` go to the system. Google's redirector (`google.*/url?q=`) is followed to where it leads. The addresses are not logged. The popups that stay are native windows of Chromium, in the same profile. DevTools open in a window of their own (the "…" menu).
 
 ## Checking persistence
 
