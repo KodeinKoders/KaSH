@@ -320,7 +320,7 @@ private fun InboxPage(draft: Settings, onChange: (Settings) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(strings.display)
         LabeledRow(strings.defaultSort) {
-            Segments(listOf(InboxSort.BY_COUNT to strings.byCount, InboxSort.BY_SERVICE to strings.byService), draft.inboxSort) {
+            Segments(listOf(InboxSort.BY_DATE to strings.byDate, InboxSort.BY_COUNT to strings.byCount, InboxSort.BY_SERVICE to strings.byService), draft.inboxSort) {
                 onChange(draft.copy(inboxSort = it))
             }
         }

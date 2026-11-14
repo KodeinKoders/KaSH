@@ -19,6 +19,7 @@ interface Strings {
     val refresh: String
     val filterPlaceholder: String
     val filterLabel: String
+    val byDate: String
     val byCount: String
     val byService: String
     fun open(name: String): String
@@ -153,6 +154,7 @@ object French : Strings {
     override val refresh = "Actualiser"
     override val filterPlaceholder = "Filtrer par nom ou par service"
     override val filterLabel = "Filtrer les conversations"
+    override val byDate = "Par date"
     override val byCount = "Par nombre"
     override val byService = "Par service"
     override fun open(name: String) = "Ouvrir $name"
@@ -287,6 +289,7 @@ object English : Strings {
     override val refresh = "Refresh"
     override val filterPlaceholder = "Filter by name or service"
     override val filterLabel = "Filter the conversations"
+    override val byDate = "By date"
     override val byCount = "By count"
     override val byService = "By service"
     override fun open(name: String) = "Open $name"

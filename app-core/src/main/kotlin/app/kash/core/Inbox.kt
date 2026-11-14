@@ -60,6 +60,13 @@ public object Inbox {
         }
     }
 
+    /**
+     * The rows by the time of their last message, the most recent first. The rows without one (the total of a custom application, a service that
+     * does not tell) come after, by number of unread messages.
+     */
+    public fun byDate(rows: List<InboxRow>): List<InboxRow> =
+        rows.sortedWith(compareBy<InboxRow> { it.time == null }.thenByDescending { it.time ?: 0L }.thenByDescending { it.count })
+
     /** The rows by number of unread messages, the most first; rows of the same number keep their order. */
     public fun byCount(rows: List<InboxRow>): List<InboxRow> = rows.sortedByDescending { it.count }
 

@@ -113,7 +113,7 @@ public enum class DockBadge { TOTAL, DOT, NONE }
 
 /** How the Unread tab lists the conversations. */
 @Serializable
-public enum class InboxSort { BY_COUNT, BY_SERVICE }
+public enum class InboxSort { BY_DATE, BY_COUNT, BY_SERVICE }
 
 /**
  * The settings of the application.
@@ -134,7 +134,7 @@ public data class Settings(
     val notifications: Boolean = true,
     val sound: Boolean = true,
     val dockBadge: DockBadge = DockBadge.TOTAL,
-    val inboxSort: InboxSort = InboxSort.BY_COUNT,
+    val inboxSort: InboxSort = InboxSort.BY_DATE,
     val openInboxOnLaunch: Boolean = true,
     val skipMuted: Boolean = true,
     val directOnly: Boolean = false,

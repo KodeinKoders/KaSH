@@ -34,6 +34,30 @@ class InboxTest {
     }
 
     @Test
+    fun byDateIsTheMostRecentFirstThenWhatHasNoDateByCount() {
+        val dated = mapOf(
+            whatsApp.id to ServiceUnread(
+                conversations = listOf(
+                    Conversation("1", "Laila", ConversationKind.DIRECT, 3, time = 1_000L),
+                    Conversation("2", "Escalade", ConversationKind.GROUP, 7, time = 3_000L),
+                    Conversation("5", "Sans date", ConversationKind.DIRECT, 2),
+                ),
+            ),
+            discord.id to ServiceUnread(conversations = listOf(Conversation("3", "Le Cerf Ludique", ConversationKind.GROUP, 12, mention = true, time = 2_000L))),
+            custom.id to ServiceUnread(total = 5),
+        )
+
+        val rows = Inbox.byDate(Inbox.rows(listOf(whatsApp, discord, custom), dated, settings))
+
+        assertEquals(listOf("Escalade", "Le Cerf Ludique", "Laila", "Mon app", "Sans date"), rows.map { it.name })
+    }
+
+    @Test
+    fun theUnreadTabIsByDateByDefault() {
+        assertEquals(InboxSort.BY_DATE, Settings().inboxSort)
+    }
+
+    @Test
     fun byCountIsTheMostFirst() {
         val rows = Inbox.byCount(Inbox.rows(listOf(whatsApp, discord, custom), unread, settings))
         assertEquals(listOf(12, 7, 5, 3), rows.map { it.count })

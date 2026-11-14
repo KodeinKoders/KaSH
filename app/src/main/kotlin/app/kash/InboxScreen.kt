@@ -92,6 +92,7 @@ fun InboxScreen(rows: List<InboxRow>, defaultSort: InboxSort, icons: ServiceIcon
                     )
                     SegmentedControl(
                         listOf(
+                            SegmentedControlButtonData(sort == InboxSort.BY_DATE, { Text(strings.byDate) }, { sort = InboxSort.BY_DATE }),
                             SegmentedControlButtonData(sort == InboxSort.BY_COUNT, { Text(strings.byCount) }, { sort = InboxSort.BY_COUNT }),
                             SegmentedControlButtonData(sort == InboxSort.BY_SERVICE, { Text(strings.byService) }, { sort = InboxSort.BY_SERVICE }),
                         ),
@@ -99,6 +100,7 @@ fun InboxScreen(rows: List<InboxRow>, defaultSort: InboxSort, icons: ServiceIcon
                 }
                 when {
                     filtered.isEmpty() -> NoResults(query.text.toString())
+                    sort == InboxSort.BY_DATE -> RowsCard(Inbox.byDate(filtered)) { row -> InboxRowView(row, icons, withService = true) { onOpen(row) } }
                     sort == InboxSort.BY_COUNT -> RowsCard(Inbox.byCount(filtered)) { row -> InboxRowView(row, icons, withService = true) { onOpen(row) } }
                     else -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                         for (group in Inbox.byService(filtered)) {
