@@ -75,6 +75,9 @@ interface Strings {
     val url: String
     val urlPlaceholder: String
     val urlInvalid: String
+    val workspace: String
+    val workspacePlaceholder: String
+    val workspaceInvalid: String
     val nameRequired: String
     val labelOptional: String
     val labelPlaceholder: String
@@ -208,6 +211,9 @@ object French : Strings {
     override val url = "URL"
     override val urlPlaceholder = "https://exemple.com/app"
     override val urlInvalid = "Une adresse http:// ou https://"
+    override val workspace = "Espace de travail"
+    override val workspacePlaceholder = "mon-equipe"
+    override val workspaceInvalid = "Des lettres, des chiffres et des tirets"
     override val nameRequired = "Un nom est nécessaire"
     override val labelOptional = "Label sous l'icône (optionnel)"
     override val labelPlaceholder = "Perso, Travail…"
@@ -343,6 +349,9 @@ object English : Strings {
     override val url = "URL"
     override val urlPlaceholder = "https://example.com/app"
     override val urlInvalid = "An http:// or https:// address"
+    override val workspace = "Workspace"
+    override val workspacePlaceholder = "my-team"
+    override val workspaceInvalid = "Letters, digits and hyphens"
     override val nameRequired = "A name is needed"
     override val labelOptional = "Label under the icon (optional)"
     override val labelPlaceholder = "Personal, Work…"

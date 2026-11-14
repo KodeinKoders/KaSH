@@ -78,11 +78,13 @@ fun main() {
     val shim = resource("notification-shim.js")
     val whatsApp = resource("services/whatsapp.js")
     val googleChat = resource("services/google-chat.js")
+    val slack = resource("services/slack.js")
     // Every page gets the notifications; a known service also gets what reads its unread conversations.
     val scriptsFor = { kind: ServiceKind ->
         when (kind) {
             ServiceKind.WHATSAPP -> listOf(shim, whatsApp)
             ServiceKind.GOOGLE_CHAT -> listOf(shim, googleChat)
+            ServiceKind.SLACK -> listOf(shim, slack)
             ServiceKind.CUSTOM -> listOf(shim)
         }
     }

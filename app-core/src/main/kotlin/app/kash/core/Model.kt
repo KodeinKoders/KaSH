@@ -42,6 +42,7 @@ public value class ServiceId(public val value: String) {
 public enum class ServiceKind {
     WHATSAPP,
     GOOGLE_CHAT,
+    SLACK,
     CUSTOM,
 }
 

@@ -123,7 +123,7 @@ class KashModel(
         get() = services.associate { service ->
             service.id to when (service.kind) {
                 ServiceKind.CUSTOM -> ServiceUnread(total = titles[service.id]?.let(UnreadCount::fromTitle))
-                ServiceKind.WHATSAPP, ServiceKind.GOOGLE_CHAT -> ServiceUnread(conversations = conversations[service.id].orEmpty())
+                ServiceKind.WHATSAPP, ServiceKind.GOOGLE_CHAT, ServiceKind.SLACK -> ServiceUnread(conversations = conversations[service.id].orEmpty())
             }
         }
 

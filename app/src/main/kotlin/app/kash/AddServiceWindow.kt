@@ -85,6 +85,7 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     val name = rememberTextFieldState(if (editing?.kind == ServiceKind.CUSTOM) editing.name else "")
     val url = rememberTextFieldState(if (editing?.kind == ServiceKind.CUSTOM) editing.url else "")
     val label = rememberTextFieldState(editing?.label.orEmpty())
+    val workspace = rememberTextFieldState(editing?.takeIf { it.kind == ServiceKind.SLACK }?.url?.let(ServiceCatalog::slackWorkspaceOf).orEmpty())
     var showBadge by remember { mutableStateOf(editing?.showBadge ?: true) }
     var includeInInbox by remember { mutableStateOf(editing?.includeInInbox ?: true) }
     var notifications by remember { mutableStateOf(editing?.desktopNotifications ?: true) }
@@ -108,7 +109,9 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     val customName = name.text.toString().trim()
     val customUrl = url.text.toString().trim()
     val urlValid = runCatching { URI(customUrl) }.getOrNull()?.let { (it.scheme == "https" || it.scheme == "http") && !it.host.isNullOrBlank() } ?: false
-    val valid = (kind != ServiceKind.CUSTOM || (customName.isNotEmpty() && urlValid)) &&
+    // A Slack service is one workspace: the design's required field.
+    val slackWorkspace = ServiceCatalog.slackWorkspace(workspace.text.toString())
+    val valid = (kind != ServiceKind.CUSTOM || (customName.isNotEmpty() && urlValid)) && (kind != ServiceKind.SLACK || slackWorkspace != null) &&
         (iconMode != IconMode.IMAGE || imageFile != null) && !(iconMode == IconMode.SQUARE && hexInvalid)
 
     val draftIcon = when (iconMode) {
@@ -153,6 +156,13 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                 } else if (preset != null) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(strings.configOf(preset.name), fontWeight = FontWeight.SemiBold)
+                        if (kind == ServiceKind.SLACK) {
+                            LabeledField(
+                                strings.workspace, workspace, strings.workspacePlaceholder, Modifier.widthIn(max = 480.dp), monospace = true,
+                                error = strings.workspaceInvalid.takeIf { workspace.text.isNotBlank() && slackWorkspace == null },
+                                prefix = "https://", suffix = ".slack.com",
+                            )
+                        }
                         Column(Modifier.widthIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             LabeledField(strings.labelOptional, label, strings.labelPlaceholder, Modifier.fillMaxWidth())
                             Hint(strings.labelHint)
@@ -192,7 +202,11 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(3.dp),
                             ) {
-                                val previewUrl = if (kind == ServiceKind.CUSTOM) customUrl.takeIf { urlValid }.orEmpty() else preset?.url.orEmpty()
+                                val previewUrl = when (kind) {
+                                    ServiceKind.CUSTOM -> customUrl.takeIf { urlValid }.orEmpty()
+                                    ServiceKind.SLACK -> slackWorkspace?.let(ServiceCatalog::slackUrl) ?: preset?.url.orEmpty()
+                                    else -> preset?.url.orEmpty()
+                                }
                                 Tile(tileContent(kind, customName, previewUrl, draftIcon, icons), 40.dp)
                                 val previewLabel = label.text.toString().trim()
                                 if (previewLabel.isNotEmpty()) {
@@ -212,7 +226,11 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                 onClick = {
                     val service = (editing ?: Service(ServiceId.random(), kind, "", "", profile = ProfileId.random())).copy(
                         name = if (kind == ServiceKind.CUSTOM) customName else preset!!.name,
-                        url = if (kind == ServiceKind.CUSTOM) customUrl else preset!!.url,
+                        url = when (kind) {
+                            ServiceKind.CUSTOM -> customUrl
+                            ServiceKind.SLACK -> ServiceCatalog.slackUrl(slackWorkspace!!)
+                            else -> preset!!.url
+                        },
                         label = label.text.toString().trim(),
                         showBadge = showBadge,
                         includeInInbox = includeInInbox,
@@ -259,6 +277,8 @@ private fun LabeledField(
     modifier: Modifier,
     monospace: Boolean = false,
     error: String? = null,
+    prefix: String? = null,
+    suffix: String? = null,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         FieldLabel(label)
@@ -268,6 +288,9 @@ private fun LabeledField(
             placeholder = { Text(placeholder, color = Kash.colors.faint, fontFamily = if (monospace) FontFamily.Monospace else null) },
             textStyle = if (monospace) org.jetbrains.jewel.foundation.theme.JewelTheme.defaultTextStyle.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp)
             else org.jetbrains.jewel.foundation.theme.JewelTheme.defaultTextStyle,
+            // What the address has around what is typed (`https://` and `.slack.com` around a workspace), as the design shows it.
+            leadingIcon = prefix?.let { { Affix(it, Modifier.padding(end = 2.dp)) } },
+            trailingIcon = suffix?.let { { Affix(it, Modifier.padding(start = 2.dp)) } },
         )
         if (error != null) Text(error, fontSize = 12.sp, color = Kash.colors.error)
     }
@@ -333,4 +356,9 @@ private fun chooseImage(icons: ServiceIcons): String? {
     dialog.isVisible = true
     val file = dialog.file ?: return null
     return icons.import(Paths.get(dialog.directory, file))
+}
+
+@Composable
+private fun Affix(text: String, modifier: Modifier) {
+    Text(text, modifier, fontFamily = FontFamily.Monospace, fontSize = 12.sp, color = Kash.colors.muted)
 }
