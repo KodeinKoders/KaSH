@@ -105,12 +105,14 @@ public class BrowserEngine private constructor(
         // Each step is logged with how long it took: KaSH sometimes could not be quit, and this tells which step it was stuck in.
         val start = System.nanoTime()
         val elapsed = { (System.nanoTime() - start) / 1_000_000 }
+        // Each step goes on when the one before fails: Chromium is stopped whatever happened to a profile.
+        val step = { name: String, action: () -> Unit -> runCatching(action).onFailure { logger.error("{} failed", name, it) } }
         logger.info("Closing {} profiles", profiles.size)
-        profiles.forEach { it.close() }
+        profiles.toList().forEach { profile -> step("Closing ${profile.directory.fileName}") { profile.close() } }
         logger.info("Profiles closed after {} ms, stopping Chromium", elapsed())
-        router.dispose()
-        client.dispose()
-        app.dispose()
+        step("Disposing the message router") { router.dispose() }
+        step("Disposing the client") { client.dispose() }
+        step("Stopping Chromium") { app.dispose() }
         if (terminated.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)) {
             logger.info("Chromium stopped after {} ms", elapsed())
         } else {

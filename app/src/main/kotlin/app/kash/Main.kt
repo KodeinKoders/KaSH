@@ -164,14 +164,19 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
             logger.info("Quitting")
             // A quit that does not end is stopped, rather than leave KaSH that can only be forced to quit by the system.
             haltIfNotQuitIn(QUIT_TIMEOUT, hangs)
-            model.save()
-            flushWindow()
+            // Each step goes on when the one before fails: one that threw left KaSH idle and unable to quit, every next Quit being ignored.
+            runCatching { model.save() }.onFailure { logger.error("The state could not be saved", it) }
+            runCatching { flushWindow() }.onFailure { logger.error("The window could not be saved", it) }
             scope.launch {
-                // Chromium writes what the profiles still hold, then stops: off Swing's thread, which JCEF finishes the shutdown on.
-                withContext(Dispatchers.IO) { engine.shutdown() }
-                model.close()
+                try {
+                    // Chromium writes what the profiles still hold, then stops: off Swing's thread, which JCEF finishes the shutdown on.
+                    withContext(Dispatchers.IO) { engine.shutdown() }
+                } catch (e: Throwable) {
+                    logger.error("Chromium could not be stopped", e)
+                }
+                runCatching { model.close() }.onFailure { logger.error("The model could not be closed", it) }
+                logger.info("Closing the windows")
                 exitApplication()
-                logger.info("Chromium stopped, closing the windows")
             }
         }
     }

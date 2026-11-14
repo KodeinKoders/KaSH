@@ -223,7 +223,26 @@ tasks.withType<JavaExec>().matching { it.name == "run" }.configureEach {
     )
     // Compose sets the executable to its `javaHome`'s `java` after this: it is set again when the task runs, to the launcher's.
     val executable = contents.get().file("MacOS/KaSH").asFile.absolutePath
-    doFirst { (this as JavaExec).setExecutable(executable) }
+    // KaSH runs from a copy of the project's own jars, made when it starts: a build while it runs rewrites the jars of `build/libs` in place, and
+    // the classes that KaSH had not loaded yet (those of quitting) were read from the new ones, which threw, and KaSH could not be quit any more.
+    // The libraries of Gradle's cache do not change.
+    val projectRoot = rootDir
+    val snapshots = layout.buildDirectory.dir("dev/classpath").get().asFile
+    val snapshotClasspath = objects.fileCollection()
+    doFirst {
+        val run = this as JavaExec
+        run.setExecutable(executable)
+        // The copies of the launches before: a KaSH that still runs keeps its jars open, which deleting their files does not take from it.
+        snapshots.listFiles()?.forEach { it.deleteRecursively() }
+        val snapshot = File(snapshots, System.currentTimeMillis().toString()).apply { mkdirs() }
+        val copied = run.classpath.files.mapIndexed { index, file ->
+            if (!file.startsWith(projectRoot) || !file.exists()) return@mapIndexed file
+            // Numbered: two jars of the classpath may have the same name.
+            File(snapshot, "$index-${file.name}").also { file.copyRecursively(it) }
+        }
+        snapshotClasspath.setFrom(copied)
+        run.classpath = snapshotClasspath
+    }
 }
 
 // Compose's task that copies the resources reads the directory, not the task that fills it.
