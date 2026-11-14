@@ -101,6 +101,11 @@ The main window opens where it was, as big and in the mode it was in when KaSH w
 - JCEF initializes and finishes its shutdown **on Swing's thread**. `BrowserEngine.start` (in `main`, before Compose starts) and `BrowserEngine.shutdown` (from `Dispatchers.IO` when quitting) wait for it, so they must never run on Swing's thread.
 - Closing a profile waits for its cookies to be written: `KashModel` does it on `Dispatchers.IO`.
 - Quitting (the close button, ⌘Q, the Dock) goes through `Kash`'s `quit`: it saves the state, closes each profile, stops Chromium, then exits. The system's Quit is intercepted for that: ending the process without it can lose the last writes of the profiles.
+- **KaSH sometimes could not be quit** (⌘Q did nothing, nor the menu's Quit, nor IntelliJ's stop button; only the system's Force Quit), and it could not be made to happen again. The cause is not known yet. `Hangs.kt` is there to find it:
+  - `watchEventThread` writes what the threads do (whole Java stacks, locks) to `<support>/hangs/<time>-event-thread-stuck.txt` when Swing's thread has not answered for 10 s: the system's Quit goes through it, so a stuck Swing thread makes ⌘Q do nothing.
+  - `haltIfNotQuitIn` stops the process 60 s after the quit started, with `<time>-quit-stuck.txt` (the state and the window are saved before). `BrowserEngine.shutdown` logs each step with how long it took.
+  - When it happens, read those files and the log. While KaSH is stuck, `jcmd <pid> Thread.print` gives the Java stacks and `sample <pid> 3` the native ones (the main thread of AppKit, which Java does not show).
+
 - The handlers of `BrowserEngine` and the callbacks of `libkash_macos` run on threads of their own: they only set `StateFlow`s or post to Swing's thread.
 
 ## The page view

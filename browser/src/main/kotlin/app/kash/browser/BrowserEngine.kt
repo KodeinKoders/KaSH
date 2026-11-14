@@ -101,11 +101,20 @@ public class BrowserEngine private constructor(
      */
     public fun shutdown(timeout: Duration = 20.seconds) {
         check(!javax.swing.SwingUtilities.isEventDispatchThread()) { "BrowserEngine.shutdown() waits for the Swing thread: call it from another one" }
+        // Each step is logged with how long it took: KaSH sometimes could not be quit, and this tells which step it was stuck in.
+        val start = System.nanoTime()
+        val elapsed = { (System.nanoTime() - start) / 1_000_000 }
+        logger.info("Closing {} profiles", profiles.size)
         profiles.forEach { it.close() }
+        logger.info("Profiles closed after {} ms, stopping Chromium", elapsed())
         router.dispose()
         client.dispose()
         app.dispose()
-        if (!terminated.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)) logger.warn("Chromium did not stop in {}", timeout)
+        if (terminated.await(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)) {
+            logger.info("Chromium stopped after {} ms", elapsed())
+        } else {
+            logger.warn("Chromium did not stop in {}", timeout)
+        }
     }
 
     public companion object {

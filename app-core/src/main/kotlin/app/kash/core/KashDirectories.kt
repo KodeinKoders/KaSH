@@ -15,6 +15,9 @@ public class KashDirectories(public val support: Path) {
     /** Where the main window was, how big and in which mode: apart from [stateFile], since it changes whenever the window moves. */
     public val windowFile: Path get() = support.resolve("window.json")
 
+    /** What the threads did when KaSH was stuck (Swing's thread that did not answer, a quit that did not end): to find out where. */
+    public val hangs: Path get() = support.resolve("hangs")
+
     /**
      * The root of the browser profiles: Chromium's `root_cache_path`, which also holds what is not a profile's (the components it downloads,
      * the GPU caches), and the lock that keeps a second KaSH from using the same profiles.

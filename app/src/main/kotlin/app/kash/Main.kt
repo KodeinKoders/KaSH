@@ -29,6 +29,7 @@ import app.kash.ui.stringsOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.seconds
 import org.jetbrains.jewel.window.DecoratedWindow
 import org.jetbrains.skiko.SystemTheme
 import org.jetbrains.skiko.currentSystemTheme
@@ -50,6 +51,9 @@ private val logger = LoggerFactory.getLogger("app.kash.Main")
 /** The system property that opens Chromium's remote debugging on that port: set by `./gradlew :app:run -Pkash.inspect`, for development only. */
 private const val INSPECT_PROPERTY = "kash.inspect.port"
 
+// How long quitting may take before the process is stopped: closing each profile waits 5 s at most for its cookies, and Chromium 20 s at most.
+private val QUIT_TIMEOUT = 60.seconds
+
 fun main() {
     // Before anything uses AWT: the menu bar of macOS is named by what this says when it starts.
     nameApplication()
@@ -65,6 +69,8 @@ fun main() {
         JOptionPane.showMessageDialog(null, stringsOf(file.load().settings.language).alreadyRunning, "KaSH", JOptionPane.WARNING_MESSAGE)
         exitProcess(1)
     }
+    // KaSH sometimes could not be quit, which could not be made to happen again: what the threads do is written when Swing's thread is stuck.
+    watchEventThread(directories.hangs)
     // The profiles of the services that were deleted or erased are deleted before Chromium starts, which could still hold their files.
     val state = deleteClosedProfiles(file.load(), directories).also(file::save)
     // On this thread, not Swing's: JCEF initializes on Swing's thread, and this waits for it.
@@ -85,7 +91,7 @@ fun main() {
     val geometry = windowFile.load().sanitized(screens())
     application {
         val model = remember { KashModel(state, file, directories, engine, scriptsFor, initialColorScheme(state.settings.theme)) }
-        Kash(engine, model, ServiceIcons(directories).let { remember { it } }, windowFile, geometry)
+        Kash(engine, model, ServiceIcons(directories).let { remember { it } }, windowFile, geometry, directories.hangs)
     }
 }
 
@@ -144,7 +150,7 @@ private fun jcefBundle(): Path {
 }
 
 @Composable
-private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons: ServiceIcons, windowFile: WindowFile, geometry: WindowGeometry) {
+private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons: ServiceIcons, windowFile: WindowFile, geometry: WindowGeometry, hangs: Path) {
     val windowState = rememberWindowState(placement = geometry.mode.toPlacement(), position = geometry.toPosition(), size = geometry.toSize())
     // Where the window is, how big and in which mode is kept as it changes, and a last time when KaSH quits.
     val flushWindow = keepWindowGeometry(windowState, windowFile, geometry)
@@ -155,6 +161,9 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
     val quit: () -> Unit = {
         if (!quitting[0]) {
             quitting[0] = true
+            logger.info("Quitting")
+            // A quit that does not end is stopped, rather than leave KaSH that can only be forced to quit by the system.
+            haltIfNotQuitIn(QUIT_TIMEOUT, hangs)
             model.save()
             flushWindow()
             scope.launch {
@@ -162,6 +171,7 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                 withContext(Dispatchers.IO) { engine.shutdown() }
                 model.close()
                 exitApplication()
+                logger.info("Chromium stopped, closing the windows")
             }
         }
     }
