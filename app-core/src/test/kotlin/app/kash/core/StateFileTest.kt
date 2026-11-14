@@ -41,18 +41,6 @@ class StateFileTest {
     }
 
     @Test
-    fun theSortByCountThatEarlierVersionsSavedAsTheirDefaultIsNotReadAndTheTabIsByDate() {
-        val path = directory.resolve("state.json")
-        path.writeText("""{"services": [], "settings": {"inboxSort": "BY_COUNT", "showLabels": false}}""")
-
-        val settings = StateFile(path).load().settings
-
-        assertEquals(InboxSort.BY_DATE, settings.inboxSort)
-        // The other settings are still read.
-        assertFalse(settings.showLabels)
-    }
-
-    @Test
     fun noFileIsAnEmptyState() {
         assertEquals(KashState(), StateFile(directory.resolve("none.json")).load())
     }
@@ -61,16 +49,6 @@ class StateFileTest {
     fun anUnreadableFileIsAnEmptyState() {
         val path = directory.resolve("broken.json").also { it.writeText("{ not json") }
         assertEquals(KashState(), StateFile(path).load())
-    }
-
-    @Test
-    fun theGenericBrowsersEnvironmentsAreDeleted() {
-        val kept = "env-51b48c24-d242-4145-b93f-79b2756fc5b1"
-        val deleted = "env-aaaaaaaa-0000-0000-0000-000000000000"
-        val path = directory.resolve("old.json").also {
-            it.writeText("""{"environments":[{"id":"$kept","name":"Environment 1","url":"https://www.google.com/"}],"selected":"$kept","deleted":["$deleted"]}""")
-        }
-        assertEquals(KashState(deletedProfiles = listOf(ProfileId(kept), ProfileId(deleted))), StateFile(path).load())
     }
 
     @Test

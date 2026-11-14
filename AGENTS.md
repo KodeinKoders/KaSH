@@ -85,7 +85,6 @@ The option is given only to the run task, as a system property (Compose replaces
 - **A profile is a direct child of the profiles root** (`KashDirectories.profile`, `BrowserEngine.profile` checks it). Chromium creates a profile only there: given `profiles/envs/<id>` it logs "Cannot create profile at path" and silently uses one that is not written to disk, **while `CefRequestContext.getCachePath()` still returns the path it was given**. Do not trust that method to check a profile.
 - A profile id starts with `env-`, so that it is never one of the directories that Chromium keeps in the same root (`Default`, `Safe Browsing`…). A service's id and its profile's are distinct: **Erase all data** gives the service a new profile.
 - A deleted service's profile, and an erased one, are deleted at the next launch, before Chromium starts (`KashState.deletedProfiles`): Chromium may still hold their files while it runs.
-- The state of the first version of KaSH (a generic browser, `environments` in `state.json`) is migrated by deleting its profiles (`StateFile`).
 
 ## Notifications
 
