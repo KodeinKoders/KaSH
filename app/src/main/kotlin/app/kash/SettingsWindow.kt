@@ -25,6 +25,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +48,7 @@ import app.kash.core.DockBadge
 import app.kash.core.IconSize
 import app.kash.core.InboxSort
 import app.kash.core.Language
+import app.kash.core.NotificationStyle
 import app.kash.core.RailSide
 import app.kash.core.Service
 import app.kash.core.ServiceId
@@ -55,6 +57,8 @@ import app.kash.core.ThemeMode
 import app.kash.core.UnreadCount
 import app.kash.macos.LoginItemStatus
 import app.kash.macos.MacosLoginItem
+import app.kash.macos.MacosNotifications
+import app.kash.macos.NotificationAuthorization
 import app.kash.macos.inAppBundle
 import app.kash.ui.Hint
 import app.kash.ui.Kash
@@ -78,6 +82,8 @@ import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 import org.jetbrains.jewel.window.DecoratedWindow
 import org.jetbrains.jewel.window.TitleBar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private enum class Page { GENERAL, APPEARANCE, NOTIFICATIONS, INBOX, SERVICES }
@@ -86,7 +92,10 @@ private enum class Page { GENERAL, APPEARANCE, NOTIFICATIONS, INBOX, SERVICES }
 private fun Strings.page(page: Page): Pair<String, List<String>> = when (page) {
     Page.GENERAL -> general to listOf(startup, launchAtLogin, language, interfaceLanguage)
     Page.APPEARANCE -> appearance to listOf(theme, light, dark, system, sidebar, iconSize, position, showLabels, showBadges)
-    Page.NOTIFICATIONS -> notifications to listOf(alerts, desktopNotifications, playSound, dockBadge, dockTotal, dockDot, dockNone, doNotDisturb)
+    Page.NOTIFICATIONS -> notifications to listOf(
+        alerts, desktopNotifications, playSound, notificationStyle, kashNotifications, systemNotifications, sendTestNotification,
+        dockBadge, dockTotal, dockDot, dockNone, doNotDisturb,
+    )
     Page.INBOX -> inboxTab to listOf(display, defaultSort, openInboxOnLaunch, content, skipMuted, directOnly)
     Page.SERVICES -> services to listOf(enabled, edit, resetCache, eraseData, delete, addService)
 }
@@ -96,18 +105,18 @@ private fun Strings.page(page: Page): Pair<String, List<String>> = when (page) {
  * at once, after their confirmation.
  */
 @Composable
-fun SettingsWindow(model: KashModel, icons: ServiceIcons, onClose: () -> Unit) {
+fun SettingsWindow(model: KashModel, notifier: Notifier, icons: ServiceIcons, onClose: () -> Unit) {
     val title = strings.settings
     DecoratedWindow(onCloseRequest = onClose, state = rememberWindowState(size = DpSize(960.dp, 720.dp)), title = title, icon = remember { AppIcon.painter() }) {
         TitleBar { Text(title, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally)) }
         CompositionLocalProvider(LocalAwtWindow provides window) {
-            SettingsContent(model, icons, onClose)
+            SettingsContent(model, notifier, icons, onClose)
         }
     }
 }
 
 @Composable
-private fun SettingsContent(model: KashModel, icons: ServiceIcons, onClose: () -> Unit) {
+private fun SettingsContent(model: KashModel, notifier: Notifier, icons: ServiceIcons, onClose: () -> Unit) {
     var page by remember { mutableStateOf(Page.APPEARANCE) }
     var draft by remember { mutableStateOf(model.settings) }
     // The services' draft: their order and whether they are enabled, applied to the services as they are then (one may be edited meanwhile).
@@ -159,7 +168,7 @@ private fun SettingsContent(model: KashModel, icons: ServiceIcons, onClose: () -
                         when (page) {
                             Page.GENERAL -> GeneralPage(draft) { draft = it }
                             Page.APPEARANCE -> AppearancePage(draft, services, model, icons) { draft = it }
-                            Page.NOTIFICATIONS -> NotificationsPage(draft) { draft = it }
+                            Page.NOTIFICATIONS -> NotificationsPage(draft, notifier) { draft = it }
                             Page.INBOX -> InboxPage(draft) { draft = it }
                             Page.SERVICES -> ServicesPage(
                                 services, model, icons,
@@ -301,11 +310,44 @@ private fun RailPreview(draft: Settings, services: List<Service>, model: KashMod
 }
 
 @Composable
-private fun NotificationsPage(draft: Settings, onChange: (Settings) -> Unit) {
+private fun NotificationsPage(draft: Settings, notifier: Notifier, onChange: (Settings) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(strings.alerts)
         CheckboxRow(strings.desktopNotifications, draft.notifications, { onChange(draft.copy(notifications = it)) })
         CheckboxRow(strings.playSound, draft.sound, { onChange(draft.copy(sound = it)) })
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle(strings.notificationStyle)
+        // Without the Notification Center (not KaSH.app), the notifications are KaSH's whatever the settings say: that is what is shown.
+        val style = if (inAppBundle) draft.notificationStyle else NotificationStyle.KASH
+        // Asked again after each test: macOS asks the user the first time a notification goes to the Notification Center.
+        var tests by remember { mutableStateOf(0) }
+        val authorization by produceState(NotificationAuthorization.UNAVAILABLE, tests) {
+            value = if (inAppBundle) withContext(Dispatchers.IO) { MacosNotifications.authorization() } else NotificationAuthorization.UNAVAILABLE
+        }
+        RadioButtonRow(strings.kashNotifications, style == NotificationStyle.KASH, { onChange(draft.copy(notificationStyle = NotificationStyle.KASH)) })
+        Hint(strings.kashNotificationsHint, Modifier.padding(start = 24.dp))
+        RadioButtonRow(
+            strings.systemNotifications, style == NotificationStyle.SYSTEM, { onChange(draft.copy(notificationStyle = NotificationStyle.SYSTEM)) },
+            enabled = inAppBundle,
+        )
+        Hint(
+            when {
+                !inAppBundle -> strings.systemNotificationsUnavailable
+                style == NotificationStyle.SYSTEM && authorization == NotificationAuthorization.DENIED -> strings.systemNotificationsDenied
+                else -> strings.systemNotificationsHint
+            },
+            Modifier.padding(start = 24.dp),
+        )
+        val s = strings
+        OutlinedButton(
+            onClick = {
+                // As the draft says: the user tries a style before applying it.
+                notifier.test(draft, s.testNotificationTitle, s.testNotificationBody)
+                tests++
+            },
+            modifier = Modifier.padding(top = 4.dp),
+        ) { Text(s.sendTestNotification) }
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(strings.dockBadge)

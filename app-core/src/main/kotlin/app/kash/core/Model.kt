@@ -115,6 +115,13 @@ public enum class RailSide { LEFT, RIGHT, TOP, BOTTOM }
 @Serializable
 public enum class DockBadge { TOTAL, DOT, NONE }
 
+/**
+ * Where the notifications are shown: in KaSH's own window (at the top right of the screen), or in macOS's Notification Center, which only an
+ * application bundle has (KaSH.app: KaSH's own window otherwise).
+ */
+@Serializable
+public enum class NotificationStyle { KASH, SYSTEM }
+
 /** How the Unread tab lists the conversations. */
 @Serializable
 public enum class InboxSort { BY_DATE, BY_COUNT, BY_SERVICE }
@@ -137,6 +144,7 @@ public data class Settings(
     val showBadges: Boolean = true,
     val notifications: Boolean = true,
     val sound: Boolean = true,
+    val notificationStyle: NotificationStyle = NotificationStyle.SYSTEM,
     val dockBadge: DockBadge = DockBadge.TOTAL,
     // The sort of the Unread tab, as the user last chose it.
     val inboxSort: InboxSort = InboxSort.BY_DATE,

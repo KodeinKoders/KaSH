@@ -10,8 +10,20 @@ public val inAppBundle: Boolean by lazy {
     (function.invoke() as Int) == 1
 }
 
+/** Whether the user lets KaSH show notifications in the Notification Center (System Settings › Notifications). */
+public enum class NotificationAuthorization {
+    /** macOS has not asked the user yet: it does when KaSH starts using the Notification Center. */
+    NOT_DETERMINED,
+    DENIED,
+    AUTHORIZED,
+
+    /** Not an application bundle, or macOS did not answer. */
+    UNAVAILABLE,
+}
+
 /** The notifications of macOS's Notification Center. */
 public object MacosNotifications {
+    private val authorization = MacosLibrary.function("kash_notifications_authorization", FunctionDescriptor.of(ValueLayout.JAVA_INT))
     private val start = MacosLibrary.function("kash_notifications_start", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
     private val post = MacosLibrary.function(
         "kash_notifications_post",
@@ -29,6 +41,14 @@ public object MacosNotifications {
         val function = start ?: return false
         started = (function.invoke(MacosLibrary.stringCallback(onClick)) as Int) == 1
         return started
+    }
+
+    /** Whether the user lets KaSH show notifications. Waits for macOS's answer (2 s at most): not on Swing's thread. */
+    public fun authorization(): NotificationAuthorization = when (authorization?.invoke() as Int?) {
+        0 -> NotificationAuthorization.NOT_DETERMINED
+        1 -> NotificationAuthorization.DENIED
+        2 -> NotificationAuthorization.AUTHORIZED
+        else -> NotificationAuthorization.UNAVAILABLE
     }
 
     /** Shows a notification, once [start] succeeded. [identifier] is what [start]'s callback is given when it is clicked. */

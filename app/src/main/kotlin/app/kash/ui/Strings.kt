@@ -130,6 +130,16 @@ interface Strings {
     val showLabels: String
     val showBadges: String
     val alerts: String
+    val notificationStyle: String
+    val kashNotifications: String
+    val kashNotificationsHint: String
+    val systemNotifications: String
+    val systemNotificationsHint: String
+    val systemNotificationsUnavailable: String
+    val systemNotificationsDenied: String
+    val sendTestNotification: String
+    val testNotificationTitle: String
+    val testNotificationBody: String
     val playSound: String
     val dockBadge: String
     val dockTotal: String
@@ -268,6 +278,16 @@ object French : Strings {
     override val showLabels = "Afficher les labels sous les icônes"
     override val showBadges = "Afficher les pastilles de non lus"
     override val alerts = "Alertes"
+    override val notificationStyle = "Style des notifications"
+    override val kashNotifications = "Notifications de KaSH"
+    override val kashNotificationsHint = "Une fenêtre de KaSH en haut à droite de l'écran."
+    override val systemNotifications = "Notifications du système"
+    override val systemNotificationsHint = "Le Centre de notifications de macOS, réglé dans Réglages Système › Notifications."
+    override val systemNotificationsUnavailable = "Seulement dans l'application signée (KaSH.app), pas en développement."
+    override val systemNotificationsDenied = "macOS refuse les notifications de KaSH : autorisez-les dans Réglages Système › Notifications › KaSH."
+    override val sendTestNotification = "Envoyer une notification de test"
+    override val testNotificationTitle = "Notification de test"
+    override val testNotificationBody = "Les notifications des services ressembleront à celle-ci."
     override val playSound = "Jouer un son"
     override val dockBadge = "Pastille de l'icône du Dock"
     override val dockTotal = "Nombre total de messages non lus"
@@ -408,6 +428,16 @@ object English : Strings {
     override val showLabels = "Show the labels under the icons"
     override val showBadges = "Show the unread badges"
     override val alerts = "Alerts"
+    override val notificationStyle = "Notification style"
+    override val kashNotifications = "KaSH's notifications"
+    override val kashNotificationsHint = "A window of KaSH at the top right of the screen."
+    override val systemNotifications = "System notifications"
+    override val systemNotificationsHint = "macOS's Notification Center, set in System Settings › Notifications."
+    override val systemNotificationsUnavailable = "Only in the signed application (KaSH.app), not in development."
+    override val systemNotificationsDenied = "macOS refuses KaSH's notifications: allow them in System Settings › Notifications › KaSH."
+    override val sendTestNotification = "Send a test notification"
+    override val testNotificationTitle = "Test notification"
+    override val testNotificationBody = "The services' notifications will look like this one."
     override val playSound = "Play a sound"
     override val dockBadge = "Dock icon badge"
     override val dockTotal = "Total number of unread messages"

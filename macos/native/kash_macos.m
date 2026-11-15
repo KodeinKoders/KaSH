@@ -59,6 +59,26 @@ int kash_notifications_start(kash_click_callback callback) {
     }
 }
 
+// Whether the user lets KaSH show notifications: 0 not asked yet, 1 denied, 2 allowed (also provisionally), -1 outside an application bundle or
+// when macOS did not answer in 2 s.
+int kash_notifications_authorization(void) {
+    if (!kash_in_app_bundle()) return -1;
+    @autoreleasepool {
+        __block int result = -1;
+        dispatch_semaphore_t answered = dispatch_semaphore_create(0);
+        [UNUserNotificationCenter.currentNotificationCenter getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
+            switch (settings.authorizationStatus) {
+                case UNAuthorizationStatusNotDetermined: result = 0; break;
+                case UNAuthorizationStatusDenied: result = 1; break;
+                default: result = 2; break;
+            }
+            dispatch_semaphore_signal(answered);
+        }];
+        dispatch_semaphore_wait(answered, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC));
+        return result;
+    }
+}
+
 // Shows a notification, which the click callback is given [identifier] of when it is clicked.
 void kash_notifications_post(const char *identifier, const char *title, const char *subtitle, const char *body, int sound) {
     if (delegate == nil) return;

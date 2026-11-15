@@ -42,6 +42,25 @@ class StateFileTest {
     }
 
     @Test
+    fun theNotificationStyleIsKept() {
+        val file = StateFile(directory.resolve("state.json"))
+
+        file.save(KashState(settings = Settings(notificationStyle = NotificationStyle.KASH)))
+
+        assertEquals(NotificationStyle.KASH, file.load().settings.notificationStyle)
+    }
+
+    @Test
+    fun aStateOfBeforeTheNotificationStyleUsesTheSystem() {
+        val path = directory.resolve("old.json").also { it.writeText("""{"settings": {"sound": false}}""") }
+
+        val settings = StateFile(path).load().settings
+
+        assertEquals(NotificationStyle.SYSTEM, settings.notificationStyle)
+        assertEquals(false, settings.sound)
+    }
+
+    @Test
     fun noFileIsAnEmptyState() {
         assertEquals(KashState(), StateFile(directory.resolve("none.json")).load())
     }

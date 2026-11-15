@@ -246,7 +246,7 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                 )
             }
             if (model.settingsOpen) {
-                SettingsWindow(model, icons, onClose = { model.settingsOpen = false; model.cacheReset.clear() })
+                SettingsWindow(model, notifier, icons, onClose = { model.settingsOpen = false; model.cacheReset.clear() })
             }
             model.confirmation?.let { confirmation ->
                 ConfirmDialog(

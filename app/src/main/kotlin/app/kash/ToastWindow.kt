@@ -1,5 +1,6 @@
 package app.kash
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,9 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -35,7 +38,7 @@ private val TOAST_GAP = 8.dp
 private val SCREEN_MARGIN = 12.dp
 
 /**
- * The notifications that macOS's Notification Center cannot show (KaSH is not run as KaSH.app): a window without decoration at the top right of
+ * KaSH's own notifications, when the settings ask for them or macOS's Notification Center is unavailable (KaSH is not run as KaSH.app): a window without decoration at the top right of
  * the screen, which never takes the focus. Clicking a notification does what clicking it in the Notification Center does.
  */
 @Composable
@@ -70,9 +73,12 @@ fun ToastWindow(notifier: Notifier, icons: ServiceIcons) {
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ServiceTile(toast.service, icons, size = 32.dp)
+                    // A test notification is KaSH's own.
+                    val appIcon = remember { AppIcon.painter() }
+                    if (toast.service != null) ServiceTile(toast.service, icons, size = 32.dp)
+                    else if (appIcon != null) Image(appIcon, contentDescription = null, modifier = Modifier.size(32.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(toast.service.title, color = Kash.colors.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(toast.service?.title ?: "KaSH", color = Kash.colors.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(toast.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         if (toast.body.isNotBlank()) Text(toast.body, color = Kash.colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
