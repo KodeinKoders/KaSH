@@ -26,6 +26,9 @@ public class BrowserProfile internal constructor(
     private val tabs: ConcurrentHashMap<CefBrowser, BrowserTab>,
     private val hiddenSize: AtomicReference<Dimension>,
     private val languages: AtomicReference<String?>,
+    // Creates a tab's browser, after the ones asked before (BrowserEngine.create), and says that one will never be.
+    private val create: (BrowserTab) -> Unit,
+    private val creationEnded: (BrowserTab) -> Unit,
     private val onClose: (BrowserProfile) -> Unit,
 ) {
     private val context: CefRequestContext = CefRequestContext.createContext(
@@ -46,7 +49,8 @@ public class BrowserProfile internal constructor(
 
     /**
      * Opens [url] in a new tab of this profile, with [initScripts] run in every document of the tab before the page's own scripts. The tab's
-     * browser is created now, hidden, so that its page runs (and notifies) before it is first shown.
+     * browser is created now, or once the browsers asked before are ([BrowserEngine.create]), hidden, so that its page runs (and notifies) before it
+     * is first shown.
      */
     public fun openTab(url: String, initScripts: List<String> = emptyList()): BrowserTab {
         check(!closed) { "The profile $directory is closed" }
@@ -55,10 +59,11 @@ public class BrowserProfile internal constructor(
         val tab = BrowserTab(browser, this, url, initScripts, hiddenSize) { closedTab ->
             own -= closedTab
             tabs -= closedTab.browser
+            creationEnded(closedTab)
         }
         tabs[browser] = tab
         own += tab
-        browser.createImmediately()
+        create(tab)
         return tab
     }
 

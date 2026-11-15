@@ -50,6 +50,10 @@ public class BrowserEngine private constructor(
     // The size of the pages that are not shown (see BrowserTab.created): the last size a page was shown at, the main window's size until then.
     private val hiddenSize = AtomicReference(Dimension(1280, 800))
 
+    // The tabs whose browser is to be created, one after the other (see create), and the one being created.
+    private val pendingCreations = ArrayDeque<BrowserTab>()
+    private var creating: BrowserTab? = null
+
     // The languages of the pages (see setPageLanguages): Chromium's own until they are given.
     private val languages = AtomicReference<String?>(null)
 
@@ -103,7 +107,9 @@ public class BrowserEngine private constructor(
         client.addKeyboardHandler(EditShortcuts)
         client.addLifeSpanHandler(object : CefLifeSpanHandlerAdapter() {
             override fun onAfterCreated(browser: CefBrowser) {
-                tabs[browser]?.created()
+                val tab = tabs[browser] ?: return
+                tab.created()
+                creationEnded(tab)
             }
 
             // A window that a service's page opens: a link to another site goes to the system's browser (see popupTarget). A window that a popup
@@ -151,7 +157,32 @@ public class BrowserEngine private constructor(
     public fun profile(directory: Path): BrowserProfile {
         val absolute = directory.toAbsolutePath().normalize()
         require(absolute.parent == profilesRoot) { "A profile must be a direct child of $profilesRoot, not $absolute" }
-        return BrowserProfile(absolute, client, tabs, hiddenSize, languages) { profiles -= it }.also { profiles += it }
+        return BrowserProfile(absolute, client, tabs, hiddenSize, languages, ::create, ::creationEnded) { profiles -= it }.also { profiles += it }
+    }
+
+    /**
+     * Creates the browser of [tab], once the browsers asked before are created: **one at a time**.
+     *
+     * JCEF gives a browser that Chromium created to the Java object of the oldest browser that was asked and not created yet (a queue,
+     * `LifeSpanHandler::OnAfterCreated`), as if Chromium created them in that order. It does not for browsers of different profiles: each profile
+     * is read from disk first, and the one read first has its browser first. At a launch, every service's page was then in another service's
+     * profile (WhatsApp's in Google Chat's…), each logged out. Created one at a time, the browser created is always the one asked.
+     */
+    internal fun create(tab: BrowserTab) {
+        val now = synchronized(pendingCreations) {
+            if (creating == null) true.also { creating = tab } else false.also { pendingCreations += tab }
+        }
+        if (now) tab.browser.createImmediately()
+    }
+
+    /** The browser of [tab] is created, or will never be (the tab is closed): the next one is created, on Swing's thread, where they all are. */
+    internal fun creationEnded(tab: BrowserTab) {
+        val next = synchronized(pendingCreations) {
+            pendingCreations -= tab
+            if (creating != tab) return
+            pendingCreations.removeFirstOrNull().also { creating = it }
+        } ?: return
+        javax.swing.SwingUtilities.invokeLater { next.browser.createImmediately() }
     }
 
     /**
