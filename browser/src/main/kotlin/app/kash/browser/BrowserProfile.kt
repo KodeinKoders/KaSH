@@ -25,6 +25,7 @@ public class BrowserProfile internal constructor(
     private val client: CefClient,
     private val tabs: ConcurrentHashMap<CefBrowser, BrowserTab>,
     private val hiddenSize: AtomicReference<Dimension>,
+    private val languages: AtomicReference<String?>,
     private val onClose: (BrowserProfile) -> Unit,
 ) {
     private val context: CefRequestContext = CefRequestContext.createContext(
@@ -35,6 +36,10 @@ public class BrowserProfile internal constructor(
         null,
     )
     private val own = ConcurrentHashMap.newKeySet<BrowserTab>()
+
+    // The languages that the profile was given (see applyLanguages): none yet.
+    @Volatile
+    private var appliedLanguages: String? = null
 
     @Volatile
     private var closed = false
@@ -47,7 +52,7 @@ public class BrowserProfile internal constructor(
         check(!closed) { "The profile $directory is closed" }
         // The page is loaded once the scripts are registered (BrowserTab.created): loaded right away, its first document would not have them.
         val browser = client.createBrowser(BLANK, CefRendering.DEFAULT, false, context)
-        val tab = BrowserTab(browser, url, initScripts, hiddenSize) { closedTab ->
+        val tab = BrowserTab(browser, this, url, initScripts, hiddenSize) { closedTab ->
             own -= closedTab
             tabs -= closedTab.browser
         }
@@ -55,6 +60,27 @@ public class BrowserProfile internal constructor(
         own += tab
         browser.createImmediately()
         return tab
+    }
+
+    /**
+     * Gives the profile the languages of the pages ([BrowserEngine.setPageLanguages]) when they changed since: Chromium's `intl.selected_languages`
+     * and `intl.accept_languages` preferences, which its `Accept-Language` header and `navigator.languages` are made from, and which it keeps in
+     * the profile. Called before
+     * each navigation of the profile's pages, so a page has them from its next load.
+     *
+     * Not with `CefRequestContextSettings.accept_language_list`: CEF prefers it to the preference, which could then not change while KaSH runs.
+     *
+     * **On Chromium's UI thread only** (a handler of the client): the preference cannot be set from another one.
+     */
+    internal fun applyLanguages() {
+        val wanted = languages.get() ?: return
+        if (wanted == appliedLanguages || closed) return
+        appliedLanguages = wanted
+        // The languages that the user chose first: Chromium makes the accepted ones from them again (LanguagePrefs), and would take the old ones
+        // back.
+        val error = LANGUAGE_PREFERENCES.firstNotNullOfOrNull { context.setPreference(it, wanted) }
+        if (error != null) logger.error("Cannot give its languages to {}: {}", directory.fileName, error)
+        else logger.debug("Languages of {}: {}", directory.fileName, wanted)
     }
 
     /** Empties the HTTP cache of the profile: what was downloaded. The cookies and the storage are kept, so the service stays logged in. */
@@ -79,5 +105,6 @@ public class BrowserProfile internal constructor(
 
     private companion object {
         const val BLANK = "about:blank"
+        val LANGUAGE_PREFERENCES = listOf("intl.selected_languages", "intl.accept_languages")
     }
 }

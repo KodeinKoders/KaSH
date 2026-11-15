@@ -12,6 +12,7 @@ import app.kash.core.Conversation
 import app.kash.core.ConversationKind
 import app.kash.core.KashDirectories
 import app.kash.core.KashState
+import app.kash.core.PageLanguages
 import app.kash.core.PluginIcon
 import app.kash.core.PluginRegistry
 import app.kash.core.ProfileId
@@ -130,6 +131,8 @@ class KashModel(
     var onIcon: (ServiceId, PluginIcon) -> Unit = { _, _ -> }
 
     init {
+        // Before the pages load: a site that follows the browser's language shows itself in KaSH's.
+        engine.setPageLanguages(PageLanguages.acceptLanguages(language))
         services.filter { it.enabled }.forEach(::load)
     }
 
@@ -244,7 +247,9 @@ class KashModel(
         val settings = change(state.settings)
         // The names of the plugins' services are in the language of the interface.
         if (languageOf(settings) == languageOf(state.settings)) state.copy(settings = settings)
+        // So are the pages, from their next load.
         else state.copy(settings = settings, services = state.services.map { plugins.refresh(it, languageOf(settings)) })
+            .also { engine.setPageLanguages(PageLanguages.acceptLanguages(languageOf(settings))) }
     }
 
     /** Adds [service] (its name and address taken from its plugin), loads it and selects it. */

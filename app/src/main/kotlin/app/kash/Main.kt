@@ -14,6 +14,7 @@ import app.kash.browser.BrowserEngine
 import app.kash.browser.ColorScheme
 import app.kash.core.Inbox
 import app.kash.core.KashDirectories
+import app.kash.core.PageLanguages
 import app.kash.core.Service
 import app.kash.core.StateFile
 import app.kash.core.ThemeMode
@@ -74,7 +75,9 @@ fun main() {
     // The profiles of the services that were deleted or erased are deleted before Chromium starts, which could still hold their files.
     val state = deleteClosedProfiles(file.load(), directories).also(file::save)
     // On this thread, not Swing's: JCEF initializes on Swing's thread, and this waits for it.
-    val engine = BrowserEngine.start(jcefBundle(), directories.profiles, inspectPort())
+    // Chromium's own menus and error pages are in KaSH's language when it starts (they change at the next launch); the pages' languages are
+    // given by KashModel.
+    val engine = BrowserEngine.start(jcefBundle(), directories.profiles, inspectPort(), PageLanguages.locale(stringsOf(state.settings.language).code))
     val shim = resource("notification-shim.js")
     val plugins = BuiltInPlugins.registry()
     // Every page gets the notifications; a plugin's service also gets its plugin's script, with the API that it reads the page with.

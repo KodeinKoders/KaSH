@@ -415,6 +415,7 @@ The page cannot read the image of another site itself when that site does not al
 
 | `kash.language`
 | The language of KaSH's interface: `en`, `fr`.
+The page is told it too (`Accept-Language`, `navigator.languages`: `fr-FR,fr,en-US,en`), so a site that follows the browser's language is in it; one that follows its account's is in that one.
 
 | `kash.dom.text(element)`
 | What an element shows: its texts and the `alt` of its images (the emojis), without the marks of direction that services put around names, with one space between words. `''` for no element.

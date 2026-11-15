@@ -50,12 +50,24 @@ public class BrowserEngine private constructor(
     // The size of the pages that are not shown (see BrowserTab.created): the last size a page was shown at, the main window's size until then.
     private val hiddenSize = AtomicReference(Dimension(1280, 800))
 
+    // The languages of the pages (see setPageLanguages): Chromium's own until they are given.
+    private val languages = AtomicReference<String?>(null)
+
     /**
      * The size that the pages that were never shown are laid out at, until one is shown: the window that will show them. A page that is not shown
      * has no size of its own, and a service's page may then render nothing to read (a virtual list draws the rows that fit: none).
      */
     public fun setHiddenPageSize(width: Int, height: Int) {
         if (width > 0 && height > 0) hiddenSize.set(Dimension(width, height))
+    }
+
+    /**
+     * The languages that every page is told the user reads, in this order (`fr-FR,fr,en-US,en`): its `Accept-Language` header and
+     * `navigator.languages`. A site that follows the browser's language shows itself in the first one it has. A page has them from its next load:
+     * one that is already loaded keeps its own until it is loaded again. Chromium's own otherwise (`en-US,en`).
+     */
+    public fun setPageLanguages(list: String) {
+        languages.set(list)
     }
 
     // What the pages send to KaSH: `window.cefQuery({request: "…"})`, which Chromium's renderer defines in every frame. A page that is not one of
@@ -111,6 +123,8 @@ public class BrowserEngine private constructor(
         client.addRequestHandler(object : CefRequestHandlerAdapter() {
             override fun onBeforeBrowse(browser: CefBrowser, frame: CefFrame, request: CefRequest, userGesture: Boolean, isRedirect: Boolean): Boolean {
                 val tab = tabs[browser] ?: return false
+                // On Chromium's UI thread, before the page asks for anything: the languages that changed hold from this load.
+                tab.profile.applyLanguages()
                 val target = navigationTarget(request.url, tab.initialUrl, frame.url, userGesture, isRedirect, request.method)
                 // A frame of the page only loads what it can: an application's address, which some pages open in a hidden frame, is not.
                 if (!frame.isMain) return (target == LinkTarget.NOWHERE).also { if (it) notLoaded(request.url) }
@@ -137,7 +151,7 @@ public class BrowserEngine private constructor(
     public fun profile(directory: Path): BrowserProfile {
         val absolute = directory.toAbsolutePath().normalize()
         require(absolute.parent == profilesRoot) { "A profile must be a direct child of $profilesRoot, not $absolute" }
-        return BrowserProfile(absolute, client, tabs, hiddenSize) { profiles -= it }.also { profiles += it }
+        return BrowserProfile(absolute, client, tabs, hiddenSize, languages) { profiles -= it }.also { profiles += it }
     }
 
     /**
@@ -193,9 +207,12 @@ public class BrowserEngine private constructor(
          * [inspectPort] opens Chromium's remote debugging on 127.0.0.1, which lets a DevTools client (chrome-devtools-mcp) read and drive every
          * page of every profile, logged in: only for development, never in the application that is distributed (the application decides).
          *
+         * [locale] is Chromium's own (`fr`, `en-US`: its menus, its error pages, `Intl`'s default in the pages), its system's when it is null. The
+         * languages that the pages are told the user reads are [setPageLanguages]'.
+         *
          * Called before the application's window is shown, and **not on the Swing thread**: JCEF initializes on it, and this waits for it.
          */
-        public fun start(bundle: Path, profilesRoot: Path, inspectPort: Int? = null, timeout: Duration = 30.seconds): BrowserEngine {
+        public fun start(bundle: Path, profilesRoot: Path, inspectPort: Int? = null, locale: String? = null, timeout: Duration = 30.seconds): BrowserEngine {
             // A JetBrains Runtime with JCEF (jbr_jcef, jbrsdk_jcef) has a `jcef` module of its own, whose `org.cef` classes would be used instead
             // of the ones that were built with the native bundle, and do not match it.
             check(ModuleLayer.boot().findModule("jcef").isEmpty) {
@@ -226,6 +243,7 @@ public class BrowserEngine private constructor(
                 // Cookies without an expiry are kept too: an environment is a browser that is never quit, from the user's point of view.
                 persist_session_cookies = true
                 log_severity = CefSettings.LogSeverity.LOGSEVERITY_WARNING
+                if (locale != null) this.locale = locale
                 // Chromium only listens on 127.0.0.1.
                 if (inspectPort != null) remote_debugging_port = inspectPort
             }
