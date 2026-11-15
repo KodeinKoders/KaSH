@@ -169,7 +169,7 @@ private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolea
         }
         // When the last message came, over the count, as WhatsApp's list shows it.
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            row.time?.let { Text(strings.timeLabel.of(it), fontSize = 11.sp, color = Kash.colors.muted, maxLines = 1) }
+            row.time?.let { Text(strings.timeLabel.of(it, dayOnly = row.dayOnly), fontSize = 11.sp, color = Kash.colors.muted, maxLines = 1) }
             CountPill(UnreadCount.badge(row.count))
         }
         KashIcon(KashIcons.ChevronRight, Kash.colors.faint)

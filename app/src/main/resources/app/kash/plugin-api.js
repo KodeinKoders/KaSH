@@ -50,6 +50,7 @@ const conversationOf = (value) => {
         mention: value.mention === true,
         preview: typeof value.preview === 'string' ? value.preview : '',
         time: Number.isFinite(time) ? time : null,
+        timePrecision: value.timePrecision === 'day' && Number.isFinite(time) ? 'day' : 'minute',
     };
 };
 

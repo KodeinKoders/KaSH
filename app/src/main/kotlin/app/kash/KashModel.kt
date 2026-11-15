@@ -197,6 +197,7 @@ class KashModel(
                         mention = conversation["mention"]?.jsonPrimitive?.booleanOrNull ?: false,
                         preview = conversation["preview"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                         time = conversation["time"]?.jsonPrimitive?.longOrNull,
+                        dayOnly = conversation["timePrecision"]?.jsonPrimitive?.contentOrNull == "day",
                     )
                 }.also { logger.debug("Unread of {}: {} conversations, {} messages", service.title, it.size, it.sumOf { c -> c.count }); totals.remove(id) }
             } catch (e: Exception) {

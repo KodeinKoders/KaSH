@@ -9,8 +9,8 @@ import kotlin.test.assertEquals
 class TimeLabelTest {
     private val zone = ZoneId.of("Europe/Paris")
     private val now = Instant.parse("2026-11-14T15:00:00Z")
-    private val french = TimeLabel(Locale.FRENCH, "HH:mm", "'Hier', HH:mm", "d MMM, HH:mm", "d MMM yyyy, HH:mm")
-    private val english = TimeLabel(Locale.ENGLISH, "h:mm a", "'Yesterday', h:mm a", "MMM d, h:mm a", "MMM d, yyyy, h:mm a")
+    private val french = TimeLabel(Locale.FRENCH, "HH:mm", "'Hier', HH:mm", "d MMM, HH:mm", "d MMM yyyy, HH:mm", "'Aujourd''hui'", "'Hier'", "d MMM", "d MMM yyyy")
+    private val english = TimeLabel(Locale.ENGLISH, "h:mm a", "'Yesterday', h:mm a", "MMM d, h:mm a", "MMM d, yyyy, h:mm a", "'Today'", "'Yesterday'", "MMM d", "MMM d, yyyy")
 
     private fun at(text: String) = Instant.parse(text).toEpochMilli()
 
@@ -39,6 +39,14 @@ class TimeLabelTest {
     @Test
     fun anotherYearHasTheYear() {
         assertEquals("31 déc. 2025, 23:00", french.of(at("2025-12-31T22:00:00Z"), now, zone))
+    }
+
+    @Test
+    fun aTimeThatOnlyTellsTheDayHasNoTime() {
+        assertEquals("Aujourd'hui", french.of(at("2026-11-13T23:00:00Z"), now, zone, dayOnly = true))
+        assertEquals("Yesterday", english.of(at("2026-11-12T23:00:00Z"), now, zone, dayOnly = true))
+        assertEquals("12 nov.", french.of(at("2026-11-11T23:00:00Z"), now, zone, dayOnly = true))
+        assertEquals("Dec 31, 2025", english.of(at("2025-12-30T23:00:00Z"), now, zone, dayOnly = true))
     }
 
     @Test

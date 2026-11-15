@@ -153,7 +153,7 @@ interface Strings {
 
 object French : Strings {
     override val code = "fr"
-    override val timeLabel = TimeLabel(Locale.FRENCH, "HH:mm", "'Hier', HH:mm", "d MMM, HH:mm", "d MMM yyyy, HH:mm")
+    override val timeLabel = TimeLabel(Locale.FRENCH, "HH:mm", "'Hier', HH:mm", "d MMM, HH:mm", "d MMM yyyy, HH:mm", "'Aujourd''hui'", "'Hier'", "d MMM", "d MMM yyyy")
     override val alreadyRunning = "KaSH est déjà ouvert. Quittez-le (⌘Q) avant de le relancer."
     override val inbox = "Non lus"
     override fun inboxSummary(messages: Int, conversations: Int) =
@@ -293,7 +293,7 @@ object French : Strings {
 
 object English : Strings {
     override val code = "en"
-    override val timeLabel = TimeLabel(Locale.ENGLISH, "h:mm a", "'Yesterday', h:mm a", "MMM d, h:mm a", "MMM d, yyyy, h:mm a")
+    override val timeLabel = TimeLabel(Locale.ENGLISH, "h:mm a", "'Yesterday', h:mm a", "MMM d, h:mm a", "MMM d, yyyy, h:mm a", "'Today'", "'Yesterday'", "MMM d", "MMM d, yyyy")
     override val alreadyRunning = "KaSH is already open. Quit it (⌘Q) before launching it again."
     override val inbox = "Unread"
     override fun inboxSummary(messages: Int, conversations: Int) =

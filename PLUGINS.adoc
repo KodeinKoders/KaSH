@@ -337,6 +337,11 @@ A conversation is:
 | `time`
 | no
 | When its last message came, in milliseconds since the epoch. `null` by default.
+
+| `timePrecision`
+| no
+| `'minute'` (the default) or `'day'`, for a service that only shows the day of an older message (Google Messages' "Fri", "Nov 7").
+With `'day'`, `time` is the start of that day, and KaSH shows the day without a time ("Yesterday", "Nov 7").
 |===
 
 An entry that is not a conversation (no id, an unknown kind, a count under 1, an id given twice) is left out, with a warning in the console, once.

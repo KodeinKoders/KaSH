@@ -20,6 +20,7 @@ public enum class ConversationKind {
  * @property mention Whether one of its unread messages mentions the user.
  * @property preview The start of its last message, as the service shows it in its list; empty when it shows none.
  * @property time When its last message came, in milliseconds since the epoch; null when the service does not tell.
+ * @property dayOnly Whether [time] only tells the day (the service shows no time for it): it is then the start of that day.
  */
 public data class Conversation(
     val id: String,
@@ -29,6 +30,7 @@ public data class Conversation(
     val mention: Boolean = false,
     val preview: String = "",
     val time: Long? = null,
+    val dayOnly: Boolean = false,
 )
 
 /**

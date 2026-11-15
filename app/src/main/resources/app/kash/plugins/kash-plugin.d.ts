@@ -23,6 +23,11 @@ declare namespace KashPlugin {
         preview?: string;
         /** When the last message came, in milliseconds since the epoch. null by default (not known). */
         time?: number | null;
+        /**
+         * How precise time is: 'minute' by default; 'day' for a service that only shows the day of an older message, time being the start of
+         * that day (KaSH then shows the day without a time).
+         */
+        timePrecision?: 'minute' | 'day';
     }
 
     interface WatchOptions {

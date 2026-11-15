@@ -16,6 +16,7 @@ public data class InboxRow(
     val count: Int,
     val preview: String = "",
     val time: Long? = null,
+    val dayOnly: Boolean = false,
 ) {
     val isTotal: Boolean get() = kind == null
 }
@@ -45,7 +46,7 @@ public object Inbox {
                 serviceUnread.conversations.isNotEmpty() ->
                     serviceUnread.conversations
                         .filter { it.count > 0 && (!settings.directOnly || it.kind == ConversationKind.DIRECT || it.mention) }
-                        .map { InboxRow(service, it.id, it.name, it.kind, it.count, it.preview, it.time) }
+                        .map { InboxRow(service, it.id, it.name, it.kind, it.count, it.preview, it.time, it.dayOnly) }
                 (serviceUnread.total ?: 0) > 0 -> listOf(InboxRow(service, null, service.title, null, serviceUnread.total!!))
                 else -> emptyList()
             }
