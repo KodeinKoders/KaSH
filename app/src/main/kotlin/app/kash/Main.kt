@@ -206,9 +206,9 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
     // The badge of the Dock's icon: the total of the tabs' badges, a dot, or nothing.
     val dockBadge = Inbox.dockBadge(Inbox.badges(model.state.services, model.unread, settings), settings)
     LaunchedEffect(dockBadge) {
-        if (Taskbar.isTaskbarSupported() && Taskbar.getTaskbar().isSupported(Taskbar.Feature.ICON_BADGE_TEXT)) {
-            Taskbar.getTaskbar().setIconBadge(dockBadge)
-        }
+        val supported = Taskbar.isTaskbarSupported() && Taskbar.getTaskbar().isSupported(Taskbar.Feature.ICON_BADGE_TEXT)
+        logger.debug("Dock badge: {}{}", dockBadge, if (supported) "" else " (not supported)")
+        if (supported) Taskbar.getTaskbar().setIconBadge(dockBadge)
     }
 
     CompositionLocalProvider(LocalStrings provides stringsOf(settings.language)) {
