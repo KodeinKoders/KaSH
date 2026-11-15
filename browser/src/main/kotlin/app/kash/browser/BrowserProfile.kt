@@ -6,10 +6,12 @@ import org.cef.browser.CefRendering
 import org.cef.browser.CefRequestContext
 import org.cef.browser.CefRequestContextSettings
 import org.slf4j.LoggerFactory
+import java.awt.Dimension
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 private val logger = LoggerFactory.getLogger(BrowserProfile::class.java)
 
@@ -22,6 +24,7 @@ public class BrowserProfile internal constructor(
     public val directory: Path,
     private val client: CefClient,
     private val tabs: ConcurrentHashMap<CefBrowser, BrowserTab>,
+    private val hiddenSize: AtomicReference<Dimension>,
     private val onClose: (BrowserProfile) -> Unit,
 ) {
     private val context: CefRequestContext = CefRequestContext.createContext(
@@ -44,7 +47,7 @@ public class BrowserProfile internal constructor(
         check(!closed) { "The profile $directory is closed" }
         // The page is loaded once the scripts are registered (BrowserTab.created): loaded right away, its first document would not have them.
         val browser = client.createBrowser(BLANK, CefRendering.DEFAULT, false, context)
-        val tab = BrowserTab(browser, url, initScripts) { closedTab ->
+        val tab = BrowserTab(browser, url, initScripts, hiddenSize) { closedTab ->
             own -= closedTab
             tabs -= closedTab.browser
         }

@@ -1,5 +1,7 @@
 package app.kash.browser
 
+import java.awt.Dimension
+import java.util.concurrent.atomic.AtomicReference
 import com.jetbrains.cef.JCefAppConfig
 import org.cef.CefApp
 import org.cef.CefClient
@@ -44,6 +46,17 @@ public class BrowserEngine private constructor(
     private val client: CefClient = app.createClient()
     private val tabs = ConcurrentHashMap<CefBrowser, BrowserTab>()
     private val profiles = CopyOnWriteArrayList<BrowserProfile>()
+
+    // The size of the pages that are not shown (see BrowserTab.created): the last size a page was shown at, the main window's size until then.
+    private val hiddenSize = AtomicReference(Dimension(1280, 800))
+
+    /**
+     * The size that the pages that were never shown are laid out at, until one is shown: the window that will show them. A page that is not shown
+     * has no size of its own, and a service's page may then render nothing to read (a virtual list draws the rows that fit: none).
+     */
+    public fun setHiddenPageSize(width: Int, height: Int) {
+        if (width > 0 && height > 0) hiddenSize.set(Dimension(width, height))
+    }
 
     // What the pages send to KaSH: `window.cefQuery({request: "…"})`, which Chromium's renderer defines in every frame. A page that is not one of
     // the tabs (a popup, DevTools) is answered too, and ignored.
@@ -124,7 +137,7 @@ public class BrowserEngine private constructor(
     public fun profile(directory: Path): BrowserProfile {
         val absolute = directory.toAbsolutePath().normalize()
         require(absolute.parent == profilesRoot) { "A profile must be a direct child of $profilesRoot, not $absolute" }
-        return BrowserProfile(absolute, client, tabs) { profiles -= it }.also { profiles += it }
+        return BrowserProfile(absolute, client, tabs, hiddenSize) { profiles -= it }.also { profiles += it }
     }
 
     /**

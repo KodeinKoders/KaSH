@@ -9,7 +9,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.cef.browser.CefBrowser
 import org.slf4j.LoggerFactory
 import java.awt.Component
+import java.awt.Dimension
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
+import java.awt.event.HierarchyEvent
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.atomic.AtomicReference
 
 private val logger = LoggerFactory.getLogger(BrowserTab::class.java)
 
@@ -21,6 +26,7 @@ public class BrowserTab internal constructor(
     internal val browser: CefBrowser,
     internal val initialUrl: String,
     private val initScripts: List<String>,
+    private val hiddenSize: AtomicReference<Dimension>,
     private val onClose: (BrowserTab) -> Unit,
 ) {
     private val _url = MutableStateFlow(initialUrl)
@@ -33,6 +39,29 @@ public class BrowserTab internal constructor(
 
     @Volatile
     private var colorScheme: ColorScheme? = null
+
+    // Whether the page has a renderer to give a size to: its first load (of the service's address) ended. Given at onAfterCreated, before that,
+    // the size crashes Chromium (a null view in ExecuteDevToolsMethod).
+    @Volatile
+    private var rendered = false
+
+    // Whether the service's address is loading: the blank page that the tab is created on ends its load first.
+    @Volatile
+    private var loadingService = false
+
+    init {
+        // While the page is shown, its size is the view's: it is the size of the pages that are not (hiddenSize). Shown or hidden, its size is
+        // given again (see applyHiddenSize).
+        browser.uiComponent.addComponentListener(object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent) {
+                val component = e.component
+                if (component.isShowing && component.width > 0 && component.height > 0) hiddenSize.set(Dimension(component.width, component.height))
+            }
+        })
+        browser.uiComponent.addHierarchyListener { event ->
+            if (event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L && rendered) applyHiddenSize()
+        }
+    }
 
     /** The address of the page, as Chromium has it (after redirects). */
     public val url: StateFlow<String> = _url.asStateFlow()
@@ -89,6 +118,25 @@ public class BrowserTab internal constructor(
             .exceptionally { logger.error("Cannot give the color scheme to {}", initialUrl, it); null }
     }
 
+    /**
+     * A page that is not shown has no size (its native view is in no window, or was never), and is laid out at 0×0: a service that draws only the
+     * rows that fit (Slack's sidebar, a virtual list) then draws none, and its plugin has nothing to read until the user shows it. While the page
+     * is not shown, it is laid out at the size of the last page shown ([hiddenSize]) through the browser's DevTools session; shown, at its view's.
+     */
+    private fun applyHiddenSize(): CompletableFuture<*> {
+        val devTools = browser.devToolsClient ?: return CompletableFuture.completedFuture(Unit)
+        val future = if (browser.uiComponent.isShowing) {
+            devTools.executeDevToolsMethod("Emulation.clearDeviceMetricsOverride")
+        } else {
+            val size = hiddenSize.get()
+            devTools.executeDevToolsMethod(
+                "Emulation.setDeviceMetricsOverride",
+                """{"width":${size.width},"height":${size.height},"deviceScaleFactor":0,"mobile":false}""",
+            )
+        }
+        return future.exceptionally { logger.error("Cannot give its size to {}", initialUrl, it); null }
+    }
+
     /** Opens Chrome's DevTools on the page, in a window of their own: in the page's profile, so they show its cookies and storage. */
     public fun openDevTools(): Unit = browser.openDevTools()
 
@@ -126,7 +174,10 @@ public class BrowserTab internal constructor(
         }
         // Not in the DevTools callback itself: Chromium is notifying its observers then, and loading from there re-enters their list
         // ("Check failed: ... ObserverListReentrancyPolicy").
-        registered.whenCompleteAsync { _, _ -> browser.loadURL(initialUrl) }
+        registered.whenCompleteAsync { _, _ ->
+            loadingService = true
+            browser.loadURL(initialUrl)
+        }
     }
 
     internal fun messageReceived(request: String) {
@@ -144,6 +195,10 @@ public class BrowserTab internal constructor(
 
     internal fun loadingStateChanged(loading: Boolean, canGoBack: Boolean, canGoForward: Boolean) {
         _loading.value = loading
+        if (!loading && loadingService && !rendered) {
+            rendered = true
+            applyHiddenSize()
+        }
         _canGoBack.value = canGoBack
         _canGoForward.value = canGoForward
     }

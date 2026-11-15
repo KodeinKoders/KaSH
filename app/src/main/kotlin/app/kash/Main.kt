@@ -84,6 +84,8 @@ fun main() {
     // The main window opens where it was, as big and in the mode it was in when KaSH was closed, on a screen that is still there.
     val windowFile = WindowFile(directories.windowFile)
     val geometry = windowFile.load().sanitized(screens())
+    // The pages that are not shown yet are laid out at the window's size, so that their plugins have something to read.
+    engine.setHiddenPageSize(geometry.width.toInt(), geometry.height.toInt())
     application {
         val model = remember { KashModel(state, file, directories, engine, plugins, scriptsFor, initialColorScheme(state.settings.theme)) }
         val icons = remember { ServiceIcons(directories, model.plugins).also { icons -> model.onIcon = icons::report } }
