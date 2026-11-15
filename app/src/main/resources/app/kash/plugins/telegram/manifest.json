@@ -1,0 +1,12 @@
+{
+  "$schema": "../manifest.schema.json",
+  "manifestVersion": 1,
+  "id": "telegram",
+  "version": "1.0.0",
+  "name": "Telegram",
+  "square": { "text": "TG", "color": "#2AABEE" },
+  "icon": "icon.webp",
+  "url": "https://web.telegram.org/k/",
+  "matches": ["https://web.telegram.org/k/*"],
+  "script": "plugin.js"
+}

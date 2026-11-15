@@ -340,7 +340,7 @@ A conversation is:
 
 | `timePrecision`
 | no
-| `'minute'` (the default) or `'day'`, for a service that only shows the day of an older message (Google Messages' "Fri", "Nov 7").
+| `'minute'` (the default) or `'day'`, for a service that only shows the day of an older message (Google Messages' "Fri", "Nov 7"): see `kash.time.parse`.
 With `'day'`, `time` is the start of that day, and KaSH shows the day without a time ("Yesterday", "Nov 7").
 |===
 
@@ -419,6 +419,12 @@ The page is told it too (`Accept-Language`, `navigator.languages`: `fr-FR,fr,en-
 
 | `kash.dom.text(element)`
 | What an element shows: its texts and the `alt` of its images (the emojis), without the marks of direction that services put around names, with one space between words. `''` for no element.
+
+| `kash.time.parse(label, language?)`
+| The time of a label that a service shows instead of it, in the language of its page (or `language`), as `{ time, timePrecision }`, to spread into a conversation: "Now", "3 min", "10:42 AM", "10 h 42" give the time, today; "Yesterday", a weekday ("Friday", "ven."), a date ("Nov 7", "7 nov.", "Nov 7, 2024", "11/7/24", "19/09/2025") give the day (`'day'`).
+A date without its year is the last one that has passed.
+`null` for a label that is not one of those.
+The words are the browser's own for that language (`Intl`), which the services' are too.
 |===
 
 `kash-plugin.d.ts` describes it all, for an editor.

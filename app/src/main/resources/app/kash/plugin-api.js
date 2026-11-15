@@ -150,6 +150,100 @@ const shown = (element) => {
     return text;
 };
 
+// The time of a label that a service shows instead of it, in the language of its page: "Now", "3 min", "10:42 AM", "10 h 42" (today, to the
+// minute), "Yesterday", a weekday, "Nov 7", "7 nov.", "Nov 7, 2024", "11/7/24", "07/11/2024" (to the day). The words are the browser's own for
+// that language (Intl), which the services' are too.
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+
+// A label's words, to compare them with a language's: lowercased, without accents, dots and repeated spaces ("Févr." is "fevr").
+const normalize = (text) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
+
+// The words of a language that labels are made of: the weekdays from Sunday and the months, long and short, "now" and "yesterday", and whether
+// a date starts with its day.
+const wordsCache = new Map();
+const wordsOf = (language) => {
+    if (!wordsCache.has(language)) {
+        const names = (count, date, option) => Array.from({ length: count }, (_, i) =>
+            ['long', 'short'].map((width) => normalize(new Intl.DateTimeFormat(language, { [option]: width }).format(date(i)))));
+        const relative = new Intl.RelativeTimeFormat(language, { numeric: 'auto' });
+        const first = new Intl.DateTimeFormat(language).formatToParts(new Date(2024, 10, 7)).find((part) => part.type === 'day' || part.type === 'month');
+        wordsCache.set(language, {
+            // 7 January 2024 was a Sunday.
+            weekdays: names(7, (i) => new Date(2024, 0, 7 + i), 'weekday'),
+            months: names(12, (i) => new Date(2024, i, 15), 'month'),
+            now: [normalize(relative.format(0, 'second')), 'now', 'just now'],
+            yesterday: [normalize(relative.format(-1, 'day')), 'yesterday'],
+            dayFirst: first ? first.type === 'day' : false,
+        });
+    }
+    return wordsCache.get(language);
+};
+
+// The month that a word names (its long name, its short one, or the start of its long one: "sept" and "sep"), or -1.
+const monthOf = (word, months) => months.findIndex(([long, short]) => word === long || word === short || (word.length >= 3 && long.startsWith(word)));
+
+const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+const day = (date) => ({ time: startOfDay(date), timePrecision: 'day' });
+
+// A day of a year: the year before when it is not given and would be to come.
+const dateOf = (year, month, dayOfMonth, now) => {
+    if (month < 0 || month > 11 || dayOfMonth < 1 || dayOfMonth > 31) return null;
+    let date = new Date(year ?? now.getFullYear(), month, dayOfMonth);
+    if (year == null && date.getTime() > now.getTime()) date = new Date(date.getFullYear() - 1, month, dayOfMonth);
+    return day(date);
+};
+
+const parseTime = (text, language) => {
+    if (typeof text !== 'string') return null;
+    const label = normalize(text);
+    if (!label) return null;
+    let words;
+    try {
+        words = wordsOf(language || window.document.documentElement.lang || window.navigator.language || 'en');
+    } catch (e) {
+        // A language that Intl does not know.
+        words = wordsOf('en');
+    }
+    const now = new Date();
+    if (words.now.includes(label)) return { time: now.getTime(), timePrecision: 'minute' };
+    let match = label.match(/^(\d+) ?min/);
+    if (match) return { time: now.getTime() - Number(match[1]) * MINUTE, timePrecision: 'minute' };
+    // A time of today: "10:42 am", "10:42", "10 h 42".
+    match = label.match(/^(\d{1,2}) ?(?::|h) ?(\d{2}) ?(am|pm)?$/);
+    if (match) {
+        let hours = Number(match[1]) % (match[3] ? 12 : 24);
+        if (match[3] === 'pm') hours += 12;
+        return { time: new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, Number(match[2])).getTime(), timePrecision: 'minute' };
+    }
+    match = label.match(/^(\d+) ?(h|hr|hrs|hour|hours|heure|heures)$/);
+    if (match) return { time: now.getTime() - Number(match[1]) * HOUR, timePrecision: 'minute' };
+    if (words.yesterday.includes(label)) return day(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+    // A weekday: the last one before today (today's messages have a time).
+    const weekday = words.weekdays.findIndex((names) => names.includes(label));
+    if (weekday >= 0) {
+        const back = (now.getDay() - weekday + 7) % 7 || 7;
+        return day(new Date(now.getFullYear(), now.getMonth(), now.getDate() - back));
+    }
+    // A date with its month's name, in any order: "Nov 7", "7 nov", "Nov 7, 2024", "7 nov 2024".
+    const tokens = label.split(/[ ,]+/).filter(Boolean);
+    const month = tokens.map((token) => monthOf(token, words.months)).find((index) => index >= 0);
+    if (month !== undefined && tokens.length <= 3) {
+        const numbers = tokens.filter((token) => /^\d+$/.test(token)).map(Number);
+        const year = numbers.find((number) => number > 31);
+        const dayOfMonth = numbers.find((number) => number <= 31);
+        if (dayOfMonth !== undefined) return dateOf(year, month, dayOfMonth, now);
+    }
+    // A date in digits, in the language's order: "11/7/24", "07/11/2024".
+    match = label.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
+    if (match) {
+        const year = Number(match[3]) + (match[3].length === 2 ? 2000 : 0);
+        const [dayOfMonth, monthNumber] = words.dayFirst ? [match[1], match[2]] : [match[2], match[1]];
+        return dateOf(year, Number(monthNumber) - 1, Number(dayOfMonth), now);
+    }
+    return null;
+};
+
 const kash = Object.freeze({
     apiVersion: config.apiVersion,
     plugin: Object.freeze({ ...config.plugin }),
@@ -163,6 +257,7 @@ const kash = Object.freeze({
         openHandler = handler;
     },
     dom: Object.freeze({ text: (element) => (element ? clean(shown(element)) : '') }),
+    time: Object.freeze({ parse: parseTime }),
 });
 
 try {

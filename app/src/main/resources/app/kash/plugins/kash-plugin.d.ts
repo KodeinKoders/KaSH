@@ -81,6 +81,16 @@ declare namespace KashPlugin {
              */
             text(element: Element | null | undefined): string;
         };
+
+        readonly time: {
+            /**
+             * The time of a label that a service shows instead of it, in the language of its page (or language: 'fr', 'en-US'): "Now", "3 min",
+             * "10:42 AM", "10 h 42" give it to the minute, today; "Yesterday", a weekday ("Friday", "ven."), a date ("Nov 7", "7 nov.",
+             * "Nov 7, 2024", "11/7/24", "19/09/2025") give the start of the day, with timePrecision 'day'. A date without its year is the last
+             * one that has passed. null for a label that is not one of those. The words are the browser's for that language (Intl).
+             */
+            parse(label: string | null | undefined, language?: string): { time: number; timePrecision: 'minute' | 'day' } | null;
+        };
     }
 }
 
