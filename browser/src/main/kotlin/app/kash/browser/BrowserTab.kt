@@ -29,12 +29,10 @@ public class BrowserTab internal constructor(
     private val _canGoBack = MutableStateFlow(false)
     private val _canGoForward = MutableStateFlow(false)
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    private val _created = MutableStateFlow(false)
 
     @Volatile
     private var colorScheme: ColorScheme? = null
-
-    @Volatile
-    private var isCreated = false
 
     /** The address of the page, as Chromium has it (after redirects). */
     public val url: StateFlow<String> = _url.asStateFlow()
@@ -48,6 +46,13 @@ public class BrowserTab internal constructor(
 
     /** What the page sends with `window.cefQuery({request: …})`: the scripts of [BrowserProfile.openTab] use it to talk to KaSH. */
     public val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    /**
+     * Whether Chromium created the browser: show [component] only then. Shown before, its native view is parented once it exists, but JCEF drops
+     * what it is told before (`setWindowVisibility`, when the view becomes showing): the view stays hidden, gray, until it is removed and added
+     * again.
+     */
+    public val created: StateFlow<Boolean> = _created.asStateFlow()
 
     /**
      * The AWT view of the page: a native view of Chromium, which keeps its page while it is removed from a window and added to another one.
@@ -69,7 +74,7 @@ public class BrowserTab internal constructor(
      */
     public fun setColorScheme(scheme: ColorScheme) {
         colorScheme = scheme
-        if (isCreated) applyColorScheme()
+        if (_created.value) applyColorScheme()
     }
 
     /**
@@ -102,7 +107,7 @@ public class BrowserTab internal constructor(
      * stay registered for every page the tab loads.
      */
     internal fun created() {
-        isCreated = true
+        _created.value = true
         val devTools = browser.devToolsClient
         if (devTools == null) logger.error("No DevTools client for {}: its page is loaded without its scripts", initialUrl)
         val scheme = applyColorScheme()

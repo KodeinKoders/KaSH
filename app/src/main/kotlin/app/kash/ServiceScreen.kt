@@ -92,10 +92,11 @@ fun ServiceButtons(service: Service, tab: BrowserTab?, onToggleMute: () -> Unit,
     }
 }
 
-/** A service's page, on the whole height under the title bar. */
+/** A service's page, on the whole height under the title bar, once Chromium created it (see [BrowserTab.created]: a service just added). */
 @Composable
 fun ServicePage(tab: BrowserTab?) {
-    if (tab != null) {
+    val created = tab?.created?.collectAsState()?.value == true
+    if (tab != null && created) {
         // The panel is the page's parent while it is shown: the page keeps running when the panel goes, and is added to the next one.
         SwingPanel(
             background = Kash.colors.background,
