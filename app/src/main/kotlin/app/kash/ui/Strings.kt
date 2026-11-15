@@ -9,6 +9,8 @@ import java.util.Locale
 /** Every text of the interface, in one language. */
 @Suppress("PropertyName")
 interface Strings {
+    /** The code of the language (`fr`, `en`): the one that plugins' texts are taken in, and that their scripts are given. */
+    val code: String
     // Main window
     val alreadyRunning: String
 
@@ -75,9 +77,9 @@ interface Strings {
     val url: String
     val urlPlaceholder: String
     val urlInvalid: String
-    val workspace: String
-    val workspacePlaceholder: String
-    val workspaceInvalid: String
+    val optionRequired: String
+    val optionTooLong: String
+    val optionInvalid: String
     val nameRequired: String
     val labelOptional: String
     val labelPlaceholder: String
@@ -149,6 +151,7 @@ interface Strings {
 }
 
 object French : Strings {
+    override val code = "fr"
     override val timeLabel = TimeLabel(Locale.FRENCH, "HH:mm", "'Hier', HH:mm", "d MMM, HH:mm", "d MMM yyyy, HH:mm")
     override val alreadyRunning = "KaSH est déjà ouvert. Quittez-le (⌘Q) avant de le relancer."
     override val inbox = "Non lus"
@@ -211,9 +214,9 @@ object French : Strings {
     override val url = "URL"
     override val urlPlaceholder = "https://exemple.com/app"
     override val urlInvalid = "Une adresse http:// ou https://"
-    override val workspace = "Espace de travail"
-    override val workspacePlaceholder = "mon-equipe"
-    override val workspaceInvalid = "Des lettres, des chiffres et des tirets"
+    override val optionRequired = "Obligatoire"
+    override val optionTooLong = "Trop long"
+    override val optionInvalid = "Valeur non valide"
     override val nameRequired = "Un nom est nécessaire"
     override val labelOptional = "Label sous l'icône (optionnel)"
     override val labelPlaceholder = "Perso, Travail…"
@@ -287,6 +290,7 @@ object French : Strings {
 }
 
 object English : Strings {
+    override val code = "en"
     override val timeLabel = TimeLabel(Locale.ENGLISH, "h:mm a", "'Yesterday', h:mm a", "MMM d, h:mm a", "MMM d, yyyy, h:mm a")
     override val alreadyRunning = "KaSH is already open. Quit it (⌘Q) before launching it again."
     override val inbox = "Unread"
@@ -349,9 +353,9 @@ object English : Strings {
     override val url = "URL"
     override val urlPlaceholder = "https://example.com/app"
     override val urlInvalid = "An http:// or https:// address"
-    override val workspace = "Workspace"
-    override val workspacePlaceholder = "my-team"
-    override val workspaceInvalid = "Letters, digits and hyphens"
+    override val optionRequired = "Required"
+    override val optionTooLong = "Too long"
+    override val optionInvalid = "Not a valid value"
     override val nameRequired = "A name is needed"
     override val labelOptional = "Label under the icon (optional)"
     override val labelPlaceholder = "Personal, Work…"

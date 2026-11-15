@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -36,13 +37,16 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.rememberWindowState
+import app.kash.core.OptionError
+import app.kash.core.PluginOption
+import app.kash.core.PluginOptions
+import app.kash.core.PluginSquare
 import app.kash.core.ProfileId
 import app.kash.core.Service
-import app.kash.core.ServiceCatalog
 import app.kash.core.ServiceIcon
 import app.kash.core.ServiceId
-import app.kash.core.ServiceKind
 import app.kash.core.SquareColors
+import app.kash.core.WebApplications
 import app.kash.ui.FieldLabel
 import app.kash.ui.Hint
 import app.kash.ui.Kash
@@ -53,6 +57,8 @@ import org.jetbrains.jewel.ui.component.CheckboxRow
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
+import org.jetbrains.jewel.ui.component.SegmentedControl
+import org.jetbrains.jewel.ui.component.SegmentedControlButtonData
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
@@ -67,8 +73,8 @@ import java.nio.file.Paths
 private enum class IconMode { FAVICON, IMAGE, SQUARE }
 
 /**
- * The window that adds a service, or edits [editing]: the catalog (WhatsApp, a custom application), the service's options, and the icon of its
- * tab, with a preview.
+ * The window that adds a service, or edits [editing]: the catalog (the plugins, a web application), the service's options (its plugin's, which
+ * its manifest describes), and the icon of its tab, with a preview.
  */
 @Composable
 fun AddServiceWindow(editing: Service?, icons: ServiceIcons, onClose: () -> Unit, onDone: (Service) -> Unit) {
@@ -81,11 +87,14 @@ fun AddServiceWindow(editing: Service?, icons: ServiceIcons, onClose: () -> Unit
 
 @Composable
 private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: () -> Unit, onDone: (Service) -> Unit) {
-    var kind by remember { mutableStateOf(editing?.kind ?: ServiceKind.WHATSAPP) }
-    val name = rememberTextFieldState(if (editing?.kind == ServiceKind.CUSTOM) editing.name else "")
-    val url = rememberTextFieldState(if (editing?.kind == ServiceKind.CUSTOM) editing.url else "")
+    val plugins = icons.plugins
+    val language = strings.code
+    // The plugin of the service (null: a web application); a service that is edited keeps its own.
+    var pluginId by remember { mutableStateOf(if (editing != null) editing.plugin else plugins.all.firstOrNull()?.id) }
+    val plugin = plugins[pluginId]
+    val name = rememberTextFieldState(if (editing != null && editing.plugin == null) editing.name else "")
+    val url = rememberTextFieldState(if (editing != null && editing.plugin == null) editing.url else "")
     val label = rememberTextFieldState(editing?.label.orEmpty())
-    val workspace = rememberTextFieldState(editing?.takeIf { it.kind == ServiceKind.SLACK }?.url?.let(ServiceCatalog::slackWorkspaceOf).orEmpty())
     var showBadge by remember { mutableStateOf(editing?.showBadge ?: true) }
     var includeInInbox by remember { mutableStateOf(editing?.includeInInbox ?: true) }
     var notifications by remember { mutableStateOf(editing?.desktopNotifications ?: true) }
@@ -98,9 +107,25 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     val hex = rememberTextFieldState((icon as? ServiceIcon.Square)?.color?.removePrefix("#").orEmpty())
     val squareText = rememberTextFieldState((icon as? ServiceIcon.Square)?.text.orEmpty())
 
-    val preset = ServiceCatalog.preset(kind)
-    val defaultColor = preset?.color ?: ServiceCatalog.CUSTOM_COLOR
-    val defaultText = preset?.mono ?: ServiceCatalog.monoOf(name.text.toString())
+    // The values of the plugin's options: the edited service's, else their defaults. A text is typed in a field, and normalized as it is saved.
+    val draftOptions = remember(pluginId) {
+        val manifest = plugin?.manifest
+        val initial = if (manifest == null) emptyMap() else PluginOptions.values(manifest, editing?.takeIf { it.plugin == pluginId }?.options.orEmpty())
+        OptionsDraft(
+            texts = manifest?.options.orEmpty().filterIsInstance<PluginOption.Text>().associate { it.id to TextFieldState(initial[it.id].orEmpty()) },
+            others = mutableStateMapOf<String, String>().apply { putAll(initial.filterKeys { id -> manifest?.options?.none { it.id == id && it is PluginOption.Text } ?: false }) },
+        )
+    }
+    val optionValues = plugin?.manifest?.options.orEmpty().associate { option ->
+        option.id to when (option) {
+            is PluginOption.Text -> PluginOptions.normalize(option, draftOptions.texts[option.id]?.text?.toString().orEmpty())
+            else -> draftOptions.others[option.id].orEmpty()
+        }
+    }
+
+    val square = plugin?.manifest?.square
+    val defaultColor = square?.color ?: WebApplications.COLOR
+    val defaultText = square?.text ?: WebApplications.monoOf(name.text.toString())
     val hexText = hex.text.toString()
     val hexInvalid = hexText.isNotEmpty() && SquareColors.parse(hexText) == null
     val color = SquareColors.parse(hexText) ?: squareColor ?: defaultColor
@@ -109,9 +134,9 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     val customName = name.text.toString().trim()
     val customUrl = url.text.toString().trim()
     val urlValid = runCatching { URI(customUrl) }.getOrNull()?.let { (it.scheme == "https" || it.scheme == "http") && !it.host.isNullOrBlank() } ?: false
-    // A Slack service is one workspace: the design's required field.
-    val slackWorkspace = ServiceCatalog.slackWorkspace(workspace.text.toString())
-    val valid = (kind != ServiceKind.CUSTOM || (customName.isNotEmpty() && urlValid)) && (kind != ServiceKind.SLACK || slackWorkspace != null) &&
+    // The address of the service: the one the user typed, or the plugin's with the values of its options (null while one is not accepted).
+    val serviceUrl = if (plugin == null) customUrl.takeIf { urlValid } else PluginOptions.resolveUrl(plugin.manifest, optionValues)
+    val valid = (if (plugin == null) customName.isNotEmpty() && urlValid else serviceUrl != null) &&
         (iconMode != IconMode.IMAGE || imageFile != null) && !(iconMode == IconMode.SQUARE && hexInvalid)
 
     val draftIcon = when (iconMode) {
@@ -123,24 +148,24 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     Column(Modifier.fillMaxSize().background(Kash.colors.panel)) {
         VerticallyScrollableContainer(rememberScrollState(), Modifier.weight(1f)) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-                // The catalog: a service that is edited keeps its kind.
+                // The catalog: the plugins, then a web application. A service that is edited keeps its plugin.
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(strings.service, fontWeight = FontWeight.SemiBold)
-                    val tiles = ServiceCatalog.presets.map { it.kind to it.name } + (ServiceKind.CUSTOM to strings.custom)
+                    val tiles: List<Pair<String?, String>> = plugins.all.map { it.id to it.manifest.name.of(language) } + (null to strings.custom)
                     for (row in tiles.chunked(3)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            for ((tileKind, tileName) in row) {
+                            for ((tilePlugin, tileName) in row) {
                                 CatalogTile(
-                                    kind = tileKind, name = tileName, selected = kind == tileKind, enabled = editing == null || editing.kind == tileKind,
-                                    modifier = Modifier.weight(1f),
-                                ) { kind = tileKind; squareColor = null; hex.edit { replace(0, length, "") }; squareText.edit { replace(0, length, "") } }
+                                    square = plugins[tilePlugin]?.manifest?.square, name = tileName, selected = pluginId == tilePlugin,
+                                    enabled = editing == null || editing.plugin == tilePlugin, modifier = Modifier.weight(1f),
+                                ) { pluginId = tilePlugin; squareColor = null; hex.edit { replace(0, length, "") }; squareText.edit { replace(0, length, "") } }
                             }
                             repeat(3 - row.size) { Box(Modifier.weight(1f)) }
                         }
                     }
                 }
 
-                if (kind == ServiceKind.CUSTOM) {
+                if (plugin == null) {
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(strings.customApplication, fontWeight = FontWeight.SemiBold)
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -153,15 +178,14 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                             Hint(strings.customBadgeHint, Modifier.padding(start = 24.dp))
                         }
                     }
-                } else if (preset != null) {
+                } else {
+                    val manifest = plugin.manifest
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Text(strings.configOf(preset.name), fontWeight = FontWeight.SemiBold)
-                        if (kind == ServiceKind.SLACK) {
-                            LabeledField(
-                                strings.workspace, workspace, strings.workspacePlaceholder, Modifier.widthIn(max = 480.dp), monospace = true,
-                                error = strings.workspaceInvalid.takeIf { workspace.text.isNotBlank() && slackWorkspace == null },
-                                prefix = "https://", suffix = ".slack.com",
-                            )
+                        Text(strings.configOf(manifest.name.of(language)), fontWeight = FontWeight.SemiBold)
+                        manifest.description?.let { Hint(it.of(language)) }
+                        // The plugin's options, as its manifest describes them.
+                        for (option in manifest.options) {
+                            OptionField(option, draftOptions, optionValues[option.id].orEmpty(), language)
                         }
                         Column(Modifier.widthIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             LabeledField(strings.labelOptional, label, strings.labelPlaceholder, Modifier.fillMaxWidth())
@@ -202,12 +226,7 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(3.dp),
                             ) {
-                                val previewUrl = when (kind) {
-                                    ServiceKind.CUSTOM -> customUrl.takeIf { urlValid }.orEmpty()
-                                    ServiceKind.SLACK -> slackWorkspace?.let(ServiceCatalog::slackUrl) ?: preset?.url.orEmpty()
-                                    else -> preset?.url.orEmpty()
-                                }
-                                Tile(tileContent(kind, customName, previewUrl, draftIcon, icons), 40.dp)
+                                Tile(tileContent(pluginId, serviceUrl.orEmpty(), draftIcon, icons), 40.dp)
                                 val previewLabel = label.text.toString().trim()
                                 if (previewLabel.isNotEmpty()) {
                                     Text(previewLabel, fontSize = 10.5.sp, color = Kash.colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -224,13 +243,12 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
             DefaultButton(
                 enabled = valid,
                 onClick = {
-                    val service = (editing ?: Service(ServiceId.random(), kind, "", "", profile = ProfileId.random())).copy(
-                        name = if (kind == ServiceKind.CUSTOM) customName else preset!!.name,
-                        url = when (kind) {
-                            ServiceKind.CUSTOM -> customUrl
-                            ServiceKind.SLACK -> ServiceCatalog.slackUrl(slackWorkspace!!)
-                            else -> preset!!.url
-                        },
+                    // A plugin's service takes its name and its address from its plugin (KashModel refreshes them).
+                    val service = (editing ?: Service(ServiceId.random(), name = "", url = "", profile = ProfileId.random())).copy(
+                        plugin = pluginId,
+                        options = optionValues,
+                        name = plugin?.manifest?.name?.of(language) ?: customName,
+                        url = serviceUrl!!,
                         label = label.text.toString().trim(),
                         showBadge = showBadge,
                         includeInInbox = includeInInbox,
@@ -244,8 +262,56 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     }
 }
 
+/** What the fields of a plugin's options hold: the texts as they are typed, the choices and the booleans as their values. */
+private class OptionsDraft(val texts: Map<String, TextFieldState>, val others: MutableMap<String, String>)
+
+/** The field of [option], as its manifest describes it; [value] is its value, normalized. */
 @Composable
-private fun CatalogTile(kind: ServiceKind, name: String, selected: Boolean, enabled: Boolean, modifier: Modifier, onPick: () -> Unit) {
+private fun OptionField(option: PluginOption, draft: OptionsDraft, value: String, language: String) {
+    when (option) {
+        is PluginOption.Text -> {
+            val state = draft.texts[option.id] ?: return
+            // An error once something is typed: an empty required field only keeps the button disabled.
+            val error = PluginOptions.error(option, value).takeIf { state.text.isNotBlank() }?.let {
+                when (it) {
+                    OptionError.MISSING -> strings.optionRequired
+                    OptionError.TOO_LONG -> strings.optionTooLong
+                    OptionError.PATTERN -> option.patternError?.of(language) ?: strings.optionInvalid
+                }
+            }
+            Column(Modifier.widthIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                LabeledField(
+                    option.label.of(language), state, option.placeholder?.of(language).orEmpty(), Modifier.fillMaxWidth(),
+                    // A field with what an address has around it is a part of an address.
+                    monospace = option.prefix != null || option.suffix != null,
+                    error = error, prefix = option.prefix, suffix = option.suffix,
+                )
+                option.hint?.let { Hint(it.of(language)) }
+            }
+        }
+        is PluginOption.Choice -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FieldLabel(option.label.of(language))
+            // A few choices side by side, more in a column.
+            if (option.choices.size <= 4) {
+                SegmentedControl(option.choices.map { choice ->
+                    SegmentedControlButtonData(choice.value == value, { Text(choice.label.of(language)) }, { draft.others[option.id] = choice.value })
+                })
+            } else {
+                for (choice in option.choices) {
+                    RadioButtonRow(choice.label.of(language), choice.value == value, { draft.others[option.id] = choice.value })
+                }
+            }
+            option.hint?.let { Hint(it.of(language)) }
+        }
+        is PluginOption.Flag -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            CheckboxRow(option.label.of(language), value == "true", { draft.others[option.id] = it.toString() })
+            option.hint?.let { Hint(it.of(language), Modifier.padding(start = 24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun CatalogTile(square: PluginSquare?, name: String, selected: Boolean, enabled: Boolean, modifier: Modifier, onPick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     Row(
         modifier.height(56.dp)
@@ -257,9 +323,8 @@ private fun CatalogTile(kind: ServiceKind, name: String, selected: Boolean, enab
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        val preset = ServiceCatalog.preset(kind)
-        if (preset != null) {
-            Tile(TileContent.Square(preset.color, preset.mono), 32.dp)
+        if (square != null) {
+            Tile(TileContent.Square(square.color, square.text), 32.dp)
         } else {
             Box(Modifier.size(32.dp).background(Kash.colors.neutral, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                 KashIcon(KashIcons.Plus, Kash.colors.text)

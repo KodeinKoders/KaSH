@@ -37,15 +37,6 @@ public value class ServiceId(public val value: String) {
     }
 }
 
-/** Which kind of service it is: a known one, whose page KaSH knows how to read, or any web application. */
-@Serializable
-public enum class ServiceKind {
-    WHATSAPP,
-    GOOGLE_CHAT,
-    SLACK,
-    CUSTOM,
-}
-
 /** The icon of a service's tab. */
 @Serializable
 public sealed interface ServiceIcon {
@@ -66,9 +57,15 @@ public sealed interface ServiceIcon {
 }
 
 /**
- * A messaging service, shown in a tab of the rail, in a Chromium profile of its own.
+ * A messaging service, shown in a tab of the rail, in a Chromium profile of its own: a plugin's (see [PluginManifest]), or a web application that the
+ * user added by its address.
  *
- * @property name What it is called (the catalog's name, or the user's for a custom application).
+ * @property plugin The id of its plugin, null for a web application that the user added.
+ * @property options The values of its plugin's options, normalized ([PluginOptions]): a boolean is `true` or `false`.
+ * @property name What it is called: the user's for a web application; for a plugin's service, its plugin's name in the language of the interface,
+ *   derived from the plugin ([PluginRegistry.refresh]).
+ * @property url Its address: the user's for a web application; for a plugin's service, its plugin's URL with the values of the options, derived
+ *   from the plugin.
  * @property label What is shown under its icon, to tell two accounts of the same service apart.
  * @property profile Its Chromium profile: replaced by a new one when its data is erased (the old one is then in [KashState.deletedProfiles]).
  * @property enabled A disabled service is not loaded, and is shown neither in the rail nor in the Unread tab.
@@ -80,7 +77,8 @@ public sealed interface ServiceIcon {
 @Serializable
 public data class Service(
     val id: ServiceId,
-    val kind: ServiceKind,
+    val plugin: String? = null,
+    val options: Map<String, String> = emptyMap(),
     val name: String,
     val url: String,
     val label: String = "",

@@ -1,0 +1,25 @@
+{
+  "$schema": "../manifest.schema.json",
+  "manifestVersion": 1,
+  "id": "slack",
+  "version": "1.0.0",
+  "name": "Slack",
+  "square": { "text": "Sl", "color": "#5B2C6F" },
+  "url": "https://${workspace}.slack.com/",
+  "matches": ["https://app.slack.com/*"],
+  "script": "plugin.js",
+  "options": [
+    {
+      "id": "workspace",
+      "type": "text",
+      "label": { "en": "Workspace", "fr": "Espace de travail" },
+      "required": true,
+      "placeholder": { "en": "my-team", "fr": "mon-equipe" },
+      "prefix": "https://",
+      "suffix": ".slack.com",
+      "lowercase": true,
+      "pattern": "[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*",
+      "patternError": { "en": "Letters, digits and hyphens", "fr": "Des lettres, des chiffres et des tirets" }
+    }
+  ]
+}

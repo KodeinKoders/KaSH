@@ -1,0 +1,116 @@
+/// <reference path="../kash-plugin.d.ts" />
+// WhatsApp's plugin: reads the unread conversations from WhatsApp Web's live model (`window.require('WAWebCollections').Chat`, the module system
+// of the page, which whatsapp-web.js uses too).
+//
+// Muted conversations (until a date, forever, or auto-muted by WhatsApp) and archived ones are left out, as WhatsApp leaves them out of its own
+// count. A conversation marked as unread by hand (its count is -1) counts as 1. A group that was never named is named by its members, without
+// the user, as WhatsApp shows it. The preview is the start of the last message as WhatsApp shows it in the row of the conversation (with the
+// sender in a group), read from the rows that are rendered and kept while the row is scrolled out; no other message is read.
+
+// The modules exist once WhatsApp is loaded and logged in: before that, `require` throws, and there is nothing to read.
+const module = (name) => {
+    try {
+        return typeof window.require === 'function' ? window.require(name) : null;
+    } catch (e) {
+        return null;
+    }
+};
+
+const kind = (id) => id.endsWith('@g.us') ? 'group' : id.endsWith('@newsletter') ? 'channel' : 'direct';
+
+const muted = (chat) => {
+    if (chat.isAutoMuted) return true;
+    const expiration = chat.mute ? chat.mute.expiration : 0;
+    return expiration === -1 || expiration * 1000 > Date.now();
+};
+
+// The user's own ids (their LID and their phone number), which a group's members are compared with.
+const me = () => {
+    const prefs = module('WAWebUserPrefsMeUser');
+    if (!prefs) return [];
+    return [prefs.getMaybeMeLidUser && prefs.getMaybeMeLidUser(), prefs.getMaybeMePnUser && prefs.getMaybeMePnUser()]
+        .filter(Boolean)
+        .map((user) => user._serialized || String(user));
+};
+
+// A member's name as WhatsApp shows it in a group: the first name of the contact, else their name, the name they chose, or their LID's.
+const memberName = (contact) => (contact && (contact.shortName || contact.name || contact.pushname || contact.displayNameLID)) || '';
+
+// Names joined as WhatsApp joins them, in the language of its interface: `Alice, Bruno et Chloé` in French.
+const list = (names) => {
+    try {
+        return new Intl.ListFormat(document.documentElement.lang || undefined, { style: 'long', type: 'conjunction' }).format(names);
+    } catch (e) {
+        return names.join(', ');
+    }
+};
+
+// A group that was never named has no title: WhatsApp shows its members' names instead, without the user's.
+const membersOf = (chat, myIds) => {
+    const participants = chat.groupMetadata && chat.groupMetadata.participants;
+    if (!participants || typeof participants.getModelsArray !== 'function') return '';
+    return list(participants.getModelsArray()
+        .filter((participant) => !myIds.includes(participant.id._serialized))
+        .map((participant) => memberName(participant.contact))
+        .filter(Boolean));
+};
+
+// Without the marks of direction (U+202A…U+202E, U+2066…U+2069) that WhatsApp puts around names in attributes.
+const clean = (text) => (text || '').replace(/[‪-‮⁦-⁩]/g, '').trim();
+
+// The previews of the last messages, as WhatsApp shows them in its rows (its own wording for calls, photos, group events…, and the sender in a
+// group), by the name that the row shows: only the rows that are rendered (the list is virtualized) have one.
+const renderedPreviews = () => {
+    const previews = new Map();
+    for (const row of document.querySelectorAll('#pane-side [role="row"]')) {
+        const title = row.querySelector('[data-testid="cell-frame-title"] [title]');
+        const preview = row.querySelector('[data-testid="last-msg-status"]');
+        if (title && preview) previews.set(clean(title.getAttribute('title')), kash.dom.text(preview));
+    }
+    return previews;
+};
+
+// The last preview of each unread conversation, kept while its row is not rendered (scrolled out of the list).
+const previewOf = new Map();
+
+kash.watch(() => {
+    const collections = module('WAWebCollections');
+    if (!collections || !collections.Chat) return null;
+    const myIds = me();
+    const rendered = renderedPreviews();
+    const conversations = collections.Chat.getModelsArray()
+        .filter((chat) => chat.unreadCount !== 0 && !chat.archive && !muted(chat))
+        .map((chat) => {
+            const id = chat.id._serialized;
+            const name = chat.formattedTitle || (kind(id) === 'group' ? membersOf(chat, myIds) : '');
+            if (rendered.has(name)) previewOf.set(id, rendered.get(name));
+            return {
+                id,
+                name,
+                kind: kind(id),
+                count: chat.unreadCount > 0 ? chat.unreadCount : 1,
+                mention: !!chat.hasUnreadMention,
+                preview: previewOf.get(id) || '',
+                // The time of its last message (the chat's last activity, in seconds), in milliseconds.
+                time: typeof chat.t === 'number' ? chat.t * 1000 : null,
+            };
+        });
+    // A conversation that is read again forgets its preview.
+    for (const id of [...previewOf.keys()]) {
+        if (!conversations.some((conversation) => conversation.id === id)) previewOf.delete(id);
+    }
+    return conversations;
+});
+
+kash.onOpenConversation((id) => {
+    const collections = module('WAWebCollections');
+    const commands = module('WAWebCmd');
+    const chat = collections && collections.Chat && collections.Chat.get(id);
+    if (!chat || !commands || !commands.Cmd) return;
+    // Its argument was the chat, and is now an object that holds it: whatsapp-web.js calls it both ways depending on the version.
+    try {
+        commands.Cmd.openChatBottom({ chat });
+    } catch (e) {
+        commands.Cmd.openChatBottom(chat);
+    }
+});

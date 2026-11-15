@@ -12,15 +12,16 @@ import app.kash.core.Conversation
 import app.kash.core.ConversationKind
 import app.kash.core.KashDirectories
 import app.kash.core.KashState
+import app.kash.core.PluginRegistry
 import app.kash.core.ProfileId
 import app.kash.core.Selection
 import app.kash.core.Service
 import app.kash.core.ServiceId
-import app.kash.core.ServiceKind
 import app.kash.core.ServiceUnread
 import app.kash.core.Settings
 import app.kash.core.StateFile
 import app.kash.core.UnreadCount
+import app.kash.ui.stringsOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -63,17 +64,26 @@ class KashModel(
     private val file: StateFile,
     private val directories: KashDirectories,
     private val engine: BrowserEngine,
-    /** The scripts that the pages of a kind of service are given: the notifications' for all, and what reads each known service. */
-    private val scriptsFor: (ServiceKind) -> List<String>,
+    /** The plugins that services may be of: their names, their addresses and their scripts. */
+    val plugins: PluginRegistry,
+    /** The scripts that the pages of a service are given, in a language (`fr`, `en`): the notifications' for all, and its plugin's. */
+    private val scriptsFor: (Service, String) -> List<String>,
     /** KaSH's theme when it starts, which the pages see as the system's (see [colorScheme]). */
     initialColorScheme: ColorScheme,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     var state: KashState by mutableStateOf(
-        initial.copy(selection = if (initial.settings.openInboxOnLaunch) Selection.Inbox else initial.selection),
+        initial.copy(
+            // A plugin's service takes its name and its address from its plugin, which may have changed since it was saved.
+            services = initial.services.map { plugins.refresh(it, languageOf(initial.settings)) },
+            selection = if (initial.settings.openInboxOnLaunch) Selection.Inbox else initial.selection,
+        ),
     )
         private set
+
+    /** The language of the interface (`fr`, `en`): the one of the plugins' names, and the one their scripts are given. */
+    val language: String get() = languageOf(settings)
 
     val services: List<Service> get() = state.services
     val settings: Settings get() = state.settings
@@ -95,8 +105,11 @@ class KashModel(
     /** The title of each service's page: what a custom application's count is read from. */
     private val titles = mutableStateMapOf<ServiceId, String>()
 
-    /** The unread conversations of each instrumented service, as its page last sent them. */
+    /** The unread conversations of each plugin's service, as its script last sent them (`kash.unread.set`). */
     private val conversations = mutableStateMapOf<ServiceId, List<Conversation>>()
+
+    /** The unread total of each plugin's service whose script only tells that (`kash.unread.setCount`). */
+    private val totals = mutableStateMapOf<ServiceId, Int>()
 
     /** The services whose cache was just reset, which Settings › Services says until the window is closed. */
     val cacheReset = mutableStateMapOf<ServiceId, Boolean>()
@@ -118,19 +131,20 @@ class KashModel(
 
     fun service(id: ServiceId): Service? = services.firstOrNull { it.id == id }
 
-    /** What is unread in each service: a known service's conversations as its page sends them (`services/`), a custom application's total in its title. */
+    /** What is unread in each service: a plugin's service's conversations or total, as its script sends them, a web application's total in its title. */
     val unread: Map<ServiceId, ServiceUnread>
         get() = services.associate { service ->
-            service.id to when (service.kind) {
-                ServiceKind.CUSTOM -> ServiceUnread(total = titles[service.id]?.let(UnreadCount::fromTitle))
-                ServiceKind.WHATSAPP, ServiceKind.GOOGLE_CHAT, ServiceKind.SLACK -> ServiceUnread(conversations = conversations[service.id].orEmpty())
+            service.id to if (service.plugin == null) {
+                ServiceUnread(total = titles[service.id]?.let(UnreadCount::fromTitle))
+            } else {
+                ServiceUnread(total = totals[service.id], conversations = conversations[service.id].orEmpty())
             }
         }
 
     private fun load(service: Service) {
         if (service.id in loaded) return
         val profile = engine.profile(directories.profile(service.profile))
-        val tab = profile.openTab(service.url, scriptsFor(service.kind))
+        val tab = profile.openTab(service.url, scriptsFor(service, language))
         tab.setColorScheme(colorScheme)
         val jobs = listOf(
             scope.launch { tab.title.collect { titles[service.id] = it } },
@@ -150,6 +164,11 @@ class KashModel(
         }
         when (json["type"]?.jsonPrimitive?.contentOrNull) {
             "notification" -> onPageNotification(service, json)
+            "unreadCount" -> {
+                val count = json["count"]?.jsonPrimitive?.intOrNull?.takeIf { it >= 0 } ?: return logger.warn("The unread total of {} cannot be read", service.title)
+                conversations.remove(id)
+                totals[id] = count
+            }
             "unread" -> conversations[id] = try {
                 // Only counts in the log: the names are the user's contacts.
                 json.getValue("conversations").jsonArray.map { element ->
@@ -167,7 +186,7 @@ class KashModel(
                         preview = conversation["preview"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                         time = conversation["time"]?.jsonPrimitive?.longOrNull,
                     )
-                }.also { logger.debug("Unread of {}: {} conversations, {} messages", service.title, it.size, it.sumOf { c -> c.count }) }
+                }.also { logger.debug("Unread of {}: {} conversations, {} messages", service.title, it.size, it.sumOf { c -> c.count }); totals.remove(id) }
             } catch (e: Exception) {
                 logger.warn("The unread conversations of {} cannot be read", service.title, e)
                 return
@@ -180,6 +199,7 @@ class KashModel(
         val loadedService = loaded.remove(id)
         titles.remove(id)
         conversations.remove(id)
+        totals.remove(id)
         if (loadedService == null) {
             then()
             return
@@ -207,19 +227,26 @@ class KashModel(
 
     fun select(selection: Selection) = update { it.copy(selection = selection) }
 
-    fun updateSettings(change: (Settings) -> Settings) = update { it.copy(settings = change(it.settings)) }
+    fun updateSettings(change: (Settings) -> Settings) = update { state ->
+        val settings = change(state.settings)
+        // The names of the plugins' services are in the language of the interface.
+        if (languageOf(settings) == languageOf(state.settings)) state.copy(settings = settings)
+        else state.copy(settings = settings, services = state.services.map { plugins.refresh(it, languageOf(settings)) })
+    }
 
-    /** Adds [service], loads it and selects it. */
-    fun add(service: Service) {
+    /** Adds [service] (its name and address taken from its plugin), loads it and selects it. */
+    fun add(added: Service) {
+        val service = plugins.refresh(added, language)
         update { it.copy(services = it.services + service, selection = Selection.OfService(service.id)) }
         if (service.enabled) load(service)
     }
 
     /**
-     * Replaces the service of the same id by [service]: its page is opened again when its address changed, and closed or opened when it was disabled
-     * or enabled.
+     * Replaces the service of the same id by [service] (its name and address taken from its plugin): its page is opened again when its address or
+     * its options changed (its script is given them), and closed or opened when it was disabled or enabled.
      */
-    fun replace(service: Service) {
+    fun replace(replaced: Service) {
+        val service = plugins.refresh(replaced, language)
         val previous = service(service.id) ?: return
         update { state -> state.copy(services = state.services.map { if (it.id == service.id) service else it }) }
         when {
@@ -227,7 +254,7 @@ class KashModel(
                 unload(service.id)
                 if (state.selection == Selection.OfService(service.id)) select(Selection.Inbox)
             }
-            !previous.enabled || previous.url != service.url -> unload(service.id) { service(service.id)?.takeIf { it.enabled }?.let(::load) }
+            !previous.enabled || previous.url != service.url || previous.options != service.options -> unload(service.id) { service(service.id)?.takeIf { it.enabled }?.let(::load) }
         }
     }
 
@@ -312,3 +339,6 @@ class KashModel(
         scope.cancel()
     }
 }
+
+/** The language of the interface that [settings] give (`fr`, `en`). */
+private fun languageOf(settings: Settings): String = stringsOf(settings.language).code

@@ -14,7 +14,7 @@ import app.kash.browser.BrowserEngine
 import app.kash.browser.ColorScheme
 import app.kash.core.Inbox
 import app.kash.core.KashDirectories
-import app.kash.core.ServiceKind
+import app.kash.core.Service
 import app.kash.core.StateFile
 import app.kash.core.ThemeMode
 import app.kash.core.WindowFile
@@ -76,24 +76,17 @@ fun main() {
     // On this thread, not Swing's: JCEF initializes on Swing's thread, and this waits for it.
     val engine = BrowserEngine.start(jcefBundle(), directories.profiles, inspectPort())
     val shim = resource("notification-shim.js")
-    val whatsApp = resource("services/whatsapp.js")
-    val googleChat = resource("services/google-chat.js")
-    val slack = resource("services/slack.js")
-    // Every page gets the notifications; a known service also gets what reads its unread conversations.
-    val scriptsFor = { kind: ServiceKind ->
-        when (kind) {
-            ServiceKind.WHATSAPP -> listOf(shim, whatsApp)
-            ServiceKind.GOOGLE_CHAT -> listOf(shim, googleChat)
-            ServiceKind.SLACK -> listOf(shim, slack)
-            ServiceKind.CUSTOM -> listOf(shim)
-        }
+    val plugins = BuiltInPlugins.registry()
+    // Every page gets the notifications; a plugin's service also gets its plugin's script, with the API that it reads the page with.
+    val scriptsFor = { service: Service, language: String ->
+        listOf(shim) + listOfNotNull(plugins[service.plugin]?.let { PluginScripts.of(it, service.options, language) })
     }
     // The main window opens where it was, as big and in the mode it was in when KaSH was closed, on a screen that is still there.
     val windowFile = WindowFile(directories.windowFile)
     val geometry = windowFile.load().sanitized(screens())
     application {
-        val model = remember { KashModel(state, file, directories, engine, scriptsFor, initialColorScheme(state.settings.theme)) }
-        Kash(engine, model, ServiceIcons(directories).let { remember { it } }, windowFile, geometry, directories.hangs)
+        val model = remember { KashModel(state, file, directories, engine, plugins, scriptsFor, initialColorScheme(state.settings.theme)) }
+        Kash(engine, model, remember { ServiceIcons(directories, model.plugins) }, windowFile, geometry, directories.hangs)
     }
 }
 

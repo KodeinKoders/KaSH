@@ -5,12 +5,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class InboxTest {
-    private fun service(kind: ServiceKind, name: String, label: String = "") =
-        Service(ServiceId.random(), kind, name, "https://example.com/", label = label, profile = ProfileId.random())
+    // A plugin's service ([plugin] is its id), or a web application (null).
+    private fun service(plugin: String?, name: String, label: String = "") =
+        Service(ServiceId.random(), plugin, name = name, url = "https://example.com/", label = label, profile = ProfileId.random())
 
-    private val whatsApp = service(ServiceKind.WHATSAPP, "WhatsApp", "Perso")
-    private val discord = service(ServiceKind.CUSTOM, "Discord", "Jeux")
-    private val custom = service(ServiceKind.CUSTOM, "Mon app")
+    private val whatsApp = service("whatsapp", "WhatsApp", "Perso")
+    private val discord = service(null, "Discord", "Jeux")
+    private val custom = service(null, "Mon app")
     private val settings = Settings()
 
     private val unread = mapOf(

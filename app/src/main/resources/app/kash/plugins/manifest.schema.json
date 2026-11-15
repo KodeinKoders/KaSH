@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KaSH plugin manifest",
+  "description": "The manifest of a KaSH plugin (manifest.json): what the plugin is, its options, the address of its services, and its script. See PLUGINS.adoc.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifestVersion", "id", "version", "name", "square", "url", "matches", "script"],
+  "properties": {
+    "$schema": {
+      "description": "The JSON Schema that editors check the file with. KaSH does not read it.",
+      "type": "string"
+    },
+    "manifestVersion": {
+      "description": "The version of this format. KaSH refuses a version it does not know.",
+      "const": 1
+    },
+    "id": {
+      "description": "What names the plugin, in the services that use it. Lowercase letters and digits, in words separated by hyphens.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "version": {
+      "description": "The plugin's own version, given to its script (kash.plugin.version).",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "name": {
+      "description": "The name of the plugin's services.",
+      "$ref": "#/$defs/localizedText"
+    },
+    "description": {
+      "description": "A line shown under the settings of the plugin's services in the Add service window.",
+      "$ref": "#/$defs/localizedText"
+    },
+    "square": {
+      "description": "The colored square that stands for a service while its site's icon is not loaded.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "color"],
+      "properties": {
+        "text": {
+          "description": "1 to 3 characters.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 3
+        },
+        "color": {
+          "description": "#RRGGBB.",
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      }
+    },
+    "url": {
+      "description": "The address of a service, an http(s) URL. ${id} is replaced by the value of the option id, a text that is required or has a default, or a choice, encoded as a component of a URI.",
+      "type": "string",
+      "pattern": "^https?://"
+    },
+    "matches": {
+      "description": "The addresses of the pages where the script runs, in the top frame only. * matches any run of characters.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "script": {
+      "description": "The file of the script, in the plugin's folder.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*\\.js$"
+    },
+    "options": {
+      "description": "The fields of the form that adds a service of the plugin. Their ids are unique.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/option" }
+    }
+  },
+  "$defs": {
+    "localizedText": {
+      "description": "A text, either the same in every language, or by language code (en, fr…): KaSH takes the language of its interface, else en, else the first one.",
+      "oneOf": [
+        { "type": "string", "minLength": 1, "pattern": "\\S" },
+        {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        }
+      ]
+    },
+    "option": {
+      "type": "object",
+      "required": ["id", "type", "label"],
+      "properties": {
+        "id": {
+          "description": "What names the option: ${id} in the URL, kash.options.id in the script. Letters and digits, starting with a letter.",
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9]*$"
+        },
+        "type": {
+          "description": "text, choice or boolean.",
+          "enum": ["text", "choice", "boolean"]
+        },
+        "label": {
+          "description": "The label of the field.",
+          "$ref": "#/$defs/localizedText"
+        },
+        "hint": {
+          "description": "A line under the field.",
+          "$ref": "#/$defs/localizedText"
+        }
+      },
+      "oneOf": [
+        { "$ref": "#/$defs/textOption" },
+        { "$ref": "#/$defs/choiceOption" },
+        { "$ref": "#/$defs/booleanOption" }
+      ]
+    },
+    "textOption": {
+      "description": "A text field. What is typed is trimmed, loses the prefix at its start (whatever its case), is cut at the first occurrence of the suffix, and is lowercased when lowercase is true; it must then match the pattern whole.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": true,
+        "type": { "const": "text" },
+        "label": true,
+        "hint": true,
+        "required": {
+          "description": "Whether the field must have a value. An option of the URL without a default must be required.",
+          "type": "boolean",
+          "default": false
+        },
+        "default": {
+          "description": "The value of a new service.",
+          "type": "string"
+        },
+        "placeholder": {
+          "description": "What the empty field shows.",
+          "$ref": "#/$defs/localizedText"
+        },
+        "prefix": {
+          "description": "Shown before the field, and removed from the start of a pasted value.",
+          "type": "string"
+        },
+        "suffix": {
+          "description": "Shown after the field; a pasted value is cut at its first occurrence.",
+          "type": "string"
+        },
+        "lowercase": {
+          "description": "Whether the value is lowercased.",
+          "type": "boolean",
+          "default": false
+        },
+        "pattern": {
+          "description": "A regular expression that the value must match whole, in a syntax that Java and JavaScript share.",
+          "type": "string",
+          "format": "regex"
+        },
+        "patternError": {
+          "description": "What is shown when the value does not match the pattern.",
+          "$ref": "#/$defs/localizedText"
+        },
+        "maxLength": {
+          "description": "The longest value.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "choiceOption": {
+      "description": "One value among several.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["choices"],
+      "properties": {
+        "id": true,
+        "type": { "const": "choice" },
+        "label": true,
+        "hint": true,
+        "choices": {
+          "description": "The values, with their labels. Their values are unique.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": { "type": "string", "minLength": 1 },
+              "label": { "$ref": "#/$defs/localizedText" }
+            }
+          }
+        },
+        "default": {
+          "description": "The value of a new service, one of the choices; the first one otherwise.",
+          "type": "string"
+        }
+      }
+    },
+    "booleanOption": {
+      "description": "A check box. It cannot be in the URL.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": true,
+        "type": { "const": "boolean" },
+        "label": true,
+        "hint": true,
+        "default": {
+          "description": "The value of a new service.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

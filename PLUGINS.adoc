@@ -1,0 +1,436 @@
+= KaSH plugins
+:toc: left
+:toclevels: 3
+:idprefix:
+:idseparator: -
+:icons: font
+:source-highlighter: highlight.js
+
+[.lead]
+A plugin teaches KaSH a messaging service: where it is, what to ask the user when they add it, and how to read its unread conversations.
+
+Every service that KaSH knows is a plugin: WhatsApp, Google Chat and Slack are the built-in ones, in `app/src/main/resources/app/kash/plugins/`.
+A web application that the user adds by its address is not a plugin: it has no options and no script, and KaSH reads its unread count from its page's title (`(3) My application`).
+
+NOTE: KaSH only loads its built-in plugins for now.
+The format is meant for plugins that the user installs too, which a later version will load.
+
+
+== What a plugin is
+
+A plugin is a folder named by its id, with two files:
+
+* `manifest.json`, which describes it: its name, the address of its services, their options, and where its script runs;
+* its script, which runs in the service's page and reports the unread conversations to KaSH through the <<the-api,`kash` API>>.
+
+[source]
+----
+plugins/
+    index.json                  the built-in plugins, in the order of the catalog
+    manifest.schema.json        the JSON Schema of a manifest
+    kash-plugin.d.ts            the types of the API
+    slack/
+        manifest.json
+        plugin.js
+----
+
+`index.json` lists the built-in plugins, in the order of the Add service window's catalog.
+A plugin that is not listed is not loaded.
+
+
+== The manifest
+
+[source,json]
+.Example: Slack's manifest
+----
+{
+    "$schema": "../manifest.schema.json",
+    "manifestVersion": 1,
+    "id": "slack",
+    "version": "1.0.0",
+    "name": "Slack",
+    "square": { "text": "Sl", "color": "#5B2C6F" },
+    "url": "https://${workspace}.slack.com/",
+    "matches": ["https://app.slack.com/*"],
+    "script": "plugin.js",
+    "options": [
+        {
+            "id": "workspace",
+            "type": "text",
+            "label": { "en": "Workspace", "fr": "Espace de travail" },
+            "required": true,
+            "placeholder": { "en": "my-team", "fr": "mon-equipe" },
+            "prefix": "https://",
+            "suffix": ".slack.com",
+            "lowercase": true,
+            "pattern": "[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*",
+            "patternError": { "en": "Letters, digits and hyphens", "fr": "Des lettres, des chiffres et des tirets" }
+        }
+    ]
+}
+----
+
+`manifest.schema.json` is the manifest's JSON Schema: an editor that knows JSON Schema checks and completes a manifest that names it in `$schema`.
+KaSH checks every manifest it loads against the same rules, and refuses one that breaks any, with the path of the field (`options[0].pattern: not a regular expression`).
+It also refuses a field that it does not know, which is most often a typo.
+
+[cols="1,1,4"]
+|===
+| Field | Required | What it is
+
+| `$schema`
+| no
+| The JSON Schema that editors check the file with. KaSH does not read it.
+
+| `manifestVersion`
+| yes
+| The version of the format: `1`. KaSH refuses a version that it does not know.
+
+| `id`
+| yes
+| What names the plugin, in the services that use it: lowercase letters and digits, in words separated by hyphens (`google-chat`). The plugin's folder has the same name.
+
+| `version`
+| yes
+| The plugin's own version, which its script is given (`kash.plugin.version`).
+
+| `name`
+| yes
+| The name of the plugin's services, a <<localized-texts,localized text>>.
+
+| `description`
+| no
+| A localized text, shown under the settings of the plugin's services in the Add service window.
+
+| `square`
+| yes
+| The colored square that stands for a service while the site's icon is not loaded: its `text` (1 to 3 characters) on its `color` (`#RRGGBB`).
+
+| `url`
+| yes
+| The address of a service: an <<the-url,http(s) URL template>>.
+
+| `matches`
+| yes
+| The addresses of the pages where the script runs, <<where-the-script-runs,in the top frame>>. Not empty.
+
+| `script`
+| yes
+| The file of the script, in the plugin's folder: a `.js` file, without `/` or `..`.
+
+| `options`
+| no
+| The <<options,fields that the user fills>> when they add a service of the plugin. Their ids are unique.
+|===
+
+
+=== Localized texts
+
+A text that KaSH shows is either a string, the same in every language, or an object of texts by language code:
+
+[source,json]
+----
+"label": { "en": "Workspace", "fr": "Espace de travail" }
+----
+
+KaSH takes the text in the language of its interface, else in English, else the first one.
+An empty text, or an object without any, is refused.
+
+
+=== Options
+
+An option is a field of the Add service window.
+Its value is saved with the service, may be used in the URL, and is given to the script as `kash.options.<id>`.
+
+Every option has:
+
+[cols="1,1,4"]
+|===
+| Field | Required | What it is
+
+| `id`
+| yes
+| Letters and digits, starting with a letter: `${id}` in the URL, `kash.options.id` in the script.
+
+| `type`
+| yes
+| `text`, `choice` or `boolean`.
+
+| `label`
+| yes
+| The label of the field, a localized text.
+
+| `hint`
+| no
+| A localized line under the field.
+|===
+
+
+==== Text
+
+A text field.
+
+[cols="1,4"]
+|===
+| Field | What it is
+
+| `required`
+| Whether the field must have a value. `false` by default.
+
+| `default`
+| The value of a new service.
+
+| `placeholder`
+| What the empty field shows, a localized text.
+
+| `prefix`
+| Shown before the field (`https://`), and removed from the start of a pasted value.
+
+| `suffix`
+| Shown after the field (`.slack.com`): a pasted value is cut at its first occurrence.
+
+| `lowercase`
+| Whether the value is lowercased. `false` by default.
+
+| `pattern`
+| A regular expression that the value must match whole, in a syntax that Java and JavaScript share.
+
+| `patternError`
+| What the field says when the value does not match the pattern, a localized text.
+
+| `maxLength`
+| The longest value.
+|===
+
+What the user types is normalized before it is checked and saved, in this order:
+
+. the spaces around it are removed;
+. the `prefix` is removed from its start, whatever its case;
+. it is cut at the first occurrence of the `suffix`;
+. it is lowercased when `lowercase` is `true`.
+
+So `https://My-Team.slack.com/client` is saved as `my-team`, which the user can paste from their browser.
+
+
+==== Choice
+
+One value among several, which the field shows side by side (up to 4) or in a column.
+
+[source,json]
+----
+{
+    "id": "region",
+    "type": "choice",
+    "label": { "en": "Region", "fr": "Région" },
+    "choices": [
+        { "value": "eu", "label": "Europe" },
+        { "value": "us", "label": { "en": "United States", "fr": "États-Unis" } }
+    ],
+    "default": "eu"
+}
+----
+
+`choices` is not empty and its values are unique.
+`default` is one of them; without it, a new service has the first one.
+
+
+==== Boolean
+
+A check box, whose `default` is `false` unless it says `true`.
+The script sees it as a boolean.
+It cannot be in the URL.
+
+
+=== The URL
+
+The `url` is the address that a service of the plugin opens.
+`${id}` in it is replaced by the value of the option `id`, encoded as a component of a URI (what is not a letter, a digit or one of `-._~` is percent-encoded).
+
+An option of the URL always has a value: it is a choice, or a text that is required or has a default.
+A boolean cannot be in it.
+With any value, the URL must be an http(s) address with a host.
+
+The URL is also what KaSH's links are judged by: a link to another site than the service's opens in the system's browser.
+
+
+=== Where the script runs
+
+The script runs in the top frame of every page whose address matches one of `matches`, where `*` matches any run of characters.
+It does not run in frames, nor in the windows that a page opens.
+
+A service may not stay at its `url`: Slack's `https://my-team.slack.com/` signs the user in, then sends them to `https://app.slack.com/client/…`, and Google Chat's `https://mail.google.com/chat/` sends them to `https://chat.google.com/`.
+`matches` names the pages that the script reads, wherever the service ends up.
+
+
+[#the-api]
+== The script and the `kash` API
+
+The script is the body of a function of `kash`, the API.
+KaSH runs it in every document of the pages that `matches` names, once per document, before the page's own scripts: the page is not loaded yet when it starts, and the script reads it later, as `kash.watch` does.
+An exception that the script throws is caught and logged in the page's console, and the page goes on.
+
+Start a script with a reference to the API's types, for an editor's completion:
+
+[source,javascript]
+----
+/// <reference path="../kash-plugin.d.ts" />
+----
+
+
+=== Reporting the unread conversations
+
+A script reports **the whole state** of the unread conversations, every time: KaSH replaces what it had with it.
+
+[source,typescript]
+----
+kash.unread.set(conversations: Conversation[]): void
+kash.unread.setCount(count: number): void
+kash.unread.clear(): void
+----
+
+`set` sends the unread conversations, which the Unread tab lists and the tab's badge counts.
+`setCount` is for a service whose page only tells a total: the tab shows it, as for a web application.
+`clear` is `set([])`.
+A state that is the same as the last one is not sent again.
+
+A conversation is:
+
+[cols="1,1,4"]
+|===
+| Field | Required | What it is
+
+| `id`
+| yes
+| The service's own id of the conversation, not empty and unique in the state: KaSH gives it back to `onOpenConversation`.
+
+| `name`
+| yes
+| Its name, or `''` when the service gives none (KaSH then shows "Unnamed group" or "Unnamed conversation").
+
+| `kind`
+| yes
+| `direct`, `group` or `channel`.
+
+| `count`
+| yes
+| Its unread messages, at least 1. A conversation that the user marked as unread by hand counts 1.
+
+| `mention`
+| no
+| Whether an unread message mentions the user. `false` by default.
+
+| `preview`
+| no
+| The start of its last message, as the service shows it. `''` by default.
+
+| `time`
+| no
+| When its last message came, in milliseconds since the epoch. `null` by default.
+|===
+
+An entry that is not a conversation (no id, an unknown kind, a count under 1, an id given twice) is left out, with a warning in the console, once.
+
+
+=== Reading the page
+
+[source,typescript]
+----
+kash.watch(read: () => Conversation[] | null | undefined, options?: { interval?: number }): () => void
+----
+
+`watch` calls `read` every `interval` milliseconds (2000 by default, 500 at least) and sends what it returns with `unread.set`.
+`read` returns `null` or `undefined` while the page is not ready (the service is loading, or the user is not logged in): nothing is sent.
+An exception of `read` is caught: the page changed its structure, nothing is sent, and reading goes on.
+`watch` returns a function that stops it.
+
+A script that would rather react to the page's changes (a `MutationObserver`) calls `kash.unread.set` itself.
+
+
+=== Opening a conversation
+
+[source,typescript]
+----
+kash.onOpenConversation(handler: (id: string) => void): void
+----
+
+KaSH calls the handler when the user clicks a conversation in the Unread tab, after it shows the service.
+The handler opens it in the page: it clicks its row, calls the service's own function, or loads its address.
+
+
+=== What else the script is given
+
+[cols="1,4"]
+|===
+| Member | What it is
+
+| `kash.apiVersion`
+| `1`.
+
+| `kash.plugin`
+| `{ id, version }`, from the manifest.
+
+| `kash.options`
+| The service's options: strings for texts and choices, booleans for booleans.
+
+| `kash.language`
+| The language of KaSH's interface: `en`, `fr`.
+
+| `kash.dom.text(element)`
+| What an element shows: its texts and the `alt` of its images (the emojis), without the marks of direction that services put around names, with one space between words. `''` for no element.
+|===
+
+`kash-plugin.d.ts` describes it all, for an editor.
+
+
+=== Example
+
+[source,javascript]
+.Example: a plugin that reads a list of rows
+----
+/// <reference path="../kash-plugin.d.ts" />
+
+const rows = () => [...document.querySelectorAll('[data-conversation-id]')];
+
+kash.watch(() => {
+    const list = document.querySelector('#conversations');
+    if (!list) return null; // <1>
+    return rows()
+        .filter((row) => row.querySelector('.unread-badge'))
+        .map((row) => ({
+            id: row.dataset.conversationId,
+            name: kash.dom.text(row.querySelector('.name')),
+            kind: row.dataset.group ? 'group' : 'direct',
+            count: parseInt(row.querySelector('.unread-badge').textContent, 10) || 1, // <2>
+            preview: kash.dom.text(row.querySelector('.last-message')),
+        }));
+});
+
+kash.onOpenConversation((id) => {
+    rows().find((row) => row.dataset.conversationId === id)?.click(); // <3>
+});
+----
+<1> The page is not ready: nothing is sent.
+<2> A badge without a number counts as 1.
+<3> The row, clicked as the user would.
+
+
+== Writing a plugin
+
+A plugin is written against the page of the service once the user is logged in to it.
+`AGENTS.md` tells how to open KaSH's pages to the DevTools (`./gradlew :app:run -Pkash.inspect`), and DevTools themselves are in each service's "…" menu.
+
+What to look for, in this order:
+
+. a model of the page that its scripts can reach (WhatsApp's `window.require('WAWebCollections')`), which is the steadiest;
+. attributes that the service keeps for its own tests or for accessibility (Slack's `data-qa-…`, `role`, `aria-…`), steadier than classes;
+. classes, last: those of compiled pages change with their versions (Google Chat's).
+
+Rules that every plugin follows:
+
+* read the structure of the page, never more of the user's messages than what the Unread tab shows (the start of the last one);
+* make no network request, and send nothing anywhere but to KaSH, through the API;
+* change nothing in the page: a plugin reads it, and opens a conversation when the user asks;
+* count what the service counts: a conversation that the service does not badge (muted, archived, a channel in bold) is not unread for KaSH either.
+
+To add a built-in plugin, put its folder in `app/src/main/resources/app/kash/plugins/` and its id in `index.json`.
+The build's tests check that every built-in plugin is listed, valid, and has its script.

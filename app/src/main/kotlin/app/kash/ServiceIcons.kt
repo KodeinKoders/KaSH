@@ -19,10 +19,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.kash.core.KashDirectories
+import app.kash.core.PluginRegistry
 import app.kash.core.Service
-import app.kash.core.ServiceCatalog
 import app.kash.core.ServiceIcon
-import app.kash.core.ServiceKind
 import app.kash.core.SquareColors
 import app.kash.ui.Kash
 import app.kash.ui.KashIcon
@@ -49,7 +48,7 @@ private val logger = LoggerFactory.getLogger(ServiceIcons::class.java)
  * The images of the services' icons: the sites' own icons ([ServiceIcon.Favicon]), fetched once from their address and kept on disk, and the images
  * that the user chose ([ServiceIcon.Image]). Both are read off Swing's thread; until they are there, a tile shows the service's square.
  */
-class ServiceIcons(private val directories: KashDirectories) {
+class ServiceIcons(private val directories: KashDirectories, val plugins: PluginRegistry) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val favicons = mutableStateMapOf<String, ImageBitmap>()
     private val images = mutableStateMapOf<String, ImageBitmap>()
@@ -148,16 +147,17 @@ sealed interface TileContent {
     data object Image : TileContent
 }
 
-/** What the tile of [service] draws: its icon when it is there, else its square (a known service's colors, or a globe for a custom application). */
+/** What the tile of [service] draws: its icon when it is there, else its square (its plugin's, or a globe for a web application). */
 @Composable
-fun tileContent(service: Service, icons: ServiceIcons): TileContent = tileContent(service.kind, service.name, service.url, service.icon, icons)
+fun tileContent(service: Service, icons: ServiceIcons): TileContent = tileContent(service.plugin, service.url, service.icon, icons)
 
+/** What the tile of a service of [plugin] (null for a web application) at [url] with [icon] draws. */
 @Composable
-fun tileContent(kind: ServiceKind, name: String, url: String, icon: ServiceIcon, icons: ServiceIcons): TileContent = when (icon) {
+fun tileContent(plugin: String?, url: String, icon: ServiceIcon, icons: ServiceIcons): TileContent = when (icon) {
     is ServiceIcon.Square -> TileContent.Square(icon.color, icon.text)
     is ServiceIcon.Image -> icons.image(icon.file)?.let { TileContent.Picture(it) } ?: TileContent.Image
     ServiceIcon.Favicon -> icons.favicon(url)?.let { TileContent.Picture(it) }
-        ?: ServiceCatalog.preset(kind)?.let { TileContent.Square(it.color, it.mono) }
+        ?: icons.plugins[plugin]?.manifest?.square?.let { TileContent.Square(it.color, it.text) }
         ?: TileContent.Globe
 }
 

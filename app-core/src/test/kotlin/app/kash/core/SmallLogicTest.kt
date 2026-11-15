@@ -19,7 +19,7 @@ class SmallLogicTest {
 
     @Test
     fun aNotificationNeedsEverythingOn() {
-        val service = Service(ServiceId.random(), ServiceKind.WHATSAPP, "WhatsApp", "https://web.whatsapp.com/", profile = ProfileId.random())
+        val service = Service(ServiceId.random(), "whatsapp", name = "WhatsApp", url = "https://web.whatsapp.com/", profile = ProfileId.random())
         val settings = Settings()
         assertEquals(NotificationDecision(show = true, sound = true), NotificationPolicy.decide(settings, service))
         assertEquals(NotificationDecision(show = true, sound = false), NotificationPolicy.decide(settings.copy(sound = false), service))
@@ -42,8 +42,8 @@ class SmallLogicTest {
 
     @Test
     fun monoIsTwoLetters() {
-        assertEquals("MA", ServiceCatalog.monoOf("Mon application"))
-        assertEquals("Ex", ServiceCatalog.monoOf("exemple"))
-        assertEquals("?", ServiceCatalog.monoOf("  "))
+        assertEquals("MA", WebApplications.monoOf("Mon application"))
+        assertEquals("Ex", WebApplications.monoOf("exemple"))
+        assertEquals("?", WebApplications.monoOf("  "))
     }
 }
