@@ -94,6 +94,19 @@ const setCount = (count) => {
     sendIfChanged({ type: 'unreadCount', count: total });
 };
 
+// The service's icon: an https URL, which KaSH downloads, or the data: URL of an image (not SVG: KaSH cannot draw it). KaSH checks it again.
+const ICON = /^(https:\/\/[^/?#\s]+|data:image\/(png|jpeg|gif|webp|x-icon|vnd\.microsoft\.icon);base64,)/i;
+let lastIcon;
+const setIcon = (source) => {
+    if (source !== null && (typeof source !== 'string' || !ICON.test(source))) {
+        warn('setIcon() takes an https URL, the data: URL of an image (PNG, JPEG, GIF, WebP, ICO), or null');
+        return;
+    }
+    if (source === lastIcon) return;
+    lastIcon = source;
+    send({ type: 'icon', source });
+};
+
 const watch = (read, options) => {
     if (typeof read !== 'function') throw new TypeError('kash.watch() takes a function');
     const interval = Math.max(500, Number(options && options.interval) || 2000);
@@ -142,6 +155,7 @@ const kash = Object.freeze({
     options: Object.freeze({ ...config.options }),
     language: config.language,
     unread: Object.freeze({ set, setCount, clear: () => set([]) }),
+    setIcon,
     watch,
     onOpenConversation: (handler) => {
         if (typeof handler !== 'function') throw new TypeError('kash.onOpenConversation() takes a function');

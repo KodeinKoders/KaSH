@@ -226,7 +226,7 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.spacedBy(3.dp),
                             ) {
-                                Tile(tileContent(pluginId, serviceUrl.orEmpty(), draftIcon, icons), 40.dp)
+                                Tile(tileContent(pluginId, serviceUrl.orEmpty(), draftIcon, icons, editing?.takeIf { it.plugin == pluginId && it.url == serviceUrl }?.id), 40.dp)
                                 val previewLabel = label.text.toString().trim()
                                 if (previewLabel.isNotEmpty()) {
                                     Text(previewLabel, fontSize = 10.5.sp, color = Kash.colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)

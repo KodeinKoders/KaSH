@@ -86,7 +86,8 @@ fun main() {
     val geometry = windowFile.load().sanitized(screens())
     application {
         val model = remember { KashModel(state, file, directories, engine, plugins, scriptsFor, initialColorScheme(state.settings.theme)) }
-        Kash(engine, model, remember { ServiceIcons(directories, model.plugins) }, windowFile, geometry, directories.hangs)
+        val icons = remember { ServiceIcons(directories, model.plugins).also { icons -> model.onIcon = icons::report } }
+        Kash(engine, model, icons, windowFile, geometry, directories.hangs)
     }
 }
 

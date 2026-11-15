@@ -51,6 +51,14 @@ declare namespace KashPlugin {
         };
 
         /**
+         * The image of the service, which its tile shows when its icon is the automatic one, in place of its site's icon (an account's or a
+         * workspace's own image): an https URL, which KaSH downloads without the service's cookies, or the data: URL of an image (PNG, JPEG, GIF,
+         * WebP, ICO; not SVG), of 1 MB at most. null: the service has none, and its tile shows its site's icon. KaSH keeps it from a launch to
+         * the next. The same source is not sent again.
+         */
+        setIcon(source: string | null): void;
+
+        /**
          * Calls read() every interval ms and sends what it returns with unread.set.
          * null or undefined means that the page is not ready: nothing is sent.
          * An exception is caught (the page changed its structure): nothing is sent, and reading goes on.

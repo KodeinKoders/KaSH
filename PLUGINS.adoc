@@ -104,7 +104,7 @@ It also refuses a field that it does not know, which is most often a typo.
 
 | `square`
 | yes
-| The colored square that stands for a service while the site's icon is not loaded: its `text` (1 to 3 characters) on its `color` (`#RRGGBB`).
+| The colored square that stands for a service while neither its <<the-services-icon,own image>> nor the site's icon is loaded: its `text` (1 to 3 characters) on its `color` (`#RRGGBB`).
 
 | `url`
 | yes
@@ -355,6 +355,31 @@ kash.onOpenConversation(handler: (id: string) => void): void
 
 KaSH calls the handler when the user clicks a conversation in the Unread tab, after it shows the service.
 The handler opens it in the page: it clicks its row, calls the service's own function, or loads its address.
+
+
+[#the-services-icon]
+=== The service's icon
+
+[source,typescript]
+----
+kash.setIcon(source: string | null): void
+----
+
+A service whose icon is the automatic one (_Site's favicon (automatic)_) has the site's icon, the same for every account of the service.
+`setIcon` gives it an image of its own instead, the account's or the workspace's (Slack gives the image of the workspace):
+
+* an `https:` URL, which KaSH downloads, **without the service's cookies**: the image must be public;
+* or the `data:` URL of an image, in base64: PNG, JPEG, GIF, WebP or ICO.
+
+KaSH cannot draw an SVG image, and does not take one bigger than 1 MB.
+`null` means that the service has none: its tile shows the site's icon again.
+
+KaSH keeps the image from a launch to the next, so that the tile has it before the script runs.
+The same source is not sent again: a script can call `setIcon` whenever it reads its page.
+A script that does not know yet (the page is loading) does not call it, since `null` would replace the image.
+A source that is none of these is not sent, with a warning in the console, once.
+
+The page cannot read the image of another site itself when that site does not allow it (CORS): that is why KaSH downloads an `https:` URL.
 
 
 === What else the script is given

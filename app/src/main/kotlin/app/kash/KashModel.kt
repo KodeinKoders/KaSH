@@ -12,6 +12,7 @@ import app.kash.core.Conversation
 import app.kash.core.ConversationKind
 import app.kash.core.KashDirectories
 import app.kash.core.KashState
+import app.kash.core.PluginIcon
 import app.kash.core.PluginRegistry
 import app.kash.core.ProfileId
 import app.kash.core.Selection
@@ -125,6 +126,9 @@ class KashModel(
     /** Called with each notification that a page shows (`notification-shim.js`): set by the [Notifier]. */
     var onPageNotification: (Service, JsonObject) -> Unit = { _, _ -> }
 
+    /** Called with the icon that a plugin's script gives its service (`kash.setIcon`), and with [PluginIcon.None] when it is deleted or erased. */
+    var onIcon: (ServiceId, PluginIcon) -> Unit = { _, _ -> }
+
     init {
         services.filter { it.enabled }.forEach(::load)
     }
@@ -164,6 +168,14 @@ class KashModel(
         }
         when (json["type"]?.jsonPrimitive?.contentOrNull) {
             "notification" -> onPageNotification(service, json)
+            "icon" -> {
+                // Only a plugin's script has the API: a web application's page has nothing to say about its tile.
+                if (service.plugin == null) return
+                val source = json["source"]?.jsonPrimitive?.contentOrNull
+                val icon = PluginIcon.parse(source) ?: return logger.warn("The icon that the plugin of {} gave is not one", service.title)
+                logger.debug("Icon of {}: {}", service.title, when (icon) { is PluginIcon.Remote -> icon.uri.host; is PluginIcon.Inline -> "inline"; PluginIcon.None -> "none" })
+                onIcon(id, icon)
+            }
             "unreadCount" -> {
                 val count = json["count"]?.jsonPrimitive?.intOrNull?.takeIf { it >= 0 } ?: return logger.warn("The unread total of {} cannot be read", service.title)
                 conversations.remove(id)
@@ -305,6 +317,7 @@ class KashModel(
                 deletedProfiles = state.deletedProfiles + service.profile,
             )
         }
+        onIcon(id, PluginIcon.None)
         unload(id) { service(id)?.takeIf { it.enabled }?.let(::load) }
     }
 
@@ -312,6 +325,7 @@ class KashModel(
     fun delete(id: ServiceId) {
         val service = service(id) ?: return
         unload(id)
+        onIcon(id, PluginIcon.None)
         update { state ->
             state.copy(
                 services = state.services.filter { it.id != id },

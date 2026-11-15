@@ -6,7 +6,8 @@
 // when Slack gives it a badge: a direct message (and a group one) with its count, a channel only when the user is mentioned in it. A channel with
 // new messages and no mention is only in bold, without a badge, and is left out, as Slack leaves it out. A muted conversation is left out, and so
 // is the user's own direct message. The replies in threads count when Slack badges its Threads entry (a mention of the user in a thread): one row,
-// named as Slack names it. The sidebar has no preview and no time: the rows of the Unread tab show what the conversation is instead.
+// named as Slack names it. The sidebar has no preview and no time: the rows of the Unread tab show what the conversation is instead. The image of
+// the workspace, when it has one, is the service's icon.
 
 // The conversations of the sidebar, rendered: its sections (starred, channels, direct messages, apps) are one list.
 const rows = () => [...document.querySelectorAll('[data-qa-channel-sidebar-channel-id]')];
@@ -23,7 +24,25 @@ const nameOf = (row) => kash.dom.text(row.querySelector('[data-qa^="channel_side
 const THREADS_ID = 'threads';
 const threadsEntry = () => document.querySelector('[data-qa="channel_sidebar_vall_threads"]');
 
+// The icon of the current workspace, Slack's button that switches accounts: its image, which Slack sets as its background (avatars.slack-edge.com, public), or its
+// initials (`c-team_icon--default`) when the workspace has none.
+const workspaceIcon = () => document.querySelector('.p-account_switcher__team_icon--current');
+
+// The URL of the workspace's image, null when it has none, undefined while Slack has not rendered it. Slack shows it at 88 px and has it at
+// 132 px too, which a tile of KaSH needs on a Retina screen.
+const workspaceImage = () => {
+    const icon = workspaceIcon();
+    if (!icon) return undefined;
+    if (icon.classList.contains('c-team_icon--default')) return null;
+    const url = getComputedStyle(icon).backgroundImage.match(/^url\("?(https:[^")]+)"?\)$/);
+    return url ? url[1].replace(/_88\.png$/, '_132.png') : undefined;
+};
+
 kash.watch(() => {
+    // The API sends it only when it changed.
+    const image = workspaceImage();
+    if (image !== undefined) kash.setIcon(image);
+
     const conversations = [];
     for (const row of rows()) {
         if (row.dataset.qaChannelSidebarChannelIsMuted === 'true' || row.dataset.qaChannelSidebarIsYou === 'true') continue;

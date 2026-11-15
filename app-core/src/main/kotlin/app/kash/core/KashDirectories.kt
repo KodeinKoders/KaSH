@@ -30,6 +30,12 @@ public class KashDirectories(public val support: Path) {
     /** The sites' icons, fetched once and kept ([ServiceIcon.Favicon]). */
     public val favicons: Path get() = support.resolve("favicons")
 
+    /** The icons that the plugins' scripts gave their services ([PluginIcon]), one file per service, named by its id. */
+    public val serviceIcons: Path get() = support.resolve("service-icons")
+
+    /** The icon that the plugin's script of the service [id] gave ([serviceIcons]); null for an id that is not a file name. */
+    public fun serviceIcon(id: ServiceId): Path? = if (FILE_NAME.matches(id.value)) serviceIcons.resolve(id.value) else null
+
     /**
      * The profile [profile]: its cookies, cache, IndexedDB, local storage, service workers.
      *
@@ -39,6 +45,9 @@ public class KashDirectories(public val support: Path) {
     public fun profile(profile: ProfileId): Path = profiles.resolve(profile.value)
 
     public companion object {
+        // A service's id is a UUID: what is not a plain name would name another file than its own.
+        private val FILE_NAME = Regex("[A-Za-z0-9][A-Za-z0-9-]*")
+
         /** The system property that changes the directory, for tests and for running a second copy of the application. */
         public const val PROPERTY: String = "kash.support"
 
