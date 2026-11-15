@@ -61,7 +61,7 @@ fun InboxScreen(rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Un
     val query = rememberTextFieldState()
     val filtered = Inbox.filter(rows, query.text.toString())
     val total = rows.sumOf { it.count }
-    VerticallyScrollableContainer(rememberScrollState(), Modifier.fillMaxSize().background(Kash.colors.background)) {
+    VerticallyScrollableContainer(Modifier.fillMaxSize().background(Kash.colors.background), scrollState = rememberScrollState()) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Column(
                 Modifier.widthIn(max = 760.dp).fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 40.dp),

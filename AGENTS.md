@@ -139,6 +139,10 @@ Every enabled service is loaded at launch (`KashModel`), hidden, so that it noti
 
 The tests do not start Chromium. After a change to `browser`, `jcef-native` or the submodule, check by hand, with `-Dkash.support` on a scratch directory: a custom application on a fixed local origin writes a cookie, localStorage and IndexedDB, KaSH is quit with ⌘Q, started again, and the page reads them back in its service and not in another one.
 
+## Jewel
+
+- **`VerticallyScrollableContainer` takes its `ScrollState` by name** (`VerticallyScrollableContainer(modifier, scrollState = rememberScrollState())`): given first, positionally, it selects the overload of a `ScrollableState`, which does not scroll its content itself (the caller has to apply `verticalScroll`). The scrollbar is there, the content does not move: the Unread tab, Settings and the Add service window did not scroll.
+
 ## Running the app
 
 `./gradlew :app:run` starts the JVM from `app/build/dev/KaSH.app` (`devBundle`), a bundle whose executable is a copy of the toolchain's `java` launcher, with links to the JDK's `lib`, `conf`, `legal` and `release` next to it: started as `java`, macOS takes the process for the JetBrains Runtime's (`com.jetbrains.jbr.java`), and ⌘Tab says "java" whatever `-Xdock:name` says. Its identifier, `app.kash.dev`, is not the application's (`app.kash`): `inAppBundle` is false in it, so the inspection port is allowed and the notifications take the fallback window. Gradle refuses an executable that is not its toolchain's, so the run task gets a `JavaLauncher` whose installation is the bundle's `Contents`, and its executable is set again in `doFirst` (Compose sets it after the script).

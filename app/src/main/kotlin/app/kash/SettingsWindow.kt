@@ -154,7 +154,7 @@ private fun SettingsContent(model: KashModel, icons: ServiceIcons, onClose: () -
             Box(Modifier.width(1.dp).fillMaxHeight().background(Kash.colors.separator))
             Column(Modifier.weight(1f).fillMaxHeight().background(Kash.colors.background)) {
                 Text(s.page(page).first, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 28.dp, end = 28.dp, top = 16.dp))
-                VerticallyScrollableContainer(rememberScrollState(), Modifier.weight(1f)) {
+                VerticallyScrollableContainer(Modifier.weight(1f), scrollState = rememberScrollState()) {
                     Column(Modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, top = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
                         when (page) {
                             Page.GENERAL -> GeneralPage(draft) { draft = it }

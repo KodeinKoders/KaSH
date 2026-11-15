@@ -155,7 +155,7 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     }
 
     Column(Modifier.fillMaxSize().background(Kash.colors.panel)) {
-        VerticallyScrollableContainer(rememberScrollState(), Modifier.weight(1f)) {
+        VerticallyScrollableContainer(Modifier.weight(1f), scrollState = rememberScrollState()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
                 // The catalog: the plugins, then a web application. A service that is edited keeps its plugin.
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
