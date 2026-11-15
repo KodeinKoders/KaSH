@@ -17,7 +17,7 @@ toc::[]
 
 == Services
 
-WhatsApp, Google Chat and Slack are in the catalog, as plugins: each one is a manifest, which describes the service and its options, and a script, which reads its unread conversations (see link:PLUGINS.adoc[the plugins' guide]).
+WhatsApp, Google Chat, Slack and Google Messages are in the catalog, as plugins: each one is a manifest, which describes the service and its options, and a script, which reads its unread conversations (see link:PLUGINS.adoc[the plugins' guide]).
 Any web application can also be added as a custom service, by its address.
 A Slack service is one workspace, given by its name (`my-team` for `my-team.slack.com`).
 A custom service shows its unread count when its page puts it at the start of its title, as `(3) My application` does.
@@ -27,6 +27,7 @@ As in WhatsApp, the muted and the archived conversations are not counted.
 
 KaSH reads Google Chat's unread conversations the same way, as Google Chat counts them: the direct messages and the message requests, and the spaces where the user is mentioned.
 And Slack's: the direct messages and the channels where the user is mentioned, without the muted ones.
+And Google Messages' (the SMS and RCS of an Android phone): its unread conversations, without the muted ones, each counted as one message, since Google Messages shows no count.
 
 The same service can be added several times, for several accounts: a label under its icon tells them apart.
 

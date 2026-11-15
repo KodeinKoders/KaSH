@@ -1,0 +1,12 @@
+{
+  "$schema": "../manifest.schema.json",
+  "manifestVersion": 1,
+  "id": "google-messages",
+  "version": "1.0.0",
+  "name": "Google Messages",
+  "square": { "text": "GM", "color": "#0B57D0" },
+  "icon": "icon.webp",
+  "url": "https://messages.google.com/web/",
+  "matches": ["https://messages.google.com/web/*"],
+  "script": "plugin.js"
+}
