@@ -18,10 +18,11 @@ The format is meant for plugins that the user installs too, which a later versio
 
 == What a plugin is
 
-A plugin is a folder named by its id, with two files:
+A plugin is a folder named by its id, with two files, and an icon if it has one:
 
 * `manifest.json`, which describes it: its name, the address of its services, their options, and where its script runs;
-* its script, which runs in the service's page and reports the unread conversations to KaSH through the <<the-api,`kash` API>>.
+* its script, which runs in the service's page and reports the unread conversations to KaSH through the <<the-api,`kash` API>>;
+* its icon, an image that its manifest names.
 
 [source]
 ----
@@ -29,6 +30,10 @@ plugins/
     index.json                  the built-in plugins, in the order of the catalog
     manifest.schema.json        the JSON Schema of a manifest
     kash-plugin.d.ts            the types of the API
+    google-chat/
+        manifest.json
+        plugin.js
+        icon.png
     slack/
         manifest.json
         plugin.js
@@ -105,6 +110,12 @@ It also refuses a field that it does not know, which is most often a typo.
 | `square`
 | yes
 | The colored square that stands for a service while neither its <<the-services-icon,own image>> nor the site's icon is loaded: its `text` (1 to 3 characters) on its `color` (`#RRGGBB`).
+
+| `icon`
+| no
+| The file of the plugin's icon, in its folder: a square PNG, JPEG, GIF, WebP or ICO image (KaSH cannot draw an SVG one).
+The tiles of its services show it by default: the Add service window offers it first, before the site's icon, which a site may not give without its cookies (Google Chat's sends to its sign-in page).
+A plugin without one has the site's icon by default.
 
 | `url`
 | yes
@@ -365,14 +376,14 @@ The handler opens it in the page: it clicks its row, calls the service's own fun
 kash.setIcon(source: string | null): void
 ----
 
-A service whose icon is the automatic one (_Site's favicon (automatic)_) has the site's icon, the same for every account of the service.
-`setIcon` gives it an image of its own instead, the account's or the workspace's (Slack gives the image of the workspace):
+A service whose icon is the plugin's (the default when the plugin has an <<the-manifest,`icon`>>) or the site's has the same icon as every other account of the service.
+`setIcon` gives it an image of its own instead, the account's or the workspace's (Slack gives the image of the workspace); an image or a square that the user chose stays:
 
 * an `https:` URL, which KaSH downloads, **without the service's cookies**: the image must be public;
 * or the `data:` URL of an image, in base64: PNG, JPEG, GIF, WebP or ICO.
 
 KaSH cannot draw an SVG image, and does not take one bigger than 1 MB.
-`null` means that the service has none: its tile shows the site's icon again.
+`null` means that the service has none: its tile shows the plugin's icon or the site's again.
 
 KaSH keeps the image from a launch to the next, so that the tile has it before the script runs.
 The same source is not sent again: a script can call `setIcon` whenever it reads its page.

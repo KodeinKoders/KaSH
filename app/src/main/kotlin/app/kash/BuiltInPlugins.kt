@@ -13,7 +13,7 @@ private val logger = LoggerFactory.getLogger("app.kash.BuiltInPlugins")
 
 /**
  * The plugins that KaSH has in its resources (`app/kash/plugins`): `index.json` lists them, in the order of the catalog, and each one is a folder of
- * that name with its `manifest.json` and its script. Plugins that the user installs are not loaded yet.
+ * that name with its `manifest.json`, its script and its icon. Plugins that the user installs are not loaded yet.
  */
 object BuiltInPlugins {
     internal const val ROOT = "/app/kash/plugins"
@@ -25,12 +25,15 @@ object BuiltInPlugins {
     /** Every built-in plugin that is valid: one that is not is logged and left out (a test of the build checks that none is). */
     fun registry(): PluginRegistry = PluginRegistry(ids().mapNotNull { id -> runCatching { load(id) }.onFailure { logger.error("The plugin {} is not loaded", id, it) }.getOrNull() })
 
-    /** The plugin [id]: its manifest, checked, and its script; its folder's name is its id. */
+    /** The plugin [id]: its manifest, checked, its script and its icon; its folder's name is its id. */
     internal fun load(id: String): Plugin {
         val manifest = PluginManifests.parse(read("$id/manifest.json") ?: error("$ROOT/$id/manifest.json is not in the resources"))
         if (manifest.id != id) throw PluginManifestException("id", "'${manifest.id}' is in the folder '$id'")
         val script = read("$id/${manifest.script}") ?: throw PluginManifestException("script", "$ROOT/$id/${manifest.script} is not in the resources")
-        return Plugin(manifest, script)
+        val icon = manifest.icon?.let { file ->
+            BuiltInPlugins::class.java.getResource("$ROOT/$id/$file")?.readBytes() ?: throw PluginManifestException("icon", "$ROOT/$id/$file is not in the resources")
+        }
+        return Plugin(manifest, script, icon)
     }
 
     private fun read(path: String): String? = BuiltInPlugins::class.java.getResource("$ROOT/$path")?.readText()

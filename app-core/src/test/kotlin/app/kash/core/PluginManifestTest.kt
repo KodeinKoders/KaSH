@@ -50,6 +50,8 @@ class PluginManifestTest {
         assertEquals("slack", manifest.id)
         assertEquals("Slack", manifest.name.of("fr"))
         assertEquals(PluginSquare("Sl", "#5B2C6F"), manifest.square)
+        assertEquals(null, manifest.icon)
+        assertEquals("icon.png", PluginManifests.parse(slackWith("\"script\": \"plugin.js\",", "\"script\": \"plugin.js\", \"icon\": \"icon.png\",")).icon)
         val workspace = assertIs<PluginOption.Text>(manifest.options[0])
         assertEquals("Espace de travail", workspace.label.of("fr"))
         assertEquals(".slack.com", workspace.suffix)
@@ -80,6 +82,8 @@ class PluginManifestTest {
         refused("square.color", slackWith("\"#5B2C6F\"", "\"purple\""))
         refused("matches", slackWith("[\"https://app.slack.com/*\"]", "[]"))
         refused("script", slackWith("\"plugin.js\"", "\"../plugin.js\""))
+        refused("icon", slackWith("\"script\": \"plugin.js\",", "\"script\": \"plugin.js\", \"icon\": \"../icon.png\","))
+        refused("icon", slackWith("\"script\": \"plugin.js\",", "\"script\": \"plugin.js\", \"icon\": \"icon.svg\","))
         refused("script", slackWith("\"plugin.js\"", "\"plugin.ts\""))
     }
 

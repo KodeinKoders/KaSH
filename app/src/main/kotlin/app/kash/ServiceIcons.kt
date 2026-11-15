@@ -56,6 +56,7 @@ class ServiceIcons(private val directories: KashDirectories, val plugins: Plugin
     private val favicons = mutableStateMapOf<String, ImageBitmap>()
     private val images = mutableStateMapOf<String, ImageBitmap>()
     private val reported = mutableStateMapOf<ServiceId, ImageBitmap>()
+    private val pluginIcons = HashMap<String, ImageBitmap?>()
     private val requested = HashSet<String>()
 
     /** The source that each service's script gave last, in this launch: the same one is not downloaded again. */
@@ -73,6 +74,14 @@ class ServiceIcons(private val directories: KashDirectories, val plugins: Plugin
             }
         }
         return favicons[host]
+    }
+
+    /** The icon of the plugin [id] (its manifest's `icon`), decoded once; null for a web application, a plugin without one, or one that cannot be. */
+    fun pluginIcon(id: String?): ImageBitmap? {
+        val plugin = plugins[id] ?: return null
+        return pluginIcons.getOrPut(plugin.id) {
+            plugin.icon?.let(::decode).also { if (it == null && plugin.icon != null) logger.warn("The icon of the plugin {} cannot be drawn", plugin.id) }
+        }
     }
 
     /** The image that the script of the service [id] gave, kept from a launch to the next; null while it is read, or when it gave none. */
@@ -219,12 +228,17 @@ sealed interface TileContent {
 fun tileContent(service: Service, icons: ServiceIcons): TileContent = tileContent(service.plugin, service.url, service.icon, icons, service.id)
 
 /**
- * What the tile of a service of [plugin] (null for a web application) at [url] with [icon] draws. The automatic icon is the image that the
- * plugin's script of the service [id] gave (null: a service that is not added yet), else the site's icon, else the plugin's square, else a globe.
+ * What the tile of a service of [plugin] (null for a web application) at [url] with [icon] draws. The plugin's icon and the automatic one are,
+ * first, the image that the plugin's script of the service [id] gave (`kash.setIcon`: Slack's workspace's; null: a service that is not added yet),
+ * then the plugin's icon or the site's, then the plugin's square, then a globe.
  */
 @Composable
 fun tileContent(plugin: String?, url: String, icon: ServiceIcon, icons: ServiceIcons, id: ServiceId? = null): TileContent = when (icon) {
     is ServiceIcon.Square -> TileContent.Square(icon.color, icon.text)
+    ServiceIcon.Plugin -> id?.takeIf { plugin != null }?.let { icons.reported(it) }?.let { TileContent.Picture(it) }
+        ?: icons.pluginIcon(plugin)?.let { TileContent.Picture(it) }
+        ?: icons.plugins[plugin]?.manifest?.square?.let { TileContent.Square(it.color, it.text) }
+        ?: TileContent.Globe
     is ServiceIcon.Image -> icons.image(icon.file)?.let { TileContent.Picture(it) } ?: TileContent.Image
     ServiceIcon.Favicon -> id?.takeIf { plugin != null }?.let { icons.reported(it) }?.let { TileContent.Picture(it) }
         ?: icons.favicon(url)?.let { TileContent.Picture(it) }

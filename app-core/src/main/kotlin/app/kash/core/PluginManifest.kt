@@ -124,6 +124,7 @@ public sealed interface PluginOption {
  * @property manifestVersion The version of this format: 1.
  * @property id What names the plugin, in the services that use it ([Service.plugin]).
  * @property version The plugin's own version, given to its script.
+ * @property icon The file of its icon, next to the manifest: what the tiles of its services show by default ([ServiceIcon.Plugin]).
  * @property url The address of a service of the plugin, where `${id}` is the value of an option.
  * @property matches The addresses of the pages where its script runs, in the top frame: `*` matches any run of characters.
  * @property script The file of its script, next to the manifest.
@@ -137,6 +138,7 @@ public data class PluginManifest(
     val name: LocalizedText,
     val description: LocalizedText? = null,
     val square: PluginSquare,
+    val icon: String? = null,
     val url: String,
     val matches: List<String>,
     val script: String,
@@ -163,6 +165,9 @@ public object PluginManifests {
     private val SCRIPT = Regex("[A-Za-z0-9_][A-Za-z0-9._-]*\\.js")
     private val COLOR = Regex("#[0-9A-Fa-f]{6}")
 
+    /** An image that KaSH can draw (Skia: not SVG), in the plugin's folder. */
+    private val ICON = Regex("[A-Za-z0-9_][A-Za-z0-9._-]*\\.(png|jpe?g|gif|webp|ico)", RegexOption.IGNORE_CASE)
+
     /** The `${id}` of a URL template. */
     internal val PLACEHOLDER = Regex("\\$\\{([^}]*)}")
 
@@ -188,6 +193,7 @@ public object PluginManifests {
         val squareText = manifest.square.text
         rule(squareText.codePointCount(0, squareText.length) in 1..3, "square.text", "1 to 3 characters")
         rule(COLOR.matches(manifest.square.color), "square.color", "a color #RRGGBB: '${manifest.square.color}'")
+        manifest.icon?.let { rule(ICON.matches(it), "icon", "a PNG, JPEG, GIF, WebP or ICO image of the plugin's folder: '$it'") }
         rule(manifest.matches.isNotEmpty(), "matches", "empty")
         manifest.matches.forEachIndexed { index, match -> rule(match.isNotBlank(), "matches[$index]", "empty") }
         rule(SCRIPT.matches(manifest.script), "script", "a .js file of the plugin's folder: '${manifest.script}'")

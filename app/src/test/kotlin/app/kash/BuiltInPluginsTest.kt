@@ -12,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import org.jetbrains.skia.Image as SkiaImage
 
 class BuiltInPluginsTest {
     // The resources are a directory when the tests run: what is in it can be listed.
@@ -30,6 +31,8 @@ class BuiltInPluginsTest {
         assertEquals(BuiltInPlugins.ids(), registry.all.map { it.id })
         for (plugin in registry.all) {
             assertTrue(plugin.script.isNotBlank(), plugin.id)
+            // Its icon is an image that KaSH can draw.
+            plugin.icon?.let { icon -> assertTrue(runCatching { SkiaImage.makeFromEncoded(icon).width > 0 }.getOrDefault(false), "The icon of ${plugin.id}") }
             // Its URL is made with values that its options accept.
             val values = PluginOptions.values(plugin.manifest, plugin.manifest.options.filterIsInstance<PluginOption.Text>().associate { it.id to "sample" })
             assertNotNull(PluginOptions.resolveUrl(plugin.manifest, values), plugin.id)

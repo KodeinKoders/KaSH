@@ -40,7 +40,6 @@ import androidx.compose.ui.window.rememberWindowState
 import app.kash.core.OptionError
 import app.kash.core.PluginOption
 import app.kash.core.PluginOptions
-import app.kash.core.PluginSquare
 import app.kash.core.ProfileId
 import app.kash.core.Service
 import app.kash.core.ServiceIcon
@@ -70,7 +69,7 @@ import java.net.URI
 import java.nio.file.Paths
 
 /** Which icon the draft has. */
-private enum class IconMode { FAVICON, IMAGE, SQUARE }
+private enum class IconMode { PLUGIN, FAVICON, IMAGE, SQUARE }
 
 /**
  * The window that adds a service, or edits [editing]: the catalog (the plugins, a web application), the service's options (its plugin's, which
@@ -99,8 +98,17 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     var includeInInbox by remember { mutableStateOf(editing?.includeInInbox ?: true) }
     var notifications by remember { mutableStateOf(editing?.desktopNotifications ?: true) }
     val icon = editing?.icon
+    // A new service of a plugin that has an icon takes it.
     var iconMode by remember {
-        mutableStateOf(when (icon) { is ServiceIcon.Image -> IconMode.IMAGE; is ServiceIcon.Square -> IconMode.SQUARE; else -> IconMode.FAVICON })
+        mutableStateOf(
+            when (icon) {
+                is ServiceIcon.Image -> IconMode.IMAGE
+                is ServiceIcon.Square -> IconMode.SQUARE
+                ServiceIcon.Plugin -> IconMode.PLUGIN
+                ServiceIcon.Favicon -> IconMode.FAVICON
+                null -> if (plugin?.icon != null) IconMode.PLUGIN else IconMode.FAVICON
+            },
+        )
     }
     var imageFile by remember { mutableStateOf((icon as? ServiceIcon.Image)?.file) }
     var squareColor by remember { mutableStateOf((icon as? ServiceIcon.Square)?.color) }
@@ -140,6 +148,7 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
         (iconMode != IconMode.IMAGE || imageFile != null) && !(iconMode == IconMode.SQUARE && hexInvalid)
 
     val draftIcon = when (iconMode) {
+        IconMode.PLUGIN -> ServiceIcon.Plugin
         IconMode.FAVICON -> ServiceIcon.Favicon
         IconMode.IMAGE -> imageFile?.let { ServiceIcon.Image(it) } ?: ServiceIcon.Favicon
         IconMode.SQUARE -> ServiceIcon.Square(color, text)
@@ -156,9 +165,15 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             for ((tilePlugin, tileName) in row) {
                                 CatalogTile(
-                                    square = plugins[tilePlugin]?.manifest?.square, name = tileName, selected = pluginId == tilePlugin,
-                                    enabled = editing == null || editing.plugin == tilePlugin, modifier = Modifier.weight(1f),
-                                ) { pluginId = tilePlugin; squareColor = null; hex.edit { replace(0, length, "") }; squareText.edit { replace(0, length, "") } }
+                                    content = if (tilePlugin == null) null else tileContent(tilePlugin, "", ServiceIcon.Plugin, icons), name = tileName,
+                                    selected = pluginId == tilePlugin, enabled = editing == null || editing.plugin == tilePlugin, modifier = Modifier.weight(1f),
+                                ) {
+                                    // The icon of the plugin picked, when it has one; the site's otherwise.
+                                    val picked = plugins[tilePlugin]
+                                    if (picked?.icon != null && iconMode == IconMode.FAVICON) iconMode = IconMode.PLUGIN
+                                    if (picked?.icon == null && iconMode == IconMode.PLUGIN) iconMode = IconMode.FAVICON
+                                    pluginId = tilePlugin; squareColor = null; hex.edit { replace(0, length, "") }; squareText.edit { replace(0, length, "") }
+                                }
                             }
                             repeat(3 - row.size) { Box(Modifier.weight(1f)) }
                         }
@@ -203,6 +218,9 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                     Text(strings.tabIcon, fontWeight = FontWeight.SemiBold)
                     Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (plugin?.icon != null) {
+                                RadioButtonRow(strings.iconOf(plugin.manifest.name.of(language)), iconMode == IconMode.PLUGIN, { iconMode = IconMode.PLUGIN })
+                            }
                             RadioButtonRow(strings.iconFavicon, iconMode == IconMode.FAVICON, { iconMode = IconMode.FAVICON })
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 RadioButtonRow(strings.iconImage, iconMode == IconMode.IMAGE, { iconMode = IconMode.IMAGE })
@@ -311,7 +329,7 @@ private fun OptionField(option: PluginOption, draft: OptionsDraft, value: String
 }
 
 @Composable
-private fun CatalogTile(square: PluginSquare?, name: String, selected: Boolean, enabled: Boolean, modifier: Modifier, onPick: () -> Unit) {
+private fun CatalogTile(content: TileContent?, name: String, selected: Boolean, enabled: Boolean, modifier: Modifier, onPick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     Row(
         modifier.height(56.dp)
@@ -323,8 +341,8 @@ private fun CatalogTile(square: PluginSquare?, name: String, selected: Boolean, 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (square != null) {
-            Tile(TileContent.Square(square.color, square.text), 32.dp)
+        if (content != null) {
+            Tile(content, 32.dp)
         } else {
             Box(Modifier.size(32.dp).background(Kash.colors.neutral, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                 KashIcon(KashIcons.Plus, Kash.colors.text)

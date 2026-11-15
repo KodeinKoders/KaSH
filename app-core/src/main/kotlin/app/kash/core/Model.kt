@@ -40,6 +40,11 @@ public value class ServiceId(public val value: String) {
 /** The icon of a service's tab. */
 @Serializable
 public sealed interface ServiceIcon {
+    /** The icon of the service's plugin (its manifest's `icon`); its colored square when the plugin has none. */
+    @Serializable
+    @SerialName("plugin")
+    public data object Plugin : ServiceIcon
+
     /** The site's own icon, fetched from its address; the service's colored square while there is none. */
     @Serializable
     @SerialName("favicon")

@@ -19,7 +19,7 @@ class StateFileTest {
     @Test
     fun savedStateIsLoadedBack() {
         val file = StateFile(directory.resolve("state.json"))
-        val whatsApp = service("slack", "Slack").copy(options = mapOf("workspace" to "mon-equipe"))
+        val whatsApp = service("slack", "Slack", ServiceIcon.Plugin).copy(options = mapOf("workspace" to "mon-equipe"))
         val custom = service(null, "Mon app", ServiceIcon.Square("#3058CF", "MA")).copy(muted = true, enabled = false)
         val image = service(null, "Autre", ServiceIcon.Image("icon.png"))
         val state = KashState(

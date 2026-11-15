@@ -90,6 +90,7 @@ interface Strings {
     val includeInInbox: String
     val desktopNotifications: String
     val tabIcon: String
+    fun iconOf(name: String): String
     val iconFavicon: String
     val iconImage: String
     val chooseFile: String
@@ -228,6 +229,7 @@ object French : Strings {
     override val includeInInbox = "Inclure les conversations dans l'onglet Non lus"
     override val desktopNotifications = "Notifications du bureau"
     override val tabIcon = "Icône de l'onglet"
+    override fun iconOf(name: String) = "Icône de $name"
     override val iconFavicon = "Favicon du site (automatique)"
     override val iconImage = "Image personnalisée"
     override val chooseFile = "Choisir un fichier…"
@@ -367,6 +369,7 @@ object English : Strings {
     override val includeInInbox = "Include the conversations in the Unread tab"
     override val desktopNotifications = "Desktop notifications"
     override val tabIcon = "Tab icon"
+    override fun iconOf(name: String) = "$name's icon"
     override val iconFavicon = "Site's favicon (automatic)"
     override val iconImage = "Custom image"
     override val chooseFile = "Choose a file…"

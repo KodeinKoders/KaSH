@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "name": "WhatsApp",
   "square": { "text": "WA", "color": "#1A7F4B" },
+  "icon": "icon.webp",
   "url": "https://web.whatsapp.com/",
   "matches": ["https://web.whatsapp.com/*"],
   "script": "plugin.js"

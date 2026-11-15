@@ -1,7 +1,7 @@
 package app.kash.core
 
-/** A plugin: its manifest, and the source of its script. */
-public class Plugin(public val manifest: PluginManifest, public val script: String) {
+/** A plugin: its manifest, the source of its script, and its icon (the image file that its manifest names; null when it names none). */
+public class Plugin(public val manifest: PluginManifest, public val script: String, public val icon: ByteArray? = null) {
     public val id: String get() = manifest.id
 }
 

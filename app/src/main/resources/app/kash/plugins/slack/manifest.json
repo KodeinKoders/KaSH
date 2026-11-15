@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "name": "Slack",
   "square": { "text": "Sl", "color": "#5B2C6F" },
+  "icon": "icon.webp",
   "url": "https://${workspace}.slack.com/",
   "matches": ["https://app.slack.com/*"],
   "script": "plugin.js",

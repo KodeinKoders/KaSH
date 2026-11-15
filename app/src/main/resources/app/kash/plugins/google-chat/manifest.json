@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "name": "Google Chat",
   "square": { "text": "GC", "color": "#0B7A75" },
+  "icon": "icon.png",
   "url": "https://mail.google.com/chat/u/0/",
   "matches": ["https://chat.google.com/*"],
   "script": "plugin.js"

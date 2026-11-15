@@ -74,6 +74,11 @@ dependencies {
     testImplementation(libs.kotlin.test.junit)
 }
 
+tasks.test {
+    // BuiltInPluginsTest decodes the plugins' icons with Skia, which loads its native library.
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+}
+
 // The icon of the application is the logo of the repository on a rounded square of this colour, the shape that macOS wants: since macOS 26 it puts
 // the icon of another shape on a grey one. The square, its colour and its shadow are KaTTY's (make-icon.java).
 val iconBackground = "#FDDDD6"

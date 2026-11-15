@@ -52,6 +52,11 @@
         }
       }
     },
+    "icon": {
+      "description": "The file of the plugin's icon, in its folder: a PNG, JPEG, GIF, WebP or ICO image (not SVG), square. The tiles of its services show it by default; without it, they show the site's icon.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]*\\.([Pp][Nn][Gg]|[Jj][Pp][Ee]?[Gg]|[Gg][Ii][Ff]|[Ww][Ee][Bb][Pp]|[Ii][Cc][Oo])$"
+    },
     "url": {
       "description": "The address of a service, an http(s) URL. ${id} is replaced by the value of the option id, a text that is required or has a default, or a choice, encoded as a component of a URI.",
       "type": "string",
