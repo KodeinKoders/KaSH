@@ -21,17 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
-import kotlin.math.roundToInt
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,6 +57,8 @@ import app.kash.ui.KashIcons
 import app.kash.ui.IconOnlyButton
 import app.kash.ui.UnreadBadge
 import app.kash.ui.MenuAnchor
+import app.kash.ui.ReorderState
+import app.kash.ui.reorderable
 import app.kash.ui.WindowMenu
 import app.kash.ui.dashedBorder
 import org.jetbrains.jewel.ui.component.MenuScope
@@ -113,13 +106,9 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
     val vertical = side == RailSide.LEFT || side == RailSide.RIGHT
     // The service whose context menu is open, and where it opens (where the click was).
     var menu by remember { mutableStateOf<Pair<ServiceId, MenuAnchor>?>(null) }
-    // The tile being dragged, how far from its place (in pixels, along the rail), and the size of each tile along the rail.
-    var dragged by remember { mutableStateOf<ServiceId?>(null) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-    val tileSizes = remember { mutableMapOf<ServiceId, Int>() }
-    val services by rememberUpdatedState(model.services)
-    val onMove by rememberUpdatedState(model.onMove)
-    val spacing = with(LocalDensity.current) { RAIL_SPACING.toPx() }
+    // The tiles are dragged to change the services' order.
+    val reorder = remember { ReorderState<ServiceId>() }
+    val ids = model.services.map { it.id }
     val tiles: @Composable () -> Unit = {
         RailItem(
             selected = model.selection == Selection.Inbox,
@@ -142,32 +131,8 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
             // Its own place in the composition, which moves with it: its drag goes on when it takes another tile's place.
             key(service.id) {
                 val count = model.badges[service.id] ?: 0
-                val dragging = dragged == service.id
                 RailItem(
-                    modifier = Modifier
-                        .onSizeChanged { tileSizes[service.id] = if (vertical) it.height else it.width }
-                        // Over the others while it is dragged, where the pointer takes it.
-                        .zIndex(if (dragging) 1f else 0f)
-                        .offset { if (!dragging) IntOffset.Zero else if (vertical) IntOffset(0, dragOffset.roundToInt()) else IntOffset(dragOffset.roundToInt(), 0) }
-                        .pointerInput(service.id, vertical) {
-                            detectDragGestures(
-                                onDragStart = { dragged = service.id; dragOffset = 0f },
-                                onDragEnd = { dragged = null; dragOffset = 0f },
-                                onDragCancel = { dragged = null; dragOffset = 0f },
-                                onDrag = { change, amount ->
-                                    change.consume()
-                                    dragOffset += if (vertical) amount.y else amount.x
-                                    // Past half of its neighbor, it takes the neighbor's place, and its offset is from there.
-                                    val position = services.indexOfFirst { it.id == service.id }
-                                    val neighbor = services.getOrNull(if (dragOffset > 0) position + 1 else position - 1) ?: return@detectDragGestures
-                                    val step = (tileSizes[neighbor.id] ?: 0) + spacing
-                                    if (position >= 0 && step > 0 && kotlin.math.abs(dragOffset) > step / 2) {
-                                        onMove(service.id, neighbor.id)
-                                        dragOffset -= if (dragOffset > 0) step else -step
-                                    }
-                                },
-                            )
-                        },
+                    modifier = Modifier.reorderable(reorder, service.id, vertical, RAIL_SPACING, ids, model.onMove),
                     selected = model.selection == Selection.OfService(service.id),
                     label = service.label,
                     badge = if (count > 0) UnreadCount.badge(count) else null,

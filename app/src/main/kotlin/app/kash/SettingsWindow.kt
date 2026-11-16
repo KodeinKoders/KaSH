@@ -1,9 +1,12 @@
 package app.kash
 
+import app.kash.ui.reorderable
+import app.kash.ui.ReorderState
+import app.kash.core.ServiceOrder
+import androidx.compose.runtime.key
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +26,6 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -32,15 +34,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.rememberWindowState
@@ -84,7 +83,6 @@ import org.jetbrains.jewel.window.DecoratedWindow
 import org.jetbrains.jewel.window.TitleBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 private enum class Page { GENERAL, APPEARANCE, NOTIFICATIONS, INBOX, SERVICES }
 
@@ -173,7 +171,7 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
                             Page.SERVICES -> ServicesPage(
                                 services, model, icons,
                                 onToggle = { id, on -> enabled = enabled + (id to on) },
-                                onMove = { from, to -> order = services.map { it.id }.toMutableList().apply { add(to, removeAt(from)) } },
+                                onMove = { id, neighbor -> order = ServiceOrder.moveNextTo(services.map { it.id }, id, neighbor) },
                             )
                         }
                     }
@@ -382,7 +380,7 @@ private fun ServicesPage(
     model: KashModel,
     icons: ServiceIcons,
     onToggle: (ServiceId, Boolean) -> Unit,
-    onMove: (Int, Int) -> Unit,
+    onMove: (ServiceId, ServiceId) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -398,57 +396,38 @@ private fun ServicesPage(
             Hint(strings.noService)
             return@Column
         }
-        val rowHeight = with(LocalDensity.current) { 49.dp.toPx() }
-        var dragged by remember { mutableStateOf<ServiceId?>(null) }
-        var offset by remember { mutableFloatStateOf(0f) }
+        // A row is dragged anywhere to change the services' order; the grip says so.
+        val reorder = remember { ReorderState<ServiceId>() }
+        val ids = services.map { it.id }
         val shape = RoundedCornerShape(8.dp)
         Column(Modifier.fillMaxWidth().background(Kash.colors.line, shape).border(1.dp, Kash.colors.line, shape), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            for ((index, service) in services.withIndex()) {
-                val dragging = dragged == service.id
-                Row(
-                    Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                        .then(if (dragging) Modifier.offset { IntOffset(0, offset.roundToInt()) } else Modifier)
-                        .background(Kash.colors.card)
-                        .padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    val currentIndex = index
-                    Box(
-                        Modifier.pointerInput(service.id) {
-                            detectDragGestures(
-                                onDragStart = { dragged = service.id; offset = 0f },
-                                onDragEnd = { dragged = null; offset = 0f },
-                                onDragCancel = { dragged = null; offset = 0f },
-                                onDrag = { change, amount ->
-                                    change.consume()
-                                    offset += amount.y
-                                    val position = services.indexOfFirst { it.id == service.id }.takeIf { it >= 0 } ?: currentIndex
-                                    if (offset > rowHeight / 2 && position < services.lastIndex) {
-                                        onMove(position, position + 1); offset -= rowHeight
-                                    } else if (offset < -rowHeight / 2 && position > 0) {
-                                        onMove(position, position - 1); offset += rowHeight
-                                    }
-                                },
-                            )
-                        }.semantics { contentDescription = "" },
+            for (service in services) {
+                // Its own place in the composition, which moves with it: its drag goes on when it takes another row's place.
+                key(service.id) {
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                            .reorderable(reorder, service.id, vertical = true, spacing = 1.dp, ids = ids, onMove = onMove)
+                            .background(Kash.colors.card)
+                            .padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         org.jetbrains.jewel.ui.component.Tooltip({ Text(strings.dragToReorder) }) { KashIcon(KashIcons.Grip, Kash.colors.faint) }
-                    }
-                    ServiceTile(service, icons, 28.dp, if (service.enabled) Modifier else Modifier.alpha(0.45f))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                        Text(
-                            service.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            color = if (service.enabled) Kash.colors.text else Kash.colors.muted,
-                        )
-                        if (model.cacheReset[service.id] == true) {
-                            Text(strings.cacheReset, fontSize = 11.sp, color = Kash.colors.muted)
-                        } else {
-                            Text(displayAddress(service.url), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Kash.colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        ServiceTile(service, icons, 28.dp, if (service.enabled) Modifier else Modifier.alpha(0.45f))
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text(
+                                service.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                color = if (service.enabled) Kash.colors.text else Kash.colors.muted,
+                            )
+                            if (model.cacheReset[service.id] == true) {
+                                Text(strings.cacheReset, fontSize = 11.sp, color = Kash.colors.muted)
+                            } else {
+                                Text(displayAddress(service.url), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = Kash.colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
+                        CheckboxRow(strings.enabled, service.enabled, { onToggle(service.id, it) })
+                        ServiceMenuButton(service, serviceActions(model, service.id), devToolsEnabled = model.loaded[service.id] != null, buttonSize = 30.dp)
                     }
-                    CheckboxRow(strings.enabled, service.enabled, { onToggle(service.id, it) })
-                    ServiceMenuButton(service, serviceActions(model, service.id), devToolsEnabled = model.loaded[service.id] != null, buttonSize = 30.dp)
                 }
             }
         }

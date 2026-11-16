@@ -19,6 +19,7 @@ import app.kash.core.ProfileId
 import app.kash.core.Selection
 import app.kash.core.Service
 import app.kash.core.ServiceId
+import app.kash.core.ServiceOrder
 import app.kash.core.ServiceUnread
 import app.kash.core.Settings
 import app.kash.core.StateFile
@@ -296,19 +297,10 @@ class KashModel(
         }
     }
 
-    /**
-     * Moves [id] past [neighbor] in the services' order (a tile dragged in the rail): right after it when it was before it, right before it
-     * otherwise. The rail shows only the enabled services, whose neighbors may not be next to each other in the order.
-     */
+    /** Moves [id] past [neighbor] in the services' order (a tile dragged in the rail): see [ServiceOrder.moveNextTo]. */
     fun moveNextTo(id: ServiceId, neighbor: ServiceId) = update { state ->
-        val services = state.services.toMutableList()
-        val from = services.indexOfFirst { it.id == id }
-        val before = from < services.indexOfFirst { it.id == neighbor }
-        if (from < 0 || services.none { it.id == neighbor } || id == neighbor) return@update state
-        val service = services.removeAt(from)
-        val target = services.indexOfFirst { it.id == neighbor }
-        services.add(if (before) target + 1 else target, service)
-        state.copy(services = services)
+        val byId = state.services.associateBy { it.id }
+        state.copy(services = ServiceOrder.moveNextTo(state.services.map { it.id }, id, neighbor).map(byId::getValue))
     }
 
     fun toggleMute(id: ServiceId) {
