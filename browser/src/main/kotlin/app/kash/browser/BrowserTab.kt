@@ -50,6 +50,13 @@ public class BrowserTab internal constructor(
     @Volatile
     private var loadingService = false
 
+    // Whether the page's size is emulated (applyHiddenSize): only until it is first shown.
+    @Volatile
+    private var sizeEmulated = false
+
+    @Volatile
+    private var shownOnce = false
+
     init {
         // While the page is shown, its size is the view's: it is the size of the pages that are not (hiddenSize). Shown or hidden, its size is
         // given again (see applyHiddenSize).
@@ -60,7 +67,10 @@ public class BrowserTab internal constructor(
             }
         })
         browser.uiComponent.addHierarchyListener { event ->
-            if (event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L && rendered) applyHiddenSize()
+            if (event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong() != 0L) {
+                if (browser.uiComponent.isShowing) shownOnce = true
+                if (rendered) applyHiddenSize()
+            }
         }
     }
 
@@ -120,15 +130,24 @@ public class BrowserTab internal constructor(
     }
 
     /**
-     * A page that is not shown has no size (its native view is in no window, or was never), and is laid out at 0×0: a service that draws only the
-     * rows that fit (Slack's sidebar, a virtual list) then draws none, and its plugin has nothing to read until the user shows it. While the page
-     * is not shown, it is laid out at the size of the last page shown ([hiddenSize]) through the browser's DevTools session; shown, at its view's.
+     * A page that was never shown has no size (its native view was never in a window), and is laid out at 0×0: a service that draws only the
+     * rows that fit (Slack's sidebar, a virtual list) then draws none, and its plugin has nothing to read until the user shows it. Until the page
+     * is first shown, it is laid out at the size of the last page shown ([hiddenSize]) through the browser's DevTools session; then at its view's,
+     * which it keeps while it is hidden (its native view is moved out of the window as it is).
+     *
+     * Only once: removing the emulated size makes Chromium lay the page out again and wait for a new frame of it, even at the same size, and the
+     * page was empty for half a second whenever it was shown.
      */
     private fun applyHiddenSize(): CompletableFuture<*> {
         val devTools = browser.devToolsClient ?: return CompletableFuture.completedFuture(Unit)
         val future = if (browser.uiComponent.isShowing) {
+            if (!sizeEmulated) return CompletableFuture.completedFuture(Unit)
+            sizeEmulated = false
             devTools.executeDevToolsMethod("Emulation.clearDeviceMetricsOverride")
         } else {
+            // A page that was shown keeps its own size.
+            if (shownOnce) return CompletableFuture.completedFuture(Unit)
+            sizeEmulated = true
             val size = hiddenSize.get()
             devTools.executeDevToolsMethod(
                 "Emulation.setDeviceMetricsOverride",

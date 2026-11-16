@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -96,10 +97,10 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
     val metrics = RailMetrics.of(settings.iconSize)
     val content: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize().background(Kash.colors.background)) {
+            // Always there, without a size while the Unread tab is shown: a new panel for each page made it resized each time it was shown.
+            ServicePage(selectedTab, if (selected == null) Modifier.size(0.dp) else Modifier.fillMaxSize())
             if (selected == null) {
                 InboxScreen(rows, settings.inboxSort, { sort -> model.updateSettings { it.copy(inboxSort = sort) } }, icons, onRefresh = { /* the counts are read as they change */ }, onOpen = { row -> model.openConversation(row.service, row.conversation) })
-            } else {
-                key(selected.id) { ServicePage(selectedTab) }
             }
         }
     }

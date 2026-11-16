@@ -41,7 +41,8 @@ import app.kash.ui.strings
 import org.jetbrains.jewel.ui.component.MenuScope
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.separator
-import java.awt.BorderLayout
+import java.awt.Component
+import java.awt.Dimension
 import java.net.URI
 import javax.swing.JPanel
 
@@ -92,20 +93,52 @@ fun ServiceButtons(service: Service, tab: BrowserTab?, onToggleMute: () -> Unit,
     }
 }
 
-/** A service's page, on the whole height under the title bar, once Chromium created it (see [BrowserTab.created]: a service just added). */
+/**
+ * The page of the selected service, on the whole height under the title bar, once Chromium created it (see [BrowserTab.created]: a service just
+ * added). One panel for every service ([PageHolder]): going from a service to another changes the page in it.
+ */
 @Composable
-fun ServicePage(tab: BrowserTab?) {
+fun ServicePage(tab: BrowserTab?, modifier: Modifier) {
     val created = tab?.created?.collectAsState()?.value == true
-    if (tab != null && created) {
-        // The panel is the page's parent while it is shown: the page keeps running when the panel goes, and is added to the next one.
-        SwingPanel(
-            background = Kash.colors.background,
-            factory = { JPanel(BorderLayout()).apply { add(tab.component, BorderLayout.CENTER) } },
-            modifier = Modifier.fillMaxSize(),
-        )
-    } else {
-        Box(Modifier.fillMaxSize().background(Kash.colors.background))
+    val holder = remember { PageHolder() }
+    SwingPanel(
+        background = Kash.colors.background,
+        factory = { holder },
+        modifier = modifier,
+        update = { it.show(tab?.takeIf { created }?.component) },
+    )
+}
+
+/**
+ * The panel of the selected service's page: the page keeps running when it is removed, and is added again when its service is selected.
+ *
+ * A page is given its size before it is added, the one of the page before: added to a panel that has none yet (a new panel for each service, as
+ * it was), a page was resized to nothing and back, and Chromium laid it out again and waited for a new frame of it, while it showed nothing.
+ */
+internal class PageHolder : JPanel(null) {
+    private var page: Component? = null
+    private var lastSize: Dimension? = null
+
+    /** Shows [next] in place of the page before (null: none). */
+    fun show(next: Component?) {
+        if (next == page) return
+        page?.let(::remove)
+        page = next
+        if (next != null) {
+            pageSize()?.let { next.setBounds(0, 0, it.width, it.height) }
+            add(next)
+        }
+        revalidate()
+        repaint()
     }
+
+    override fun doLayout() {
+        val size = pageSize() ?: return
+        page?.takeIf { it.width != size.width || it.height != size.height }?.setBounds(0, 0, size.width, size.height)
+    }
+
+    // The panel's size, or its last one while it has none (the Unread tab is shown).
+    private fun pageSize(): Dimension? = if (width > 0 && height > 0) Dimension(width, height).also { lastSize = it } else lastSize
 }
 
 /** The "…" button of a service and its menu. */
