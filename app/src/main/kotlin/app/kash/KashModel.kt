@@ -188,6 +188,7 @@ class KashModel(
                 // Only counts in the log: the names are the user's contacts.
                 json.getValue("conversations").jsonArray.map { element ->
                     val conversation = element.jsonObject
+                    val topic = conversation["topic"]?.jsonPrimitive?.booleanOrNull ?: false
                     Conversation(
                         id = conversation.getValue("id").jsonPrimitive.content,
                         name = conversation["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
@@ -196,13 +197,15 @@ class KashModel(
                             "channel" -> ConversationKind.CHANNEL
                             else -> ConversationKind.DIRECT
                         },
-                        count = conversation["count"]?.jsonPrimitive?.intOrNull ?: 1,
-                        mention = conversation["mention"]?.jsonPrimitive?.booleanOrNull ?: false,
+                        // A topic's messages are not counted.
+                        count = if (topic) 0 else conversation["count"]?.jsonPrimitive?.intOrNull ?: 1,
+                        mention = !topic && conversation["mention"]?.jsonPrimitive?.booleanOrNull ?: false,
                         preview = conversation["preview"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                         time = conversation["time"]?.jsonPrimitive?.longOrNull,
                         dayOnly = conversation["timePrecision"]?.jsonPrimitive?.contentOrNull == "day",
+                        topic = topic,
                     )
-                }.also { logger.debug("Unread of {}: {} conversations, {} messages", service.title, it.size, it.sumOf { c -> c.count }); totals.remove(id) }
+                }.also { logger.debug("Unread of {}: {} conversations, {} messages, {} topics", service.title, it.count { c -> !c.topic }, it.sumOf { c -> c.count }, it.count { c -> c.topic }); totals.remove(id) }
             } catch (e: Exception) {
                 logger.warn("The unread conversations of {} cannot be read", service.title, e)
                 return

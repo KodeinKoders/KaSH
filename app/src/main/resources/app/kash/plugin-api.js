@@ -33,24 +33,27 @@ const warn = (message) => {
 
 const KINDS = ['direct', 'group', 'channel'];
 
-// A conversation as KaSH reads it, or null when it is not one (it is then left out).
+// A conversation as KaSH reads it, or null when it is not one (it is then left out). A topic (new messages that the service does not count: a
+// channel in bold, without a badge) has no count and no mention.
 const conversationOf = (value) => {
     if (value === null || typeof value !== 'object') return null;
     const id = typeof value.id === 'number' ? String(value.id) : value.id;
     if (typeof id !== 'string' || id === '') return null;
     if (!KINDS.includes(value.kind)) return null;
-    const count = Math.floor(Number(value.count));
-    if (!Number.isFinite(count) || count < 1) return null;
+    const topic = value.topic === true;
+    const count = topic ? 0 : Math.floor(Number(value.count));
+    if (!topic && (!Number.isFinite(count) || count < 1)) return null;
     const time = value.time === undefined || value.time === null ? null : Number(value.time);
     return {
         id,
         name: typeof value.name === 'string' ? value.name : '',
         kind: value.kind,
         count,
-        mention: value.mention === true,
+        mention: !topic && value.mention === true,
         preview: typeof value.preview === 'string' ? value.preview : '',
         time: Number.isFinite(time) ? time : null,
         timePrecision: value.timePrecision === 'day' && Number.isFinite(time) ? 'day' : 'minute',
+        topic,
     };
 };
 
@@ -73,7 +76,7 @@ const set = (conversations) => {
     for (const value of conversations) {
         const conversation = conversationOf(value);
         if (conversation === null) {
-            warn('a conversation without an id, a kind among direct, group and channel, or a count of at least 1 was left out');
+            warn('a conversation without an id, a kind among direct, group and channel, or a count of at least 1 (or topic: true) was left out');
             continue;
         }
         if (ids.has(conversation.id)) {

@@ -83,7 +83,8 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
         services = enabled,
         selection = if (selected == null) Selection.Inbox else state.selection,
         badges = badges,
-        inboxCount = rows.sumOf { it.count },
+        // The topics are not counted (Inbox.sections).
+        inboxCount = Inbox.sections(rows).count,
         showBadges = settings.showBadges,
         showLabels = settings.showLabels,
         doNotDisturb = settings.doNotDisturb,

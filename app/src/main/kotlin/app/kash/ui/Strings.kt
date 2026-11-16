@@ -18,6 +18,11 @@ interface Strings {
     val timeLabel: TimeLabel
     val inbox: String
     fun inboxSummary(messages: Int, conversations: Int): String
+    fun topicsSummary(topics: Int): String
+    val messagesSection: String
+    val topicsSection: String
+    val noUnreadMessages: String
+    val noUnreadTopics: String
     val refresh: String
     val filterPlaceholder: String
     val filterLabel: String
@@ -168,6 +173,11 @@ object French : Strings {
     override val inbox = "Non lus"
     override fun inboxSummary(messages: Int, conversations: Int) =
         "$messages message${s(messages)} non lu${s(messages)} dans $conversations conversation${s(conversations)}"
+    override fun topicsSummary(topics: Int) = "$topics sujet${s(topics)}"
+    override val messagesSection = "Messages"
+    override val topicsSection = "Sujets"
+    override val noUnreadMessages = "Aucun message non lu."
+    override val noUnreadTopics = "Aucun sujet non lu."
     override val refresh = "Actualiser"
     override val filterPlaceholder = "Filtrer par nom ou par service"
     override val filterLabel = "Filtrer les conversations"
@@ -318,6 +328,11 @@ object English : Strings {
     override val inbox = "Unread"
     override fun inboxSummary(messages: Int, conversations: Int) =
         "$messages unread message${s(messages)} in $conversations conversation${s(conversations)}"
+    override fun topicsSummary(topics: Int) = "$topics topic${s(topics)}"
+    override val messagesSection = "Messages"
+    override val topicsSection = "Topics"
+    override val noUnreadMessages = "No unread messages."
+    override val noUnreadTopics = "No unread topics."
     override val refresh = "Refresh"
     override val filterPlaceholder = "Filter by name or service"
     override val filterLabel = "Filter the conversations"

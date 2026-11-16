@@ -115,4 +115,46 @@ class InboxTest {
         assertNull(Inbox.dockBadge(badges, settings.copy(dockBadge = DockBadge.NONE)))
         assertNull(Inbox.dockBadge(emptyMap(), settings))
     }
+
+    private val slack = service("slack", "Slack", "kotlinlang")
+
+    private val withTopics = unread + mapOf(
+        slack.id to ServiceUnread(
+            conversations = listOf(
+                Conversation("D1", "Bruno", ConversationKind.DIRECT, 2),
+                Conversation("C1", "general", ConversationKind.GROUP, 0, topic = true),
+                Conversation("C2", "random", ConversationKind.GROUP, 0, topic = true, time = 5_000L),
+            ),
+        ),
+    )
+
+    @Test
+    fun theTopicsAreASectionOfTheirOwn() {
+        val sections = Inbox.sections(Inbox.rows(listOf(whatsApp, slack), withTopics, settings))
+        assertEquals(listOf("Laila", "Escalade", "Bruno"), sections.messages.map { it.name })
+        assertEquals(listOf("general", "random"), sections.topics.map { it.name })
+        assertEquals(12, sections.count)
+        assertEquals(listOf(0, 0), sections.topics.map { it.count })
+    }
+
+    @Test
+    fun aTopicIsCountedByNoBadge() {
+        assertEquals(2, withTopics.getValue(slack.id).count)
+        assertEquals(mapOf(slack.id to 2), Inbox.badges(listOf(slack), withTopics, settings))
+        val onlyTopics = mapOf(slack.id to ServiceUnread(conversations = listOf(Conversation("C1", "general", ConversationKind.GROUP, 0, topic = true))))
+        assertEquals(emptyMap(), Inbox.badges(listOf(slack), onlyTopics, settings))
+        assertNull(Inbox.dockBadge(Inbox.badges(listOf(slack), onlyTopics, settings), settings))
+    }
+
+    @Test
+    fun directOnlyLeavesTheTopicsOut() {
+        val rows = Inbox.rows(listOf(slack), withTopics, settings.copy(directOnly = true))
+        assertEquals(listOf("Bruno"), rows.map { it.name })
+    }
+
+    @Test
+    fun aGroupOfTheTopicsCountsNoMessage() {
+        val groups = Inbox.byService(Inbox.sections(Inbox.rows(listOf(slack), withTopics, settings)).topics)
+        assertEquals(listOf(0), groups.map { it.count })
+    }
 }

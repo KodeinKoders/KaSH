@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
@@ -51,7 +54,9 @@ import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 
 /**
- * The Unread tab: every conversation with unread messages of the services that tell them, by count or by service, filtered by name.
+ * The Unread tab: every conversation with unread messages of the services that tell them, by date, by count or by service, filtered by name, in
+ * two sections: the messages, which the services count, and the topics, which they show without counting them (a channel in bold, without a
+ * badge).
  *
  * @param rows Every row, before filtering (see [Inbox.rows]).
  * @param sort How the rows are sorted, which [onSort] changes: kept in the settings, so that it is the same at the next launch.
@@ -59,8 +64,8 @@ import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 @Composable
 fun InboxScreen(rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Unit, icons: ServiceIcons, onRefresh: () -> Unit, onOpen: (InboxRow) -> Unit) {
     val query = rememberTextFieldState()
-    val filtered = Inbox.filter(rows, query.text.toString())
-    val total = rows.sumOf { it.count }
+    val all = Inbox.sections(rows)
+    val filtered = Inbox.sections(Inbox.filter(rows, query.text.toString()))
     VerticallyScrollableContainer(Modifier.fillMaxSize().background(Kash.colors.background), scrollState = rememberScrollState()) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Column(
@@ -70,7 +75,8 @@ fun InboxScreen(rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Un
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(strings.inbox, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                        Text(strings.inboxSummary(total, rows.size), color = Kash.colors.muted)
+                        val summary = strings.inboxSummary(all.count, all.messages.size)
+                        Text(if (all.topics.isEmpty()) summary else "$summary · ${strings.topicsSummary(all.topics.size)}", color = Kash.colors.muted)
                     }
                     OutlinedButton(onClick = onRefresh) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -79,7 +85,7 @@ fun InboxScreen(rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Un
                         }
                     }
                 }
-                if (rows.isEmpty()) {
+                if (all.isEmpty) {
                     EmptyInbox()
                     return@Column
                 }
@@ -98,23 +104,43 @@ fun InboxScreen(rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Un
                         ),
                     )
                 }
-                when {
-                    filtered.isEmpty() -> NoResults(query.text.toString())
-                    sort == InboxSort.BY_DATE -> RowsCard(Inbox.byDate(filtered)) { row -> InboxRowView(row, icons, withService = true) { onOpen(row) } }
-                    sort == InboxSort.BY_COUNT -> RowsCard(Inbox.byCount(filtered)) { row -> InboxRowView(row, icons, withService = true) { onOpen(row) } }
-                    else -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                        for (group in Inbox.byService(filtered)) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    ServiceTile(group.service, icons, 20.dp)
-                                    Text(group.service.title, fontWeight = FontWeight.SemiBold)
-                                    Text(strings.unread(group.count), color = Kash.colors.muted)
-                                    Box(Modifier.weight(1f))
-                                    Link(strings.open(group.service.name), onClick = { onOpen(group.rows.first().copy(conversation = null)) })
-                                }
-                                RowsCard(group.rows) { row -> InboxRowView(row, icons, withService = false) { onOpen(row) } }
-                            }
+                if (filtered.isEmpty) {
+                    NoResults(query.text.toString())
+                } else {
+                    InboxSection(strings.messagesSection, filtered.messages, strings.noUnreadMessages, sort, icons, onOpen)
+                    InboxSection(strings.topicsSection, filtered.topics, strings.noUnreadTopics, sort, icons, onOpen)
+                }
+            }
+        }
+    }
+}
+
+/** A section of the Unread tab: its title and its number of conversations, then its rows as [sort] says, or [empty] when it has none. */
+@Composable
+private fun InboxSection(title: String, rows: List<InboxRow>, empty: String, sort: InboxSort, icons: ServiceIcons, onOpen: (InboxRow) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            if (rows.isNotEmpty()) Text(rows.size.toString(), color = Kash.colors.muted, maxLines = 1)
+            Box(Modifier.weight(1f).height(1.dp).background(Kash.colors.line))
+        }
+        when {
+            rows.isEmpty() -> Text(empty, color = Kash.colors.muted, modifier = Modifier.padding(horizontal = 2.dp))
+            sort == InboxSort.BY_DATE -> RowsCard(Inbox.byDate(rows)) { row -> InboxRowView(row, icons, withService = true) { onOpen(row) } }
+            sort == InboxSort.BY_COUNT -> RowsCard(Inbox.byCount(rows)) { row -> InboxRowView(row, icons, withService = true) { onOpen(row) } }
+            else -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                for (group in Inbox.byService(rows)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ServiceTile(group.service, icons, 20.dp)
+                            Text(group.service.title, fontWeight = FontWeight.SemiBold)
+                            // The topics have no count: their number.
+                            val count = if (group.rows.first().topic) strings.topicsSummary(group.rows.size) else strings.unread(group.count)
+                            Text(count, color = Kash.colors.muted)
+                            Box(Modifier.weight(1f))
+                            Link(strings.open(group.service.name), onClick = { onOpen(group.rows.first().copy(conversation = null)) })
                         }
+                        RowsCard(group.rows) { row -> InboxRowView(row, icons, withService = false) { onOpen(row) } }
                     }
                 }
             }
@@ -136,7 +162,7 @@ private fun RowsCard(rows: List<InboxRow>, row: @Composable (InboxRow) -> Unit) 
 
 /**
  * A conversation: its service's tile (in the flat list), its name, its context and its service, its count. A row of a custom application is its
- * total, which says so.
+ * total, which says so; a topic has a dot instead of a count.
  */
 @Composable
 private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolean, onClick: () -> Unit) {
@@ -170,7 +196,8 @@ private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolea
         // When the last message came, over the count, as WhatsApp's list shows it.
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             row.time?.let { Text(strings.timeLabel.of(it, dayOnly = row.dayOnly), fontSize = 11.sp, color = Kash.colors.muted, maxLines = 1) }
-            CountPill(UnreadCount.badge(row.count))
+            if (row.topic) Box(Modifier.padding(horizontal = 8.dp, vertical = 7.dp).size(8.dp).background(Kash.colors.muted, CircleShape))
+            else CountPill(UnreadCount.badge(row.count))
         }
         KashIcon(KashIcons.ChevronRight, Kash.colors.faint)
     }

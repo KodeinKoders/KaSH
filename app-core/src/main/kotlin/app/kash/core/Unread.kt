@@ -21,6 +21,8 @@ public enum class ConversationKind {
  * @property preview The start of its last message, as the service shows it in its list; empty when it shows none.
  * @property time When its last message came, in milliseconds since the epoch; null when the service does not tell.
  * @property dayOnly Whether [time] only tells the day (the service shows no time for it): it is then the start of that day.
+ * @property topic Whether the service shows its new messages without counting them (a channel in bold, without a badge, and no mention): it is
+ * a topic of the Unread tab, which no badge counts, and its [count] is 0.
  */
 public data class Conversation(
     val id: String,
@@ -31,6 +33,7 @@ public data class Conversation(
     val preview: String = "",
     val time: Long? = null,
     val dayOnly: Boolean = false,
+    val topic: Boolean = false,
 )
 
 /**
@@ -43,8 +46,8 @@ public data class ServiceUnread(
     val total: Int? = null,
     val conversations: List<Conversation> = emptyList(),
 ) {
-    /** The number of unread messages: the conversations' when they are known, else [total], else none. */
-    val count: Int get() = if (conversations.isNotEmpty()) conversations.sumOf { it.count } else total ?: 0
+    /** The number of unread messages: the conversations' when they are known (not the topics', which the service does not count), else [total], else none. */
+    val count: Int get() = if (conversations.isNotEmpty()) conversations.filterNot { it.topic }.sumOf { it.count } else total ?: 0
 
     public companion object {
         public val NONE: ServiceUnread = ServiceUnread()

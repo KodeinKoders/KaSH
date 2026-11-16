@@ -4,8 +4,8 @@
 // Slack's web application has no model that a page's script can reach; its sidebar describes each conversation with attributes that it keeps for
 // its own tests (`data-qa-channel-sidebar-…`: its id, its type, whether it is muted), which are steadier than its classes. A conversation counts
 // when Slack gives it a badge: a direct message (and a group one) with its count, a channel only when the user is mentioned in it. A channel with
-// new messages and no mention is only in bold, without a badge, and is left out, as Slack leaves it out. A muted conversation is left out, and so
-// is the user's own direct message. The replies in threads count when Slack badges its Threads entry (a mention of the user in a thread): one row,
+// new messages and no mention is only in bold, without a badge (`p-channel_sidebar__channel--unread`): a topic, which nothing counts. A muted
+// conversation is left out, and so is the user's own direct message. The replies in threads count when Slack badges its Threads entry (a mention of the user in a thread): one row,
 // named as Slack names it. The sidebar has no preview and no time: the rows of the Unread tab show what the conversation is instead. The image of
 // the workspace, when it has one, is the service's icon.
 
@@ -47,10 +47,15 @@ kash.watch(() => {
     for (const row of rows()) {
         if (row.dataset.qaChannelSidebarChannelIsMuted === 'true' || row.dataset.qaChannelSidebarIsYou === 'true') continue;
         const badge = row.querySelector('[data-qa="badge"]');
-        if (!badge) continue;
+        const bold = row.classList.contains('p-channel_sidebar__channel--unread');
+        if (!badge && !bold) continue;
         const id = row.dataset.qaChannelSidebarChannelId;
-        // A conversation that is starred may be in its section and in the one of its kind.
+        // A conversation that is starred may be in its section and in the one of its kind: its rows say the same.
         if (conversations.some((conversation) => conversation.id === id)) continue;
+        if (!badge) {
+            conversations.push({ id, name: nameOf(row), kind: kindOf(row), topic: true });
+            continue;
+        }
         const count = parseInt(badge.textContent, 10);
         conversations.push({
             id,

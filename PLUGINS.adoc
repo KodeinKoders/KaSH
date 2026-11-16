@@ -300,6 +300,7 @@ kash.unread.clear(): void
 ----
 
 `set` sends the unread conversations, which the Unread tab lists and the tab's badge counts.
+The Unread tab has two sections: *Messages*, the conversations whose unread messages the service counts, and *Topics*, those that it shows without counting them (`topic`).
 `setCount` is for a service whose page only tells a total: the tab shows it, as for a web application.
 `clear` is `set([])`.
 A state that is the same as the last one is not sent again.
@@ -323,12 +324,19 @@ A conversation is:
 | `direct`, `group` or `channel`.
 
 | `count`
-| yes
+| yes, but for a topic
 | Its unread messages, at least 1. A conversation that the user marked as unread by hand counts 1.
 
 | `mention`
 | no
 | Whether an unread message mentions the user. `false` by default.
+
+| `topic`
+| no
+| Whether the service shows new messages in it without counting them: a channel in bold, without a badge, and no mention (Slack's, Google Chat's spaces).
+KaSH lists it in the *Topics* section of the Unread tab, without a count, and no badge counts it (not the tab's, not the Dock's).
+Its `count` and its `mention` are ignored.
+`false` by default.
 
 | `preview`
 | no
@@ -344,7 +352,7 @@ A conversation is:
 With `'day'`, `time` is the start of that day, and KaSH shows the day without a time ("Yesterday", "Nov 7").
 |===
 
-An entry that is not a conversation (no id, an unknown kind, a count under 1, an id given twice) is left out, with a warning in the console, once.
+An entry that is not a conversation (no id, an unknown kind, a count under 1 when it is not a topic, an id given twice) is left out, with a warning in the console, once.
 
 
 === Reading the page
@@ -478,7 +486,7 @@ Rules that every plugin follows:
 * read the structure of the page, never more of the user's messages than what the Unread tab shows (the start of the last one);
 * make no network request, and send nothing anywhere but to KaSH, through the API;
 * change nothing in the page: a plugin reads it, and opens a conversation when the user asks;
-* count what the service counts: a conversation that the service does not badge (muted, archived, a channel in bold) is not unread for KaSH either.
+* count what the service counts: a conversation that the service does not badge (muted, archived) is not unread for KaSH either, and one that it only shows in bold (a channel without a mention) is a `topic`, which nothing counts.
 
 To add a built-in plugin, put its folder in `app/src/main/resources/app/kash/plugins/` and its id in `index.json`.
 The build's tests check that every built-in plugin is listed, valid, and has its script.

@@ -7,6 +7,7 @@ package app.kash.core
  * @property kind The conversation's kind, null for a total.
  * @property preview The start of the conversation's last message; empty for a total, or when the service shows none.
  * @property time When the conversation's last message came, in milliseconds since the epoch; null for a total, or when the service does not tell.
+ * @property topic Whether it is a topic (see [Conversation.topic]): in the Topics section, without a count, which no badge counts.
  */
 public data class InboxRow(
     val service: Service,
@@ -17,6 +18,7 @@ public data class InboxRow(
     val preview: String = "",
     val time: Long? = null,
     val dayOnly: Boolean = false,
+    val topic: Boolean = false,
 ) {
     val isTotal: Boolean get() = kind == null
 }
@@ -29,6 +31,20 @@ public data class InboxGroup(
     val count: Int get() = rows.sumOf { it.count }
 }
 
+/**
+ * The two sections of the Unread tab: the conversations whose unread messages their service counts, and the topics, which it shows without
+ * counting them (a channel in bold, without a badge).
+ */
+public data class InboxSections(
+    val messages: List<InboxRow>,
+    val topics: List<InboxRow>,
+) {
+    val isEmpty: Boolean get() = messages.isEmpty() && topics.isEmpty()
+
+    /** The number of unread messages, the topics' left out. */
+    val count: Int get() = messages.sumOf { it.count }
+}
+
 /** What the Unread tab shows, made from the services and what is unread in each. */
 public object Inbox {
     /** The services whose unread messages the Unread tab lists: enabled, included, and not muted when [Settings.skipMuted] says so. */
@@ -37,7 +53,7 @@ public object Inbox {
 
     /**
      * Every row, before filtering: the conversations of each listed service, or its total when it only has one. With [Settings.directOnly], the
-     * conversations of groups and channels are left out, unless they mention the user.
+     * conversations of groups and channels are left out, unless they mention the user, and so are the topics.
      */
     public fun rows(services: List<Service>, unread: Map<ServiceId, ServiceUnread>, settings: Settings): List<InboxRow> =
         listed(services, settings).flatMap { service ->
@@ -45,12 +61,18 @@ public object Inbox {
             when {
                 serviceUnread.conversations.isNotEmpty() ->
                     serviceUnread.conversations
-                        .filter { it.count > 0 && (!settings.directOnly || it.kind == ConversationKind.DIRECT || it.mention) }
-                        .map { InboxRow(service, it.id, it.name, it.kind, it.count, it.preview, it.time, it.dayOnly) }
+                        .filter { (it.topic || it.count > 0) && (!settings.directOnly || (!it.topic && (it.kind == ConversationKind.DIRECT || it.mention))) }
+                        .map { InboxRow(service, it.id, it.name, it.kind, if (it.topic) 0 else it.count, it.preview, it.time, it.dayOnly, it.topic) }
                 (serviceUnread.total ?: 0) > 0 -> listOf(InboxRow(service, null, service.title, null, serviceUnread.total!!))
                 else -> emptyList()
             }
         }
+
+    /** The rows in their sections: the messages, then the topics, each in the order of [rows]. */
+    public fun sections(rows: List<InboxRow>): InboxSections {
+        val (topics, messages) = rows.partition { it.topic }
+        return InboxSections(messages, topics)
+    }
 
     /** The rows that [query] matches, by the conversation's name, or the service's name or label, ignoring case. */
     public fun filter(rows: List<InboxRow>, query: String): List<InboxRow> {

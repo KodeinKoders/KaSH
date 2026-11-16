@@ -4,11 +4,17 @@
 // Google Chat has no model that a page's script can reach (its code is compiled, and it keeps nothing in IndexedDB): the side panel is what it
 // shows, and what it counts. A conversation counts when its row has Google Chat's badge: a direct message (and a message request, from an account
 // outside the organization) with its count, a space only when the user is mentioned in it. A space with new messages and no mention is only in
-// bold in Google Chat, without a number, and is left out as Google Chat leaves it out. The preview is the one of the Home list, when it is
-// rendered, and kept while it is not.
+// bold in Google Chat, without a number: a topic, which nothing counts. The preview is the one of the Home list, when it is rendered, and kept
+// while it is not.
+//
+// Not seen yet when it was written: a space in bold. A row with new messages has the compiled class `H7du2` (seen on the direct messages with a
+// badge, not on the read rows), and its row of the Home list `data-is-unread="true"`; either makes a row without a badge a topic.
 
 // The badge of a row (its count, or a mark), as Google Chat draws it: its classes are compiled names, the only thing that tells it.
 const BADGE = '.SaMfhe';
+
+// A row with new messages, in bold: a compiled name too.
+const UNREAD = 'H7du2';
 
 // The rows of the side panel: its sections (starred, direct messages, spaces, apps) are groups, the Home list is not in one.
 const panelRows = () => [...document.querySelectorAll('[role="group"] [data-group-id]')];
@@ -33,32 +39,43 @@ const timeOf = (row) => {
     return Number.isFinite(time) && time > 0 ? time : null;
 };
 
-// The previews of the Home list, by conversation: only the rows that are rendered have one (the list is virtualized, and is there only on Home).
-// A row of a thread is a reply in a conversation, whose own row has the preview of the conversation.
-const renderedPreviews = () => {
-    const previews = new Map();
+// The rows of the Home list, by conversation: only the rows that are rendered (the list is virtualized, and is there only on Home). A row of a
+// thread is a reply in a conversation, whose own row has the preview of the conversation.
+const homeRows = () => {
+    const rows = new Map();
     for (const row of document.querySelectorAll('[data-group-id][data-is-unread]')) {
         if (row.closest('[role="group"]') || row.dataset.topicId) continue;
-        // Its text with the sender of the last message, without what is only read to screen readers (`Message` before it).
-        const preview = row.querySelector('.Hkj4n');
-        if (preview) previews.set(row.dataset.groupId, kash.dom.text(preview));
+        rows.set(row.dataset.groupId, row);
     }
-    return previews;
+    return rows;
+};
+
+// Its text with the sender of the last message, without what is only read to screen readers (`Message` before it).
+const previewOfRow = (row) => {
+    const preview = row && row.querySelector('.Hkj4n');
+    return preview ? kash.dom.text(preview) : null;
 };
 
 // The last preview of each unread conversation, kept while the Home list is not rendered.
 const previewOf = new Map();
 
 kash.watch(() => {
-    const rendered = renderedPreviews();
+    const home = homeRows();
     const conversations = [];
     for (const row of panelRows()) {
         const badge = row.querySelector(BADGE);
-        if (!badge) continue;
+        const homeRow = home.get(row.dataset.groupId);
+        const bold = row.classList.contains(UNREAD) || (homeRow !== undefined && homeRow.dataset.isUnread === 'true');
+        if (!badge && !bold) continue;
         const id = idOf(row);
         // A conversation that is starred is in its section and in the one of its kind.
         if (conversations.some((conversation) => conversation.id === id)) continue;
-        if (rendered.has(row.dataset.groupId)) previewOf.set(id, rendered.get(row.dataset.groupId));
+        const preview = previewOfRow(homeRow);
+        if (preview !== null) previewOf.set(id, preview);
+        if (!badge) {
+            conversations.push({ id, name: nameOf(row), kind: kindOf(row), topic: true, preview: previewOf.get(id) || '', time: timeOf(row) });
+            continue;
+        }
         const count = parseInt(badge.textContent, 10);
         const kind = kindOf(row);
         conversations.push({

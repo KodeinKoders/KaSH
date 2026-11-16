@@ -15,10 +15,15 @@ declare namespace KashPlugin {
         /** The name to show; '' when the service gives none (KaSH then shows "Unnamed group"…). */
         name: string;
         kind: ConversationKind;
-        /** Unread messages, at least 1 (a conversation marked as unread by hand: 1). */
-        count: number;
-        /** Whether one of the unread messages mentions the user. false by default. */
+        /** Unread messages, at least 1 (a conversation marked as unread by hand: 1). Not given, and ignored, for a topic. */
+        count?: number;
+        /** Whether one of the unread messages mentions the user. false by default; ignored for a topic. */
         mention?: boolean;
+        /**
+         * Whether the service shows new messages in it without counting them (a channel in bold, without a badge, and no mention): KaSH lists it
+         * in the Topics section of its Unread tab, without a count, and no badge counts it. false by default.
+         */
+        topic?: boolean;
         /** The start of the last message, as the service shows it. '' by default. */
         preview?: string;
         /** When the last message came, in milliseconds since the epoch. null by default (not known). */
