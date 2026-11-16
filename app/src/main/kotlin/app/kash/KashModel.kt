@@ -296,6 +296,21 @@ class KashModel(
         }
     }
 
+    /**
+     * Moves [id] past [neighbor] in the services' order (a tile dragged in the rail): right after it when it was before it, right before it
+     * otherwise. The rail shows only the enabled services, whose neighbors may not be next to each other in the order.
+     */
+    fun moveNextTo(id: ServiceId, neighbor: ServiceId) = update { state ->
+        val services = state.services.toMutableList()
+        val from = services.indexOfFirst { it.id == id }
+        val before = from < services.indexOfFirst { it.id == neighbor }
+        if (from < 0 || services.none { it.id == neighbor } || id == neighbor) return@update state
+        val service = services.removeAt(from)
+        val target = services.indexOfFirst { it.id == neighbor }
+        services.add(if (before) target + 1 else target, service)
+        state.copy(services = services)
+    }
+
     fun toggleMute(id: ServiceId) {
         val service = service(id) ?: return
         update { state -> state.copy(services = state.services.map { if (it.id == id) service.copy(muted = !service.muted) else it }) }

@@ -34,6 +34,8 @@ And Telegram's (Telegram Web K): its unread conversations, with their counts, wi
 The same service can be added several times, for several accounts: a label under its icon tells them apart.
 
 Each service's "…" menu opens Chrome's DevTools on it, resets its cache, erases all its data (it is then logged out), or deletes it.
+The tiles of the rail are dragged to change the services' order.
+A right click on a service's tile in the rail opens a menu with all of it: back, forward, reload, mute its notifications, the "…" menu's actions, disable it and delete it.
 
 A link to another site opens in the system's browser; the service's own pages and the sign-in pages (Google, Microsoft, Apple, Facebook, GitHub) stay in KaSH.
 

@@ -55,6 +55,9 @@ interface Strings {
     val reload: String
     val muteService: String
     val unmuteService: String
+    val muteNotifications: String
+    val unmuteNotifications: String
+    val disableService: String
     val moreOptions: String
     val devTools: String
     val edit: String
@@ -210,6 +213,9 @@ object French : Strings {
     override val reload = "Recharger"
     override val muteService = "Couper les notifications de ce service"
     override val unmuteService = "Réactiver les notifications de ce service"
+    override val muteNotifications = "Couper les notifications"
+    override val unmuteNotifications = "Réactiver les notifications"
+    override val disableService = "Désactiver"
     override val moreOptions = "Plus d'options"
     override val devTools = "Outils de développement"
     override val edit = "Modifier…"
@@ -365,6 +371,9 @@ object English : Strings {
     override val reload = "Reload"
     override val muteService = "Mute this service's notifications"
     override val unmuteService = "Unmute this service's notifications"
+    override val muteNotifications = "Mute notifications"
+    override val unmuteNotifications = "Unmute notifications"
+    override val disableService = "Disable"
     override val moreOptions = "More options"
     override val devTools = "Developer tools"
     override val edit = "Edit…"

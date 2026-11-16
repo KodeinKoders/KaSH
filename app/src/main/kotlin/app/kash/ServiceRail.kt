@@ -21,7 +21,27 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isPrimaryPressed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -45,7 +65,11 @@ import app.kash.ui.KashIcon
 import app.kash.ui.KashIcons
 import app.kash.ui.IconOnlyButton
 import app.kash.ui.UnreadBadge
+import app.kash.ui.MenuAnchor
+import app.kash.ui.WindowMenu
 import app.kash.ui.dashedBorder
+import org.jetbrains.jewel.ui.component.MenuScope
+import java.awt.MouseInfo
 import app.kash.ui.strings
 import org.jetbrains.jewel.ui.component.Text
 
@@ -74,6 +98,10 @@ class RailModel(
     val onAdd: () -> Unit,
     val onToggleDoNotDisturb: () -> Unit,
     val onSettings: () -> Unit,
+    /** Moves a service past its neighbor in the rail (a tile dragged over it): see [KashModel.moveNextTo]. */
+    val onMove: (ServiceId, ServiceId) -> Unit,
+    /** The items of a service's context menu (a right click on its tile), which the function given closes. */
+    val contextMenu: MenuScope.(Service, () -> Unit) -> Unit,
 )
 
 /**
@@ -83,6 +111,15 @@ class RailModel(
 @Composable
 fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: RailMetrics) {
     val vertical = side == RailSide.LEFT || side == RailSide.RIGHT
+    // The service whose context menu is open, and where it opens (where the click was).
+    var menu by remember { mutableStateOf<Pair<ServiceId, MenuAnchor>?>(null) }
+    // The tile being dragged, how far from its place (in pixels, along the rail), and the size of each tile along the rail.
+    var dragged by remember { mutableStateOf<ServiceId?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val tileSizes = remember { mutableMapOf<ServiceId, Int>() }
+    val services by rememberUpdatedState(model.services)
+    val onMove by rememberUpdatedState(model.onMove)
+    val spacing = with(LocalDensity.current) { RAIL_SPACING.toPx() }
     val tiles: @Composable () -> Unit = {
         RailItem(
             selected = model.selection == Selection.Inbox,
@@ -102,18 +139,47 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
             if (vertical) Modifier.padding(vertical = 4.dp).width(32.dp).height(1.dp) else Modifier.padding(horizontal = 4.dp).height(32.dp).width(1.dp),
         ) { Box(Modifier.matchParentSize().background(Kash.colors.divider)) }
         for (service in model.services) {
-            val count = model.badges[service.id] ?: 0
-            RailItem(
-                selected = model.selection == Selection.OfService(service.id),
-                label = service.label,
-                badge = if (count > 0) UnreadCount.badge(count) else null,
-                description = strings.serviceTileLabel(service.title, count),
-                side = side,
-                metrics = metrics,
-                showLabel = model.showLabels,
-                onClick = { model.onSelect(Selection.OfService(service.id)) },
-            ) {
-                ServiceTile(service, icons, metrics.tile)
+            // Its own place in the composition, which moves with it: its drag goes on when it takes another tile's place.
+            key(service.id) {
+                val count = model.badges[service.id] ?: 0
+                val dragging = dragged == service.id
+                RailItem(
+                    modifier = Modifier
+                        .onSizeChanged { tileSizes[service.id] = if (vertical) it.height else it.width }
+                        // Over the others while it is dragged, where the pointer takes it.
+                        .zIndex(if (dragging) 1f else 0f)
+                        .offset { if (!dragging) IntOffset.Zero else if (vertical) IntOffset(0, dragOffset.roundToInt()) else IntOffset(dragOffset.roundToInt(), 0) }
+                        .pointerInput(service.id, vertical) {
+                            detectDragGestures(
+                                onDragStart = { dragged = service.id; dragOffset = 0f },
+                                onDragEnd = { dragged = null; dragOffset = 0f },
+                                onDragCancel = { dragged = null; dragOffset = 0f },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    dragOffset += if (vertical) amount.y else amount.x
+                                    // Past half of its neighbor, it takes the neighbor's place, and its offset is from there.
+                                    val position = services.indexOfFirst { it.id == service.id }
+                                    val neighbor = services.getOrNull(if (dragOffset > 0) position + 1 else position - 1) ?: return@detectDragGestures
+                                    val step = (tileSizes[neighbor.id] ?: 0) + spacing
+                                    if (position >= 0 && step > 0 && kotlin.math.abs(dragOffset) > step / 2) {
+                                        onMove(service.id, neighbor.id)
+                                        dragOffset -= if (dragOffset > 0) step else -step
+                                    }
+                                },
+                            )
+                        },
+                    selected = model.selection == Selection.OfService(service.id),
+                    label = service.label,
+                    badge = if (count > 0) UnreadCount.badge(count) else null,
+                    description = strings.serviceTileLabel(service.title, count),
+                    side = side,
+                    metrics = metrics,
+                    showLabel = model.showLabels,
+                    onClick = { model.onSelect(Selection.OfService(service.id)) },
+                    onContextMenu = { menu = service.id to pointerAnchor() },
+                ) {
+                    ServiceTile(service, icons, metrics.tile)
+                }
             }
         }
         val addLabel = strings.addService
@@ -135,6 +201,16 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
         )
         IconOnlyButton(KashIcons.Settings, strings.settings, model.onSettings, size = 44.dp, iconSize = 20.dp)
     }
+    menu?.let { (id, anchor) ->
+        val service = model.services.firstOrNull { it.id == id }
+        if (service == null) {
+            menu = null
+        } else {
+            val close = { menu = null }
+            // Wide enough for the longest item in French ("Réactiver les notifications", "Effacer toutes les données…").
+            WindowMenu(anchor, width = 260.dp, alignEnd = false, onDismiss = close) { model.contextMenu(this, service, close) }
+        }
+    }
     if (vertical) {
         val edge = if (side == RailSide.LEFT) Modifier.padding(end = 1.dp) else Modifier.padding(start = 1.dp)
         Box(Modifier.width(metrics.rail).fillMaxHeight().background(Kash.colors.separator)) {
@@ -145,7 +221,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
                 Column(
                     Modifier.weight(1f).verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(RAIL_SPACING),
                 ) { tiles() }
                 buttons()
             }
@@ -160,11 +236,37 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
                 Row(
                     Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(RAIL_SPACING),
                 ) { tiles() }
                 buttons()
             }
         }
+    }
+}
+
+// Between the tiles of the rail.
+private val RAIL_SPACING = 2.dp
+
+/** Where the pointer is on the screen, for a context menu that opens there. */
+private fun pointerAnchor(): MenuAnchor {
+    val location = MouseInfo.getPointerInfo()?.location
+    return MenuAnchor().apply {
+        left = location?.x?.toFloat() ?: 0f
+        right = left
+        bottom = location?.y?.toFloat() ?: 0f
+    }
+}
+
+/**
+ * A right click, or a click with Control (macOS's right click on a trackpad without it), which runs [onContextClick] instead of the click of
+ * the element.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+private fun Modifier.onContextClick(onContextClick: () -> Unit): Modifier = onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) { event ->
+    val buttons = event.buttons
+    if (buttons.isSecondaryPressed || (buttons.isPrimaryPressed && event.keyboardModifiers.isCtrlPressed)) {
+        event.changes.forEach { it.consume() }
+        onContextClick()
     }
 }
 
@@ -174,6 +276,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
  */
 @Composable
 private fun RailItem(
+    modifier: Modifier = Modifier,
     selected: Boolean,
     label: String,
     badge: String?,
@@ -182,12 +285,14 @@ private fun RailItem(
     metrics: RailMetrics,
     showLabel: Boolean,
     onClick: () -> Unit,
+    onContextMenu: (() -> Unit)? = null,
     tile: @Composable () -> Unit,
 ) {
     val vertical = side == RailSide.LEFT || side == RailSide.RIGHT
     val ringed = metrics.tile + 8.dp
     Box(
-        (if (vertical) Modifier.width(metrics.rail) else Modifier.padding(horizontal = 6.dp))
+        modifier.then(if (vertical) Modifier.width(metrics.rail) else Modifier.padding(horizontal = 6.dp))
+            .then(if (onContextMenu != null) Modifier.onContextClick(onContextMenu) else Modifier)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
             .semantics {
                 contentDescription = description

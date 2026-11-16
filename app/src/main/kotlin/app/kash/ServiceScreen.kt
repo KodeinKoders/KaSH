@@ -48,6 +48,11 @@ import javax.swing.JPanel
 
 /** What the "…" menu of a service does: the same actions as Settings › Services, and the DevTools. */
 class ServiceActions(
+    val onBack: () -> Unit,
+    val onForward: () -> Unit,
+    val onReload: () -> Unit,
+    val onToggleMute: () -> Unit,
+    val onDisable: () -> Unit,
     val onDevTools: () -> Unit,
     val onEdit: () -> Unit,
     val onResetCache: () -> Unit,
@@ -150,7 +155,8 @@ fun ServiceMenuButton(service: Service, actions: ServiceActions, devToolsEnabled
         IconOnlyButton(KashIcons.More, strings.moreOptions, menu::toggle, size = buttonSize, active = menu.open)
     }
     if (menu.open) {
-        WindowMenu(anchor, width = 220.dp, alignEnd = true, onDismiss = menu::dismiss) {
+        // Wide enough for the longest item in French ("Effacer toutes les données…").
+        WindowMenu(anchor, width = 260.dp, alignEnd = true, onDismiss = menu::dismiss) {
             serviceMenu(service, actions, devToolsEnabled, menu::dismiss)
         }
     }
@@ -168,12 +174,45 @@ fun MenuScope.serviceMenu(service: Service, actions: ServiceActions, devToolsEna
     selectableItem(selected = false, onClick = { close(); actions.onDelete() }) { MenuRow(KashIcons.Trash, StringsKey.Delete, destructive = true) }
 }
 
+/**
+ * The items of a service's context menu (a right click on its tile in the rail), which [close] closes: what its header's buttons do on its page
+ * ([tab], null while it is not loaded), muting it, what its "…" menu does, and disabling it.
+ */
+fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: ServiceActions, close: () -> Unit) {
+    // Read when the menu opens: what the page can do then.
+    val canGoBack = tab?.canGoBack?.value == true
+    val canGoForward = tab?.canGoForward?.value == true
+    selectableItem(selected = false, onClick = { close(); actions.onBack() }, enabled = canGoBack) { MenuRow(KashIcons.ChevronLeft, StringsKey.Back) }
+    selectableItem(selected = false, onClick = { close(); actions.onForward() }, enabled = canGoForward) {
+        MenuRow(KashIcons.ChevronRight, StringsKey.Forward)
+    }
+    selectableItem(selected = false, onClick = { close(); actions.onReload() }, enabled = tab != null) { MenuRow(KashIcons.Refresh, StringsKey.Reload) }
+    separator()
+    selectableItem(selected = false, onClick = { close(); actions.onToggleMute() }) {
+        if (service.muted) MenuRow(KashIcons.Bell, StringsKey.Unmute) else MenuRow(KashIcons.BellOff, StringsKey.Mute)
+    }
+    separator()
+    selectableItem(selected = false, onClick = { close(); actions.onDevTools() }, enabled = tab != null) { MenuRow(KashIcons.Code, StringsKey.DevTools) }
+    selectableItem(selected = false, onClick = { close(); actions.onEdit() }) { MenuRow(KashIcons.Pencil, StringsKey.Edit) }
+    selectableItem(selected = false, onClick = { close(); actions.onResetCache() }) { MenuRow(KashIcons.Refresh, StringsKey.ResetCache) }
+    selectableItem(selected = false, onClick = { close(); actions.onErase() }) { MenuRow(KashIcons.Eraser, StringsKey.Erase) }
+    separator()
+    selectableItem(selected = false, onClick = { close(); actions.onDisable() }) { MenuRow(KashIcons.Close, StringsKey.Disable) }
+    selectableItem(selected = false, onClick = { close(); actions.onDelete() }) { MenuRow(KashIcons.Trash, StringsKey.Delete, destructive = true) }
+}
+
 /** Which text of [strings] a menu row shows: the items are built outside a composition, their text inside. */
-enum class StringsKey { DevTools, Edit, ResetCache, Erase, Delete }
+enum class StringsKey { Back, Forward, Reload, Mute, Unmute, DevTools, Edit, ResetCache, Erase, Disable, Delete }
 
 @Composable
 private fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = false) {
     val text = when (key) {
+        StringsKey.Back -> strings.back
+        StringsKey.Forward -> strings.forward
+        StringsKey.Reload -> strings.reload
+        StringsKey.Mute -> strings.muteNotifications
+        StringsKey.Unmute -> strings.unmuteNotifications
+        StringsKey.Disable -> strings.disableService
         StringsKey.DevTools -> strings.devTools
         StringsKey.Edit -> strings.edit
         StringsKey.ResetCache -> strings.resetCache
@@ -183,7 +222,8 @@ private fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = f
     val color: Color = if (destructive) Kash.colors.error else Kash.colors.text
     Row(Modifier.height(22.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         KashIcon(icon, if (destructive) Kash.colors.error else Kash.colors.muted)
-        Text(text, color = color)
+        // On one line: a row is one line high, and a second line was cut off ("Effacer toutes les").
+        Text(text, color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
     }
 }
 

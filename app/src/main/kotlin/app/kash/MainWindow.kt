@@ -93,6 +93,8 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
         onAdd = { model.editing = null; model.addServiceOpen = true },
         onToggleDoNotDisturb = model::toggleDoNotDisturb,
         onSettings = { model.settingsOpen = true },
+        onMove = model::moveNextTo,
+        contextMenu = { service, close -> serviceContextMenu(service, model.loaded[service.id]?.tab, serviceActions(model, service.id), close) },
     )
     val metrics = RailMetrics.of(settings.iconSize)
     val content: @Composable () -> Unit = {
@@ -116,6 +118,11 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
 
 /** What a service's menu does, wherever it is (its header, Settings › Services). */
 fun serviceActions(model: KashModel, id: app.kash.core.ServiceId) = ServiceActions(
+    onBack = { model.loaded[id]?.tab?.back() },
+    onForward = { model.loaded[id]?.tab?.forward() },
+    onReload = { model.loaded[id]?.tab?.reload() },
+    onToggleMute = { model.toggleMute(id) },
+    onDisable = { model.service(id)?.let { model.replace(it.copy(enabled = false)) } },
     onDevTools = { model.loaded[id]?.tab?.openDevTools() },
     onEdit = { model.editing = id; model.addServiceOpen = true },
     onResetCache = { model.resetCache(id) },
