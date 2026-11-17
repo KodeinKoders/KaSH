@@ -6,7 +6,7 @@
 // its IndexedDB holds caches, not the conversations. Its list describes each conversation with attributes that it keeps for its own tests
 // (`data-e2e-…`), steadier than its classes: whether it is unread, muted, pinned, its name and its snippet. It shows no count: an unread
 // conversation counts as 1. A muted one is left out. The list loads its rows as it is scrolled: an unread conversation whose row is not loaded is
-// not seen.
+// not seen. Its rows are also the search's contacts (`kash.contacts`).
 //
 // It shows no time either, only a label: "Now", "3 min" for a message of today, then the weekday ("Fri") and the date ("Nov 7") for older ones,
 // in the language of the page, which is KaSH's ("Maintenant", "ven.", "7 nov."). The time is read from it (`kash.time.parse`): to the minute
@@ -47,6 +47,13 @@ kash.watch(() => {
         });
     }
     return conversations;
+});
+
+// The conversations of the list, which the search lists: the rows that it loaded (it loads them as it is scrolled), muted ones too.
+kash.contacts.watch(() => {
+    const all = rows();
+    if (all.length === 0) return null;
+    return all.map((row) => ({ id: idOf(row), name: kash.dom.text(row.querySelector('[data-e2e-conversation-name]')), kind: 'direct' }));
 });
 
 kash.onOpenConversation((id) => {

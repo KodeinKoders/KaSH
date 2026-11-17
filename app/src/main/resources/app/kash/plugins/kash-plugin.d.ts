@@ -35,13 +35,33 @@ declare namespace KashPlugin {
         timePrecision?: 'minute' | 'day';
     }
 
+    /**
+     * A contact or a topic that the service gives access to (a person, a group, a channel, a space, a server), which KaSH's search lists by its
+     * name and opens with onOpenConversation(id): a direct one is a contact, the others are topics.
+     */
+    interface Contact {
+        /** The same id as its conversation's (Conversation.id), which onOpenConversation is given. */
+        id: string | number;
+        /** What the search finds it by: an entry without one is left out. */
+        name: string;
+        kind: ConversationKind;
+    }
+
+    interface ContactsWatchOptions {
+        /** How often the page is read, in milliseconds; 10000 by default, 1000 at least. */
+        interval?: number;
+        /** Whether read() gives every contact (contacts.set), or what the page shows (contacts.add, the default). */
+        complete?: boolean;
+    }
+
     interface WatchOptions {
         /** How often the page is read, in milliseconds; 2000 by default, 500 at least. */
         interval?: number;
     }
 
     interface Kash {
-        readonly apiVersion: 1;
+        /** 2 since contacts; 1 before. */
+        readonly apiVersion: number;
         readonly plugin: { readonly id: string; readonly version: string };
         /** The values of the service's options: strings for text and choice, booleans for boolean. */
         readonly options: Readonly<Record<string, string | boolean>>;
@@ -60,6 +80,22 @@ declare namespace KashPlugin {
             clear(): void;
         };
 
+        /** The contacts and topics of the service, which KaSH's search lists (since apiVersion 2). The same list is not sent again. */
+        readonly contacts: {
+            /** Every contact of the service: KaSH replaces what it knew, and forgets those that are not there any more. */
+            set(contacts: readonly Contact[]): void;
+            /**
+             * What the page shows of them (a virtual list, the rows it loaded): KaSH adds them to those it saw before, from a launch to the next,
+             * and takes their new names; it forgets none.
+             */
+            add(contacts: readonly Contact[]): void;
+            /**
+             * Calls read() every interval ms (and once 3 s after it starts) and sends what it returns with set or add. null or undefined: nothing
+             * is sent. An exception is caught. Returns a function that stops reading.
+             */
+            watch(read: () => readonly Contact[] | null | undefined, options?: ContactsWatchOptions): () => void;
+        };
+
         /**
          * The image of the service (an account's or a workspace's own), which its tile shows in place of the plugin's icon or the site's (not
          * of an image or a square that the user chose): an https URL, which KaSH downloads without the service's cookies, or the data: URL of
@@ -76,7 +112,10 @@ declare namespace KashPlugin {
          */
         watch(read: () => readonly Conversation[] | null | undefined, options?: WatchOptions): () => void;
 
-        /** Called when the user opens the conversation id from the Unread tab (KaSH already shows the service). */
+        /**
+         * Called when the user opens the conversation id from the Unread tab or from the search (KaSH already shows the service): it may not be
+         * unread, nor shown by the page (a row of a virtual list that is not rendered).
+         */
         onOpenConversation(handler: (id: string) => void): void;
 
         readonly dom: {

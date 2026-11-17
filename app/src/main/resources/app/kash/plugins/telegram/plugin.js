@@ -6,7 +6,8 @@
 // the row's address is `#<id>`): its name (`.dialog-title .peer-title`), its last message (`.dialog-subtitle`), the label of its time
 // (`.message-time`: "01:46" today, "Oct 28" this year, "09/19/2025" another one, in the language of Telegram's interface) and its unread badge
 // (`.dialog-subtitle-badge-unread`, with its count). The archive is a row of its own (`archive-dialog`), left out, as Telegram leaves its chats out
-// of its counts. The list is virtual: a conversation whose row is not rendered is not seen; it is the list of the folder that is shown.
+// of its counts. The list is virtual: a conversation whose row is not rendered is not seen; it is the list of the folder that is shown. Its rows
+// are also the search's contacts and topics (`kash.contacts`).
 //
 // Not seen yet when it was written: a group, a channel, a mention, a muted conversation (Telegram gives its badge a gray class).
 
@@ -48,6 +49,17 @@ kash.watch(() => {
         });
     }
     return conversations;
+});
+
+// The conversations of the list, which the search lists: the rows that it rendered (a virtual list, of the folder that is shown), muted ones too.
+kash.contacts.watch(() => {
+    const all = rows();
+    if (all.length === 0) return null;
+    return all.map((row) => ({
+        id: row.dataset.peerId,
+        name: kash.dom.text(row.querySelector('.dialog-title .peer-title')),
+        kind: row.dataset.peerId.startsWith('-') ? 'group' : 'direct',
+    }));
 });
 
 kash.onOpenConversation((id) => {

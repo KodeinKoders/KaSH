@@ -11,6 +11,7 @@ import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import app.kash.browser.BrowserEngine
+import app.kash.browser.BrowserShortcut
 import app.kash.browser.ColorScheme
 import app.kash.core.Inbox
 import app.kash.core.KashDirectories
@@ -102,6 +103,11 @@ fun main() {
                 model.onIcon = icons::report
                 model.onPluginChanged = icons::forgetPluginIcon
             }
+        }
+        // KaSH's shortcuts in a page, which the page does not get (PageShortcuts).
+        DisposableEffect(Unit) {
+            engine.onShortcut = { shortcut -> if (shortcut == BrowserShortcut.SEARCH) model.toggleSearch() }
+            onDispose { engine.onShortcut = {} }
         }
         Kash(engine, model, icons, windowFile, geometry, directories.hangs)
     }
@@ -239,6 +245,15 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                 title = "KaSH",
                 icon = remember { AppIcon.painter() },
                 state = windowState,
+                // The search's shortcut while KaSH's own views have the focus (the Unread tab, the rail): a page's goes to engine.onShortcut.
+                onPreviewKeyEvent = { event ->
+                    if (isSearchShortcut(event)) {
+                        model.toggleSearch()
+                        true
+                    } else {
+                        false
+                    }
+                },
             ) {
                 DisposableEffect(window) {
                     model.activateWindow = {
@@ -250,6 +265,16 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                 }
                 CompositionLocalProvider(LocalAwtWindow provides window) {
                     MainWindowContent(model, icons, systemDark)
+                }
+                if (model.searchOpen) {
+                    SearchWindow(
+                        window, model.searchEntries, icons,
+                        onOpen = { entry ->
+                            model.dismissSearch()
+                            model.openConversation(entry.service, entry.conversation)
+                        },
+                        onDismiss = model::dismissSearch,
+                    )
                 }
             }
             ToastWindow(notifier, icons)

@@ -34,6 +34,18 @@ interface Strings {
     val byService: String
     fun open(name: String): String
     fun noResults(query: String): String
+
+    // The search
+    val searchField: String
+    val searchPlaceholder: String
+    val searchLabel: String
+    val searchContacts: String
+    val searchTopics: String
+    fun searchNoMatch(query: String): String
+    val searchNothingYet: String
+    val searchNavigate: String
+    val searchOpen: String
+    val searchClose: String
     val emptyTitle: String
     val emptyHint: String
     fun unread(count: Int): String
@@ -241,6 +253,16 @@ object French : Strings {
     override val byService = "Par service"
     override fun open(name: String) = "Ouvrir $name"
     override fun noResults(query: String) = "Aucune conversation non lue ne correspond à « $query »."
+    override val searchField = "Rechercher…"
+    override val searchPlaceholder = "Rechercher un contact ou un sujet…"
+    override val searchLabel = "Rechercher un contact ou un sujet"
+    override val searchContacts = "CONTACTS"
+    override val searchTopics = "SUJETS"
+    override fun searchNoMatch(query: String) = "Aucun contact ni sujet ne correspond à « $query »."
+    override val searchNothingYet = "Les services n'ont encore montré aucun contact."
+    override val searchNavigate = "Naviguer"
+    override val searchOpen = "Ouvrir"
+    override val searchClose = "Fermer"
     override val emptyTitle = "Aucun message non lu"
     override val emptyHint = "Les conversations non lues de vos services apparaîtront ici."
     override fun unread(count: Int) = "$count non lu${s(count)}"
@@ -448,6 +470,16 @@ object English : Strings {
     override val byService = "By service"
     override fun open(name: String) = "Open $name"
     override fun noResults(query: String) = "No unread conversation matches “$query”."
+    override val searchField = "Search…"
+    override val searchPlaceholder = "Search a contact or a topic…"
+    override val searchLabel = "Search a contact or a topic"
+    override val searchContacts = "CONTACTS"
+    override val searchTopics = "TOPICS"
+    override fun searchNoMatch(query: String) = "No contact or topic matches “$query”."
+    override val searchNothingYet = "The services have not shown any contact yet."
+    override val searchNavigate = "Navigate"
+    override val searchOpen = "Open"
+    override val searchClose = "Close"
     override val emptyTitle = "No unread messages"
     override val emptyHint = "The unread conversations of your services will show up here."
     override fun unread(count: Int) = "$count unread"

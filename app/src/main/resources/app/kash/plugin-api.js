@@ -127,6 +127,66 @@ const watch = (read, options) => {
     return () => clearInterval(timer);
 };
 
+// A contact or a topic that the service gives access to (a person, a group, a channel, a space, a server), as KaSH reads it, or null when it is
+// not one: the search lists them, by their names.
+const contactOf = (value) => {
+    if (value === null || typeof value !== 'object') return null;
+    const id = typeof value.id === 'number' ? String(value.id) : value.id;
+    if (typeof id !== 'string' || id === '') return null;
+    if (!KINDS.includes(value.kind)) return null;
+    const name = typeof value.name === 'string' ? clean(value.name) : '';
+    if (name === '') return null;
+    return { id, name, kind: value.kind };
+};
+
+// What was sent last of the contacts, apart from the unread conversations: the two alternate, and each one would be sent again every time.
+let lastContacts = null;
+const sendContacts = (contacts, complete) => {
+    if (!Array.isArray(contacts)) {
+        warn(`contacts.${complete ? 'set' : 'add'}() takes an array of contacts`);
+        return;
+    }
+    const ids = new Set();
+    const valid = [];
+    for (const value of contacts) {
+        const contact = contactOf(value);
+        if (contact === null) {
+            warn('a contact without an id, a name, or a kind among direct, group and channel was left out');
+            continue;
+        }
+        if (ids.has(contact.id)) continue;
+        ids.add(contact.id);
+        valid.push(contact);
+    }
+    const message = { type: 'contacts', complete, contacts: valid };
+    const json = JSON.stringify(message);
+    if (json === lastContacts) return;
+    lastContacts = json;
+    send(message);
+};
+
+const watchContacts = (read, options) => {
+    if (typeof read !== 'function') throw new TypeError('kash.contacts.watch() takes a function');
+    const interval = Math.max(1000, Number(options && options.interval) || 10000);
+    const complete = !!(options && options.complete);
+    const tick = () => {
+        let contacts;
+        try {
+            contacts = read();
+        } catch (e) {
+            return;
+        }
+        if (contacts !== null && contacts !== undefined) sendContacts(contacts, complete);
+    };
+    // Once the page had time to show its lists, then every interval.
+    const first = setTimeout(tick, Math.min(interval, 3000));
+    const timer = setInterval(tick, interval);
+    return () => {
+        clearTimeout(first);
+        clearInterval(timer);
+    };
+};
+
 let openHandler = null;
 Object.defineProperty(window, '__kashOpenConversation', {
     value: (id) => {
@@ -253,6 +313,11 @@ const kash = Object.freeze({
     options: Object.freeze({ ...config.options }),
     language: config.language,
     unread: Object.freeze({ set, setCount, clear: () => set([]) }),
+    contacts: Object.freeze({
+        set: (contacts) => sendContacts(contacts, true),
+        add: (contacts) => sendContacts(contacts, false),
+        watch: watchContacts,
+    }),
     setIcon,
     watch,
     onOpenConversation: (handler) => {

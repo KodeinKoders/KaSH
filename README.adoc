@@ -33,6 +33,9 @@ And Google Messages' (the SMS and RCS of an Android phone): its unread conversat
 And Telegram's (Telegram Web K): its unread conversations, with their counts, without the muted ones and the archive.
 And Discord's: its unread direct messages, with their counts; its servers with new messages are topics.
 
+The search, the field in the middle of the title bar or ⌘⇧K, finds any contact or topic of every service by its name (its letters in order, whatever their accents), read or unread, and opens it in its service.
+A service's page often shows only part of them (the rows of a list that fit, those it loaded): KaSH keeps those it saw, from a launch to the next.
+
 The same service can be added several times, for several accounts: a label under its icon tells them apart.
 
 Each service's "…" menu opens Chrome's DevTools on it, resets its cache, erases all its data (it is then logged out), or deletes it.

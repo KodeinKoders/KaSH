@@ -7,7 +7,7 @@
 // new messages and no mention is only in bold, without a badge (`p-channel_sidebar__channel--unread`): a topic, which nothing counts. A muted
 // conversation is left out, and so is the user's own direct message. The replies in threads count when Slack badges its Threads entry (a mention of the user in a thread): one row,
 // named as Slack names it. The sidebar has no preview and no time: the rows of the Unread tab show what the conversation is instead. The image of
-// the workspace, when it has one, is the service's icon.
+// the workspace, when it has one, is the service's icon. Its channels and direct messages are the search's topics and contacts (`kash.contacts`).
 
 // The conversations of the sidebar, rendered: its sections (starred, channels, direct messages, apps) are one list.
 const rows = () => [...document.querySelectorAll('[data-qa-channel-sidebar-channel-id]')];
@@ -81,6 +81,19 @@ kash.watch(() => {
         });
     }
     return conversations;
+});
+
+// The channels and the direct messages of the sidebar, which the search lists: the rows that it rendered (a virtual list), muted ones too, not
+// the user's own direct message.
+kash.contacts.watch(() => {
+    const all = rows();
+    if (all.length === 0) return null;
+    return all
+        .filter((row) => row.dataset.qaChannelSidebarIsYou !== 'true')
+        .map((row) => {
+            const type = row.dataset.qaChannelSidebarChannelType;
+            return { id: row.dataset.qaChannelSidebarChannelId, name: nameOf(row), kind: type === 'channel' ? 'channel' : type === 'mpim' ? 'group' : 'direct' };
+        });
 });
 
 kash.onOpenConversation((id) => {

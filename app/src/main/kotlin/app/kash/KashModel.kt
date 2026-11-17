@@ -8,8 +8,11 @@ import app.kash.browser.BrowserEngine
 import app.kash.browser.BrowserProfile
 import app.kash.browser.BrowserTab
 import app.kash.browser.ColorScheme
+import app.kash.core.Contact
 import app.kash.core.Conversation
 import app.kash.core.ConversationKind
+import app.kash.core.Directory
+import app.kash.core.DirectoryFile
 import app.kash.core.KashDirectories
 import app.kash.core.KashState
 import app.kash.core.PageLanguages
@@ -23,6 +26,8 @@ import app.kash.core.PluginRegistry
 import app.kash.core.PluginSource
 import app.kash.core.PluginUpdates
 import app.kash.core.ProfileId
+import app.kash.core.Search
+import app.kash.core.SearchEntry
 import app.kash.core.SeenService
 import app.kash.core.Selection
 import app.kash.core.Service
@@ -166,12 +171,42 @@ class KashModel(
     private val pageLoads = HashMap<ServiceId, Pair<Long, Long?>>()
     private var unreadTimesSave: Job? = null
 
+    // The contacts and topics that each plugin's service showed (Directory), which the search lists, kept across launches; the services that no
+    // longer exist are forgotten. A disabled service keeps them.
+    private val directoryFile = DirectoryFile(directories.directoryFile)
+    private val directory = mutableStateMapOf<ServiceId, List<Contact>>().apply {
+        putAll(directoryFile.load().filterKeys { id -> initial.services.any { it.id == id } })
+    }
+    private var directorySave: Job? = null
+
+    /** What the search lists: the contacts and topics of the enabled plugins' services, with what is unread in them. */
+    val searchEntries: List<SearchEntry> get() = Search.entries(services, directory, unread)
+
     /** The services whose cache was just reset, which Settings › Services says until the window is closed. */
     val cacheReset = mutableStateMapOf<ServiceId, Boolean>()
 
     var addServiceOpen by mutableStateOf(false)
     var editing: ServiceId? by mutableStateOf(null)
     var settingsOpen by mutableStateOf(false)
+
+    /** Whether the search is open: from the field of the title bar, or ⌘⇧K. */
+    var searchOpen by mutableStateOf(false)
+        private set
+    private var searchDismissedAt = 0L
+
+    /**
+     * Opens the search, or closes it when it is open. Not again at once after it closed: a click on the field closes the search first (it loses
+     * the focus), then would open it again, as `MenuState` says of the menus.
+     */
+    fun toggleSearch() {
+        if (searchOpen) dismissSearch() else if (System.currentTimeMillis() - searchDismissedAt > SEARCH_REOPEN_DELAY_MS) searchOpen = true
+    }
+
+    /** Closes the search. */
+    fun dismissSearch() {
+        if (searchOpen) searchDismissedAt = System.currentTimeMillis()
+        searchOpen = false
+    }
 
     /** Whether the About window is open: from the About item of the application menu, or Settings' button. */
     var aboutOpen by mutableStateOf(false)
@@ -246,6 +281,34 @@ class KashModel(
                 logger.debug("Icon of {}: {}", service.title, when (icon) { is PluginIcon.Remote -> icon.uri.host; is PluginIcon.Inline -> "inline"; PluginIcon.None -> "none" })
                 onIcon(id, icon)
             }
+            "contacts" -> {
+                if (service.plugin == null) return
+                val received = try {
+                    json.getValue("contacts").jsonArray.map { element ->
+                        val contact = element.jsonObject
+                        Contact(
+                            id = contact.getValue("id").jsonPrimitive.content,
+                            name = contact.getValue("name").jsonPrimitive.content,
+                            kind = when (contact["kind"]?.jsonPrimitive?.contentOrNull) {
+                                "group" -> ConversationKind.GROUP
+                                "channel" -> ConversationKind.CHANNEL
+                                else -> ConversationKind.DIRECT
+                            },
+                        )
+                    }
+                } catch (e: Exception) {
+                    logger.warn("The contacts of {} cannot be read", service.title, e)
+                    return
+                }
+                val complete = json["complete"]?.jsonPrimitive?.booleanOrNull ?: false
+                val merged = Directory.merge(directory[id].orEmpty(), received, complete)
+                // Only counts in the log: the names are the user's contacts.
+                logger.debug("Contacts of {}: {} shown{}, {} known", service.title, received.size, if (complete) " (all)" else "", merged.size)
+                if (merged != directory[id]) {
+                    directory[id] = merged
+                    saveDirectoryLater()
+                }
+            }
             "unreadCount" -> {
                 val count = json["count"]?.jsonPrimitive?.intOrNull?.takeIf { it >= 0 } ?: return logger.warn("The unread total of {} cannot be read", service.title)
                 conversations.remove(id)
@@ -299,6 +362,24 @@ class KashModel(
         }
     }
 
+    // Writes the contacts a few seconds after they last changed, off Swing's thread; save() writes them at once.
+    private fun saveDirectoryLater() {
+        directorySave?.cancel()
+        val snapshot = directory.toMap()
+        directorySave = scope.launch {
+            delay(UNREAD_TIMES_SAVE_MS)
+            withContext(Dispatchers.IO) { saveDirectory(snapshot) }
+        }
+    }
+
+    private fun saveDirectory(services: Map<ServiceId, List<Contact>>) {
+        try {
+            directoryFile.save(services)
+        } catch (e: Exception) {
+            logger.error("Cannot save the contacts", e)
+        }
+    }
+
     private fun saveUnreadTimes(services: Map<ServiceId, SeenService>) {
         try {
             unreadTimesFile.save(services)
@@ -349,6 +430,8 @@ class KashModel(
         unreadTimesSave?.cancel()
         val now = System.currentTimeMillis()
         saveUnreadTimes(seen.mapValues { (id, service) -> if (id in loaded) service.copy(until = now) else service })
+        directorySave?.cancel()
+        saveDirectory(directory.toMap())
     }
 
     fun select(selection: Selection) = update { it.copy(selection = selection) }
@@ -441,9 +524,11 @@ class KashModel(
         }
         onIcon(id, PluginIcon.None)
         unload(id) { service(id)?.takeIf { it.enabled }?.let(::load) }
-        // Its conversations are the ones of an account that is not logged in any more.
+        // Its conversations and contacts are the ones of an account that is not logged in any more.
         seen.remove(id)
         saveUnreadTimesLater()
+        directory.remove(id)
+        saveDirectoryLater()
     }
 
     /** Deletes the service: its page is closed now, its profile deleted at the next launch. */
@@ -452,6 +537,8 @@ class KashModel(
         unload(id)
         seen.remove(id)
         saveUnreadTimesLater()
+        directory.remove(id)
+        saveDirectoryLater()
         onIcon(id, PluginIcon.None)
         update { state ->
             state.copy(
@@ -597,6 +684,9 @@ class KashModel(
         const val FOLDER_WATCH_MS = 10_000L
         const val ADDRESS_WATCH_MS = 60 * 60 * 1000L
         const val UNREAD_TIMES_SAVE_MS = 5_000L
+
+        // How long after the search closed it does not open again (see toggleSearch).
+        const val SEARCH_REOPEN_DELAY_MS = 300L
     }
 }
 

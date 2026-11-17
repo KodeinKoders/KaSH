@@ -5,7 +5,8 @@
 // Muted conversations (until a date, forever, or auto-muted by WhatsApp) and archived ones are left out, as WhatsApp leaves them out of its own
 // count. A conversation marked as unread by hand (its count is -1) counts as 1. A group that was never named is named by its members, without
 // the user, as WhatsApp shows it. The preview is the start of the last message as WhatsApp shows it in the row of the conversation (with the
-// sender in a group), read from the rows that are rendered and kept while the row is scrolled out; no other message is read.
+// sender in a group), read from the rows that are rendered and kept while the row is scrolled out; no other message is read. Every conversation
+// is a contact or a topic of the search (`kash.contacts`), from the same model.
 
 // The modules exist once WhatsApp is loaded and logged in: before that, `require` throws, and there is nothing to read.
 const module = (name) => {
@@ -101,6 +102,23 @@ kash.watch(() => {
     }
     return conversations;
 });
+
+// Every conversation, which the search lists: the model has all of them (archived and muted too), the most recent first. Not the status updates
+// nor the broadcast lists, which open no conversation.
+kash.contacts.watch(() => {
+    const collections = module('WAWebCollections');
+    if (!collections || !collections.Chat) return null;
+    const myIds = me();
+    return collections.Chat.getModelsArray()
+        .filter((chat) => !chat.id._serialized.endsWith('@broadcast'))
+        .sort((a, b) => (b.t || 0) - (a.t || 0))
+        .map((chat) => {
+            const id = chat.id._serialized;
+            return { id, name: chat.formattedTitle || (kind(id) === 'group' ? membersOf(chat, myIds) : ''), kind: kind(id) };
+        })
+        // A conversation without a name cannot be searched for.
+        .filter((contact) => contact.name);
+}, { complete: true });
 
 kash.onOpenConversation((id) => {
     const collections = module('WAWebCollections');

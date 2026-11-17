@@ -65,6 +65,10 @@ public class BrowserEngine private constructor(
         if (width > 0 && height > 0) hiddenSize.set(Dimension(width, height))
     }
 
+    /** Called on Swing's thread when one of KaSH's shortcuts ([BrowserShortcut]) is pressed in a page, which does not get it. */
+    @Volatile
+    public var onShortcut: (BrowserShortcut) -> Unit = {}
+
     /**
      * The languages that every page is told the user reads, in this order (`fr-FR,fr,en-US,en`): its `Accept-Language` header and
      * `navigator.languages`. A site that follows the browser's language shows itself in the first one it has. A page has them from its next load:
@@ -104,7 +108,7 @@ public class BrowserEngine private constructor(
             }
         })
         client.addMessageRouter(router)
-        client.addKeyboardHandler(EditShortcuts)
+        client.addKeyboardHandler(PageShortcuts { shortcut -> onShortcut(shortcut) })
         client.addLifeSpanHandler(object : CefLifeSpanHandlerAdapter() {
             override fun onAfterCreated(browser: CefBrowser) {
                 val tab = tabs[browser] ?: return

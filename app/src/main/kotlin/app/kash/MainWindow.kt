@@ -58,9 +58,9 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
     val selectedTab = selected?.let { model.loaded[it.id]?.tab }
     TitleBar {
         // A service's header is here, so that its page has the whole height of the window: its tile, title, address and count on the left, its
-        // buttons on the right. The Unread tab has its title in the middle.
+        // buttons on the right. The Unread tab has its title there too. The search's field is in the middle.
         if (selected == null) {
-            Text(strings.inbox, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally))
+            Text(strings.inbox, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.Start).padding(start = 8.dp))
         } else {
             key(selected.id) { ServiceTitle(selected, selectedTab, badges[selected.id] ?: 0, icons, Modifier.align(Alignment.Start).padding(start = 8.dp)) }
         }
@@ -82,6 +82,9 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
             if (settings.doNotDisturb) Chip(strings.doNotDisturb, height = 22.dp)
             ThemeMenu(settings.theme, systemDark) { mode -> model.updateSettings { it.copy(theme = mode) } }
         }
+        // Last: Jewel's title bar measures its children in their order and leaves out those that do not fit, and in a narrow window the field is
+        // what goes (⌘⇧K still opens the search), not the service's buttons.
+        SearchField(onClick = model::toggleSearch, modifier = Modifier.align(Alignment.CenterHorizontally))
     }
 
     val rail = RailModel(

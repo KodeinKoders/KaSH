@@ -5,7 +5,7 @@
 // shows, and what it counts. A conversation counts when its row has Google Chat's badge: a direct message (and a message request, from an account
 // outside the organization) with its count, a space only when the user is mentioned in it. A space with new messages and no mention is only in
 // bold in Google Chat, without a number: a topic, which nothing counts. The preview is the one of the Home list, when it is rendered, and kept
-// while it is not.
+// while it is not. Its people and spaces are the search's contacts and topics (`kash.contacts`), from the same rows.
 //
 // Not seen yet when it was written: a space in bold. A row with new messages has the compiled class `H7du2` (seen on the direct messages with a
 // badge, not on the read rows), and its row of the Home list `data-is-unread="true"`; either makes a row without a badge a topic.
@@ -95,6 +95,16 @@ kash.watch(() => {
         if (!conversations.some((conversation) => conversation.id === id)) previewOf.delete(id);
     }
     return conversations;
+});
+
+// The people and spaces of the side panel, which the search lists: the rows that it loaded (it loads them as it is scrolled), each once (a starred
+// one is in two sections). Not the message requests, which have no conversation yet.
+kash.contacts.watch(() => {
+    const rows = panelRows();
+    if (rows.length === 0) return null;
+    return rows
+        .filter((row) => /^(dm|space)\//.test(row.dataset.groupId))
+        .map((row) => ({ id: row.dataset.groupId, name: nameOf(row), kind: kindOf(row) }));
 });
 
 kash.onOpenConversation((id) => {

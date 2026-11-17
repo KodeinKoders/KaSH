@@ -45,6 +45,9 @@ public class KashDirectories(public val support: Path) {
     /** When KaSH saw the unread conversations whose service does not tell when they came ([UnreadTimesFile]). */
     public val unreadTimesFile: Path get() = support.resolve("unread-times.json")
 
+    /** The contacts and topics that each service's plugin showed, which the search lists ([DirectoryFile]). */
+    public val directoryFile: Path get() = support.resolve("contacts.json")
+
     /** The folder of the installed plugin [id] ([plugins]); null for an id that is not a plugin's (it would name another folder). */
     public fun plugin(id: String): Path? = if (PLUGIN_ID.matches(id)) plugins.resolve(id) else null
 

@@ -9,7 +9,8 @@
 // "<name>, 1 message non lu", "37 mentions, <name>", "Messages non lus, <name>") and, for a server, its name (`data-dnd-name`).
 //
 // A direct message counts, with its badge. A server with unread messages is a topic (the user's choice), whether the user is mentioned in it (its
-// badge) or not (its pill): the column tells neither which of its channels nor how many messages. The column has no time nor preview.
+// badge) or not (its pill): the column tells neither which of its channels nor how many messages. The column has no time nor preview. Its
+// servers and direct messages are also the search's topics and contacts (`kash.contacts`).
 //
 // Not seen yet when it was written: a group direct message (its image is not a user's avatar), a closed folder of servers (whose servers may not
 // be in the page, and whose badge is the folder's), a muted server (Discord gives it no pill; its mentions keep their badge).
@@ -69,6 +70,31 @@ kash.watch(() => {
         if (unread) conversations.push({ id, name: serverName, kind: 'channel', topic: true });
     }
     return conversations;
+});
+
+// The servers of the column and its direct messages, which the search lists: every server (in an open folder), and the direct messages that it
+// shows, those with unread ones; once seen, KaSH keeps them. Not yet the list of the direct messages of `/channels/@me`, which has them all
+// while it is shown: it was not inspected yet.
+kash.contacts.watch(() => {
+    const nav = column();
+    if (!nav) return null;
+    const contacts = [];
+    for (const entry of nav.querySelectorAll('[class*="listItem_"]')) {
+        const item = entry.querySelector(`[data-list-item-id^="${ENTRY_PREFIX}"]`);
+        if (!item) continue;
+        const id = item.getAttribute('data-list-item-id').slice(ENTRY_PREFIX.length);
+        if (!id || NOT_CONVERSATIONS.has(id)) continue;
+        const serverName = entry.querySelector('[data-dnd-name]')?.getAttribute('data-dnd-name');
+        if (serverName) {
+            contacts.push({ id, name: serverName, kind: 'channel' });
+            continue;
+        }
+        const label = kash.dom.text(entry.querySelector('[class*="hiddenVisually_"]'));
+        const comma = label.lastIndexOf(',');
+        const image = entry.querySelector('img')?.getAttribute('src') || '';
+        contacts.push({ id: `@me/${id}`, name: comma > 0 ? label.slice(0, comma).trim() : label, kind: image.includes('/avatars/') ? 'direct' : 'group' });
+    }
+    return contacts;
 });
 
 kash.onOpenConversation((id) => {

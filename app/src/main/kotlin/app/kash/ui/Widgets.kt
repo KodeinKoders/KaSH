@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -143,4 +145,26 @@ fun Hint(text: String, modifier: Modifier = Modifier) {
 @Composable
 fun Gap(width: Dp = 0.dp, height: Dp = 0.dp) {
     Box(Modifier.width(width).height(height))
+}
+
+/** A key of a shortcut, in a little frame: `⌘`, `F`, `esc` (KaTTY's). */
+@Composable
+fun KeyCap(label: String, modifier: Modifier = Modifier) {
+    val colors = Kash.colors
+    Box(
+        modifier.heightIn(min = 18.dp).widthIn(min = 18.dp).background(colors.panel, RoundedCornerShape(4.dp))
+            .border(1.dp, colors.divider, RoundedCornerShape(4.dp)).padding(horizontal = 5.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = colors.muted, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+    }
+}
+
+/** A shortcut, a [KeyCap] per key: `⌘⇧K` is `⌘`, `⇧` and `K`. */
+@Composable
+fun Shortcut(keys: String, modifier: Modifier = Modifier) {
+    val modifiers = keys.takeWhile { it in "⌘⌥⇧⌃" }
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+        (modifiers.map { it.toString() } + keys.drop(modifiers.length)).filter { it.isNotEmpty() }.forEach { KeyCap(it) }
+    }
 }

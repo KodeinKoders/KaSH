@@ -374,6 +374,43 @@ An exception of `read` is caught: the page changed its structure, nothing is sen
 A script that would rather react to the page's changes (a `MutationObserver`) calls `kash.unread.set` itself.
 
 
+[#reporting-the-contacts]
+=== Reporting the contacts and topics
+
+KaSH's search (the field of its title bar, ⌘⇧K) lists the contacts and topics of every service, not only the unread ones, and opens them with <<opening-a-conversation,`onOpenConversation`>>.
+A script tells them, since `kash.apiVersion` 2:
+
+[source,typescript]
+----
+kash.contacts.set(contacts: Contact[]): void
+kash.contacts.add(contacts: Contact[]): void
+kash.contacts.watch(read: () => Contact[] | null | undefined, options?: { interval?: number, complete?: boolean }): () => void
+----
+
+[cols="1,4"]
+|===
+| Field | What it is
+
+| `id`
+| The conversation's id, the same as its unread entry's: what `onOpenConversation` is given.
+
+| `name`
+| What the search finds it by. An entry without one is left out.
+
+| `kind`
+| `'direct'` (a person: the search's Contacts), `'group'` or `'channel'` (a group, a channel, a space, a server: its Topics).
+|===
+
+* `set` gives **every** contact of the service (WhatsApp's model has them all): KaSH replaces what it knew, and forgets those that are not there any more.
+* `add` gives **what the page shows** of them (a virtual list renders only the rows that fit, a list loads its rows as it is scrolled): KaSH adds them to those it saw before and takes their new names, and forgets none.
+
+KaSH keeps them from a launch to the next, so that the search has them before the page shows them again; it forgets a service's when the service is deleted or its data erased.
+`watch` calls `read` 3 seconds after it starts, then every `interval` milliseconds (10000 by default, 1000 at least), and sends what it returns with `set` when `complete` is true, with `add` otherwise; `null` or `undefined` sends nothing, and an exception is caught.
+The same list is not sent again.
+An entry without an id, a name or a known kind is left out, with a warning in the console, once; an id given twice is given once.
+
+
+[#opening-a-conversation]
 === Opening a conversation
 
 [source,typescript]
@@ -381,8 +418,9 @@ A script that would rather react to the page's changes (a `MutationObserver`) ca
 kash.onOpenConversation(handler: (id: string) => void): void
 ----
 
-KaSH calls the handler when the user clicks a conversation in the Unread tab, after it shows the service.
+KaSH calls the handler when the user opens a conversation in the Unread tab or in the search, after it shows the service.
 The handler opens it in the page: it clicks its row, calls the service's own function, or loads its address.
+A conversation of the search need not be unread, nor shown by the page (a row of a virtual list that is not rendered): its address opens it then.
 
 
 [#the-services-icon]
@@ -417,7 +455,7 @@ The page cannot read the image of another site itself when that site does not al
 | Member | What it is
 
 | `kash.apiVersion`
-| `1`.
+| `2` (`1` before `kash.contacts`).
 
 | `kash.plugin`
 | `{ id, version }`, from the manifest.
@@ -465,13 +503,22 @@ kash.watch(() => {
         }));
 });
 
+kash.contacts.watch(() => rows().map((row) => ({ // <3>
+    id: row.dataset.conversationId,
+    name: kash.dom.text(row.querySelector('.name')),
+    kind: row.dataset.group ? 'group' : 'direct',
+})));
+
 kash.onOpenConversation((id) => {
-    rows().find((row) => row.dataset.conversationId === id)?.click(); // <3>
+    const row = rows().find((row) => row.dataset.conversationId === id);
+    if (row) row.click(); // <4>
+    else location.assign(`/conversations/${id}`);
 });
 ----
 <1> The page is not ready: nothing is sent.
 <2> A badge without a number counts as 1.
-<3> The row, clicked as the user would.
+<3> Every row that the page shows, read or unread, for the search: KaSH keeps those it saw.
+<4> The row, clicked as the user would; its address when it is not shown.
 
 
 == Writing a plugin
@@ -487,7 +534,7 @@ What to look for, in this order:
 
 Rules that every plugin follows:
 
-* read the structure of the page, never more of the user's messages than what the Unread tab shows (the start of the last one);
+* read the structure of the page, never more of the user's messages than what the Unread tab shows (the start of the last one), nor more of their contacts than their names, which the search shows;
 * make no network request, and send nothing anywhere but to KaSH, through the API;
 * change nothing in the page: a plugin reads it, and opens a conversation when the user asks;
 * count what the service counts: a conversation that the service does not badge (muted, archived) is not unread for KaSH either, and one that it only shows in bold (a channel without a mention) is a `topic`, which nothing counts.

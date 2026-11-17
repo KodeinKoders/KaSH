@@ -4,7 +4,9 @@ import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
 import org.cef.handler.CefKeyboardHandler.CefKeyEvent
 import org.cef.handler.CefKeyboardHandlerAdapter
+import org.cef.misc.BoolRef
 import org.cef.misc.EventFlags
+import javax.swing.SwingUtilities
 
 /** An editing command of a page, as macOS's Edit menu has them. */
 internal enum class EditCommand(val run: (CefFrame) -> Unit) {
@@ -44,14 +46,37 @@ internal fun editCommandOf(type: CefKeyEvent.EventType, modifiers: Int, characte
     }
 }
 
+/** A shortcut of KaSH's that a page does not get: KaSH takes it whatever the page shows ([BrowserEngine.onShortcut]). */
+public enum class BrowserShortcut {
+    /** ⇧⌘K: the search of the contacts and topics. */
+    SEARCH,
+}
+
+/** KaSH's shortcut of a key press, or null: ⇧⌘K. [character] is read as [editCommandOf]'s. */
+internal fun browserShortcutOf(type: CefKeyEvent.EventType, modifiers: Int, character: Char): BrowserShortcut? {
+    if (type != CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN) return null
+    val shifted = EventFlags.EVENTFLAG_COMMAND_DOWN or EventFlags.EVENTFLAG_SHIFT_DOWN
+    return if (modifiers and MODIFIERS == shifted && character.lowercaseChar() == 'k') BrowserShortcut.SEARCH else null
+}
+
 /**
- * The editing shortcuts of macOS in the pages (⌘C, ⌘V, ⌘X, ⌘A, ⌘Z, ⇧⌘Z), which do nothing in them otherwise.
+ * The shortcuts of the pages, the client's only keyboard handler (a `CefClient` keeps the first one that it is given, and ignores the others).
  *
- * In Chrome, they are the Edit menu's: macOS gives a shortcut to the menu bar, whose item sends `copy:` to the focused view. KaSH's menu bar has no
- * Edit menu, and Chromium's view only gets the key press, which the page does not handle: once the page had its chance (a page that handles the
- * shortcut itself keeps it), the command is run on the focused frame, as Chrome's menu would.
+ * - KaSH's own ([browserShortcutOf]), before the page sees them (`onPreKeyEvent`): they go to [onShortcut], on Swing's thread, whatever the
+ *   service does with them.
+ * - The editing shortcuts of macOS ([editCommandOf]: ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z, ⇧⌘Z), which do nothing in them otherwise. In Chrome, they are the Edit
+ *   menu's: macOS gives a shortcut to the menu bar, whose item sends `copy:` to the focused view. KaSH's menu bar has no Edit menu, and Chromium's
+ *   view only gets the key press, which the page does not handle: once the page had its chance (a page that handles the shortcut itself keeps
+ *   it), the command is run on the focused frame, as Chrome's menu would.
  */
-internal object EditShortcuts : CefKeyboardHandlerAdapter() {
+internal class PageShortcuts(private val onShortcut: (BrowserShortcut) -> Unit) : CefKeyboardHandlerAdapter() {
+    override fun onPreKeyEvent(browser: CefBrowser, event: CefKeyEvent, isKeyboardShortcut: BoolRef): Boolean {
+        val shortcut = browserShortcutOf(event.type, event.modifiers, event.unmodified_character) ?: return false
+        // Chromium's thread: KaSH's state is Swing's.
+        SwingUtilities.invokeLater { onShortcut(shortcut) }
+        return true
+    }
+
     override fun onKeyEvent(browser: CefBrowser, event: CefKeyEvent): Boolean {
         val command = editCommandOf(event.type, event.modifiers, event.unmodified_character) ?: return false
         val frame = browser.focusedFrame ?: browser.mainFrame ?: return false
