@@ -122,6 +122,13 @@ public enum class DockBadge { TOTAL, DOT, NONE }
 @Serializable
 public enum class NotificationStyle { KASH, SYSTEM }
 
+/**
+ * How long KaSH's own notifications stay: a few seconds, or until they are clicked or closed. The Notification Center's are macOS's to decide (its
+ * settings of KaSH: banners or alerts).
+ */
+@Serializable
+public enum class NotificationDuration { TEMPORARY, PERMANENT }
+
 /** How the Unread tab lists the conversations. */
 @Serializable
 public enum class InboxSort { BY_DATE, BY_COUNT, BY_SERVICE }
@@ -148,6 +155,7 @@ public data class Settings(
     val notifications: Boolean = true,
     val sound: Boolean = true,
     val notificationStyle: NotificationStyle = NotificationStyle.SYSTEM,
+    val notificationDuration: NotificationDuration = NotificationDuration.TEMPORARY,
     val dockBadge: DockBadge = DockBadge.TOTAL,
     // The sort of the Unread tab, as the user last chose it.
     val inboxSort: InboxSort = InboxSort.BY_DATE,

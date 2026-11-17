@@ -1,5 +1,6 @@
 package app.kash.ui
 
+import app.kash.macos.NotificationAlertStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import app.kash.core.Language
@@ -160,6 +161,12 @@ interface Strings {
     val systemNotificationsHint: String
     val systemNotificationsUnavailable: String
     val systemNotificationsDenied: String
+    val notificationDuration: String
+    val temporaryNotifications: String
+    val permanentNotifications: String
+    fun systemDuration(style: NotificationAlertStyle): String
+    val systemDurationHint: String
+    val openSystemNotificationSettings: String
     val sendTestNotification: String
     val testNotificationTitle: String
     val testNotificationBody: String
@@ -375,6 +382,17 @@ object French : Strings {
     override val systemNotificationsHint = "Le Centre de notifications de macOS, réglé dans Réglages Système › Notifications."
     override val systemNotificationsUnavailable = "Seulement dans l'application signée (KaSH.app), pas en développement."
     override val systemNotificationsDenied = "macOS refuse les notifications de KaSH : autorisez-les dans Réglages Système › Notifications › KaSH."
+    override val notificationDuration = "Durée d'affichage"
+    override val temporaryNotifications = "Temporaires : elles disparaissent après 6 secondes"
+    override val permanentNotifications = "Permanentes : elles restent jusqu'à ce qu'on les ferme"
+    override fun systemDuration(style: NotificationAlertStyle) = when (style) {
+        NotificationAlertStyle.BANNERS -> "macOS les affiche en bannières, qui disparaissent après quelques secondes."
+        NotificationAlertStyle.ALERTS -> "macOS les affiche en alertes, qui restent jusqu'à ce qu'on les ferme."
+        NotificationAlertStyle.NONE -> "macOS ne les affiche pas à l'écran, seulement dans le Centre de notifications."
+        NotificationAlertStyle.UNAVAILABLE -> "macOS les affiche en bannières ou en alertes, selon ses réglages."
+    }
+    override val systemDurationHint = "KaSH ne peut pas le choisir : c'est le style des alertes de KaSH dans Réglages Système › Notifications."
+    override val openSystemNotificationSettings = "Changer dans les Réglages Système…"
     override val sendTestNotification = "Envoyer une notification de test"
     override val testNotificationTitle = "Notification de test"
     override val testNotificationBody = "Les notifications des services ressembleront à celle-ci."
@@ -592,6 +610,17 @@ object English : Strings {
     override val systemNotificationsHint = "macOS's Notification Center, set in System Settings › Notifications."
     override val systemNotificationsUnavailable = "Only in the signed application (KaSH.app), not in development."
     override val systemNotificationsDenied = "macOS refuses KaSH's notifications: allow them in System Settings › Notifications › KaSH."
+    override val notificationDuration = "How long they stay"
+    override val temporaryNotifications = "Temporary: they go away after 6 seconds"
+    override val permanentNotifications = "Permanent: they stay until they are closed"
+    override fun systemDuration(style: NotificationAlertStyle) = when (style) {
+        NotificationAlertStyle.BANNERS -> "macOS shows them as banners, which go away after a few seconds."
+        NotificationAlertStyle.ALERTS -> "macOS shows them as alerts, which stay until they are closed."
+        NotificationAlertStyle.NONE -> "macOS does not show them on the screen, only in the Notification Center."
+        NotificationAlertStyle.UNAVAILABLE -> "macOS shows them as banners or alerts, as its settings say."
+    }
+    override val systemDurationHint = "KaSH cannot choose it: it is KaSH's alert style in System Settings › Notifications."
+    override val openSystemNotificationSettings = "Change in System Settings…"
     override val sendTestNotification = "Send a test notification"
     override val testNotificationTitle = "Test notification"
     override val testNotificationBody = "The services' notifications will look like this one."

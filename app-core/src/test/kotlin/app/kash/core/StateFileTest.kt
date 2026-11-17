@@ -51,6 +51,16 @@ class StateFileTest {
     }
 
     @Test
+    fun theDurationOfTheNotificationsIsKeptAndTemporaryBeforeIt() {
+        val file = StateFile(directory.resolve("state.json"))
+        file.save(KashState(settings = Settings(notificationDuration = NotificationDuration.PERMANENT)))
+        assertEquals(NotificationDuration.PERMANENT, file.load().settings.notificationDuration)
+
+        val old = directory.resolve("older.json").also { it.writeText("""{"settings": {"sound": false}}""") }
+        assertEquals(NotificationDuration.TEMPORARY, StateFile(old).load().settings.notificationDuration)
+    }
+
+    @Test
     fun aStateOfBeforeTheNotificationStyleUsesTheSystem() {
         val path = directory.resolve("old.json").also { it.writeText("""{"settings": {"sound": false}}""") }
 

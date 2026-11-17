@@ -3,6 +3,7 @@ package app.kash
 import app.kash.core.PluginManifest
 import app.kash.ui.stringsOf
 import androidx.compose.runtime.mutableStateListOf
+import app.kash.core.NotificationDuration
 import app.kash.core.NotificationPolicy
 import app.kash.core.NotificationStyle
 import app.kash.core.Service
@@ -25,7 +26,7 @@ import javax.swing.SwingUtilities
 
 private val logger = LoggerFactory.getLogger(Notifier::class.java)
 
-/** How long a notification of the fallback window stays. */
+/** How long a notification of KaSH's own window stays, when it is temporary ([Settings.notificationDuration]). */
 private const val TOAST_DURATION_MS = 6_000L
 
 /** The key of a test notification ([Notifier.test]): no service's. */
@@ -69,7 +70,7 @@ class Notifier(private val model: KashModel) {
         if (!settings.notifications || settings.doNotDisturb) return
         val strings = stringsOf(settings.language)
         val title = strings.pluginUpdateTitle(manifest.name.of(strings.code), manifest.version)
-        show("$PLUGIN_KEY|${manifest.id}", null, title, "KaSH", strings.pluginUpdateBody, settings.sound, usesSystem(settings))
+        show("$PLUGIN_KEY|${manifest.id}", null, title, "KaSH", strings.pluginUpdateBody, settings.sound, usesSystem(settings), settings.notificationDuration)
     }
 
     /** Whether a notification goes to the Notification Center with [settings]: they say so, and KaSH is an application bundle (KaSH.app). */
@@ -86,7 +87,7 @@ class Notifier(private val model: KashModel) {
     fun test(settings: Settings, title: String, body: String) {
         logger.info("Test notification, shown {}", if (usesSystem(settings)) "by the Notification Center" else "in KaSH's own window")
         // A key of its own each time: the Notification Center replaces a notification of the same identifier.
-        show("$TEST_KEY|${System.currentTimeMillis()}", null, title, "KaSH", body, settings.sound, usesSystem(settings))
+        show("$TEST_KEY|${System.currentTimeMillis()}", null, title, "KaSH", body, settings.sound, usesSystem(settings), settings.notificationDuration)
     }
 
     private fun received(service: Service, json: JsonObject) {
@@ -103,18 +104,30 @@ class Notifier(private val model: KashModel) {
         logger.debug("Notification of {}: {}", service.title, decision)
         if (!decision.show) return
         // The key says which service and which notification of its page: what the click is given back.
-        show("${service.id.value}|$id", service, title.ifBlank { service.title }, service.title, body, decision.sound && !silent, usesSystem(model.settings))
+        show(
+            "${service.id.value}|$id", service, title.ifBlank { service.title }, service.title, body, decision.sound && !silent, usesSystem(model.settings),
+            model.settings.notificationDuration,
+        )
     }
 
-    private fun show(key: String, service: Service?, title: String, subtitle: String, body: String, sound: Boolean, system: Boolean) {
+    private fun show(
+        key: String, service: Service?, title: String, subtitle: String, body: String, sound: Boolean, system: Boolean, duration: NotificationDuration,
+    ) {
         if (system) {
+            // How long it stays is macOS's to decide (KaSH's settings in its Notification settings: banners or alerts).
             MacosNotifications.post(key, title, subtitle, body, sound)
         } else {
-            toasts += Toast(key, service, title, body)
+            // A new notification of the same conversation replaces the one before, as the Notification Center does.
+            val toast = Toast(key, service, title, body)
+            toasts.removeAll { it.key == key }
+            toasts += toast
             if (sound) Toolkit.getDefaultToolkit().beep()
-            scope.launch {
-                delay(TOAST_DURATION_MS)
-                toasts.removeAll { it.key == key }
+            // A permanent one stays until it is clicked or closed; the window shows the last four, the others once those are gone.
+            if (duration == NotificationDuration.TEMPORARY) {
+                scope.launch {
+                    delay(TOAST_DURATION_MS)
+                    toasts.removeAll { it === toast }
+                }
             }
         }
     }

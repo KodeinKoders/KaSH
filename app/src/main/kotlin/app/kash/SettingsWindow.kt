@@ -50,6 +50,7 @@ import app.kash.core.DockBadge
 import app.kash.core.IconSize
 import app.kash.core.InboxSort
 import app.kash.core.Language
+import app.kash.core.NotificationDuration
 import app.kash.core.NotificationStyle
 import app.kash.core.RailSide
 import app.kash.core.Service
@@ -60,6 +61,7 @@ import app.kash.core.UnreadCount
 import app.kash.macos.LoginItemStatus
 import app.kash.macos.MacosLoginItem
 import app.kash.macos.MacosNotifications
+import app.kash.macos.NotificationAlertStyle
 import app.kash.macos.NotificationAuthorization
 import app.kash.macos.inAppBundle
 import app.kash.ui.Hint
@@ -85,7 +87,9 @@ import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 import org.jetbrains.jewel.window.DecoratedWindow
 import org.jetbrains.jewel.window.TitleBar
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 
 /** The pages of Settings. */
 enum class SettingsPage { GENERAL, APPEARANCE, NOTIFICATIONS, INBOX, SERVICES, PLUGINS }
@@ -96,6 +100,7 @@ private fun Strings.page(page: SettingsPage): Pair<String, List<String>> = when 
     SettingsPage.APPEARANCE -> appearance to listOf(theme, light, dark, system, sidebar, iconSize, position, showLabels, showBadges)
     SettingsPage.NOTIFICATIONS -> notifications to listOf(
         alerts, desktopNotifications, playSound, notificationStyle, kashNotifications, systemNotifications, sendTestNotification,
+        notificationDuration, temporaryNotifications, permanentNotifications,
         dockBadge, dockTotal, dockDot, dockNone, doNotDisturb,
     )
     SettingsPage.INBOX -> inboxTab to listOf(display, defaultSort, openInboxOnLaunch, showApproximateTimes, content, skipMuted, directOnly)
@@ -332,6 +337,22 @@ private fun RailPreview(draft: Settings, services: List<Service>, model: KashMod
     }
 }
 
+// How often Settings reads KaSH's alert style in macOS's settings again, which the user may change there while it is open.
+private const val ALERT_STYLE_POLL_MS = 2_000L
+
+// macOS's Notification settings of KaSH (System Settings › Notifications › KaSH: its bundle's identifier, `bundleID` in app/build.gradle.kts), or its Notification settings when the address of an
+// application's is not understood.
+private fun openSystemNotificationSettings() {
+    Thread {
+        try {
+            val process = ProcessBuilder("open", "x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=app.kash").start()
+            if (process.waitFor() != 0) ProcessBuilder("open", "x-apple.systempreferences:com.apple.Notifications-Settings.extension").start()
+        } catch (e: Exception) {
+            LoggerFactory.getLogger("app.kash.SettingsWindow").warn("Cannot open the Notification settings of macOS", e)
+        }
+    }.start()
+}
+
 @Composable
 private fun NotificationsPage(draft: Settings, notifier: Notifier, onChange: (Settings) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -371,6 +392,27 @@ private fun NotificationsPage(draft: Settings, notifier: Notifier, onChange: (Se
             },
             modifier = Modifier.padding(top = 4.dp),
         ) { Text(s.sendTestNotification) }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle(strings.notificationDuration)
+        val style = if (inAppBundle) draft.notificationStyle else NotificationStyle.KASH
+        if (style == NotificationStyle.KASH) {
+            for ((value, label) in listOf(NotificationDuration.TEMPORARY to strings.temporaryNotifications, NotificationDuration.PERMANENT to strings.permanentNotifications)) {
+                RadioButtonRow(label, draft.notificationDuration == value, { onChange(draft.copy(notificationDuration = value)) })
+            }
+        } else {
+            // macOS's to decide (KaSH's alert style in its settings), which the user may change there while Settings is open: read again every
+            // few seconds.
+            val alertStyle by produceState(NotificationAlertStyle.UNAVAILABLE) {
+                while (true) {
+                    value = withContext(Dispatchers.IO) { MacosNotifications.alertStyle() }
+                    delay(ALERT_STYLE_POLL_MS)
+                }
+            }
+            Text(strings.systemDuration(alertStyle))
+            Hint(strings.systemDurationHint)
+            OutlinedButton(onClick = ::openSystemNotificationSettings, modifier = Modifier.padding(top = 4.dp)) { Text(strings.openSystemNotificationSettings) }
+        }
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(strings.dockBadge)

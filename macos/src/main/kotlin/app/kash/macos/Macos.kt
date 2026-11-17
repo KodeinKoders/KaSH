@@ -21,9 +21,27 @@ public enum class NotificationAuthorization {
     UNAVAILABLE,
 }
 
+/**
+ * How macOS shows KaSH's notifications, as the user set it in System Settings › Notifications › KaSH (its alert style): KaSH cannot choose it.
+ */
+public enum class NotificationAlertStyle {
+    /** Not shown on the screen (only in the Notification Center's list). */
+    NONE,
+
+    /** Banners, which go away after a few seconds. */
+    BANNERS,
+
+    /** Alerts, which stay until they are closed. */
+    ALERTS,
+
+    /** Not an application bundle, or macOS did not answer. */
+    UNAVAILABLE,
+}
+
 /** The notifications of macOS's Notification Center. */
 public object MacosNotifications {
     private val authorization = MacosLibrary.function("kash_notifications_authorization", FunctionDescriptor.of(ValueLayout.JAVA_INT))
+    private val alertStyle = MacosLibrary.function("kash_notifications_alert_style", FunctionDescriptor.of(ValueLayout.JAVA_INT))
     private val start = MacosLibrary.function("kash_notifications_start", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
     private val post = MacosLibrary.function(
         "kash_notifications_post",
@@ -49,6 +67,14 @@ public object MacosNotifications {
         1 -> NotificationAuthorization.DENIED
         2 -> NotificationAuthorization.AUTHORIZED
         else -> NotificationAuthorization.UNAVAILABLE
+    }
+
+    /** How macOS shows KaSH's notifications (the user's choice). Waits for macOS's answer (2 s at most): not on Swing's thread. */
+    public fun alertStyle(): NotificationAlertStyle = when (alertStyle?.invoke() as Int?) {
+        0 -> NotificationAlertStyle.NONE
+        1 -> NotificationAlertStyle.BANNERS
+        2 -> NotificationAlertStyle.ALERTS
+        else -> NotificationAlertStyle.UNAVAILABLE
     }
 
     /** Shows a notification, once [start] succeeded. [identifier] is what [start]'s callback is given when it is clicked. */
