@@ -252,7 +252,8 @@ class KashModel(
     private fun load(service: Service) {
         if (service.id in loaded) return
         val profile = engine.profile(directories.profile(service.profile))
-        val tab = profile.openTab(service.url, scriptsFor(service, plugins[service.plugin], language))
+        val plugin = plugins[service.plugin]
+        val tab = profile.openTab(service.url, scriptsFor(service, plugin, language), plugin?.manifest?.openInKash.orEmpty())
         tab.setColorScheme(colorScheme)
         val jobs = listOf(
             scope.launch { tab.title.collect { titles[service.id] = it } },

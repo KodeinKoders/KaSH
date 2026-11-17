@@ -76,6 +76,14 @@
         "minLength": 1
       }
     },
+    "openInKash": {
+      "description": "The addresses of other sites than the service's that its pages open in KaSH, in the service's profile, rather than in the system's browser: a sign-in with another site's account that KaSH does not know. * matches any run of characters.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^https?://[^/\\s]+(/\\S*)?$"
+      }
+    },
     "script": {
       "description": "The file of the script, in the plugin's folder.",
       "type": "string",

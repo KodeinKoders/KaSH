@@ -1,0 +1,14 @@
+{
+  "$schema": "../manifest.schema.json",
+  "manifestVersion": 1,
+  "id": "instagram",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "name": "Instagram",
+  "square": { "text": "IG", "color": "#E1306C" },
+  "icon": "icon.webp",
+  "url": "https://www.instagram.com/direct/inbox/",
+  "matches": ["https://www.instagram.com/*"],
+  "script": "plugin.js",
+  "openInKash": ["https://www.facebook.com/oidc/*"]
+}

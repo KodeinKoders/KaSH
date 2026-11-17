@@ -121,7 +121,7 @@ public class BrowserEngine private constructor(
             override fun onBeforePopup(browser: CefBrowser, frame: CefFrame?, targetUrl: String?, targetFrameName: String?): Boolean {
                 val tab = tabs[browser] ?: return false
                 if (targetUrl == null) return false
-                return when (popupTarget(targetUrl, tab.initialUrl)) {
+                return when (popupTarget(targetUrl, tab.initialUrl, tab.openInKash)) {
                     LinkTarget.KASH -> false
                     LinkTarget.SYSTEM -> true.also { openInSystem(targetUrl) }
                     LinkTarget.NOWHERE -> true.also { notLoaded(targetUrl) }
@@ -135,7 +135,7 @@ public class BrowserEngine private constructor(
                 val tab = tabs[browser] ?: return false
                 // On Chromium's UI thread, before the page asks for anything: the languages that changed hold from this load.
                 tab.profile.applyLanguages()
-                val target = navigationTarget(request.url, tab.initialUrl, frame.url, userGesture, isRedirect, request.method)
+                val target = navigationTarget(request.url, tab.initialUrl, frame.url, userGesture, isRedirect, request.method, tab.openInKash)
                 // A frame of the page only loads what it can: an application's address, which some pages open in a hidden frame, is not.
                 if (!frame.isMain) return (target == LinkTarget.NOWHERE).also { if (it) notLoaded(request.url) }
                 return when (target) {

@@ -132,6 +132,11 @@ A plugin without one has the site's icon by default.
 | yes
 | The file of the script, in the plugin's folder: a `.js` file, without `/` or `..`.
 
+| `openInKash`
+| no
+| The addresses of <<links,other sites than the service's>> that its pages open in KaSH, rather than in the system's browser: a sign-in with another site's account that KaSH does not know (Instagram's with Facebook, `https://www.facebook.com/oidc/*`).
+`*` matches any run of characters.
+
 | `options`
 | no
 | The <<options,fields that the user fills>> when they add a service of the plugin. Their ids are unique.
@@ -274,6 +279,19 @@ It does not run in frames, nor in the windows that a page opens.
 
 A service may not stay at its `url`: Slack's `https://my-team.slack.com/` signs the user in, then sends them to `https://app.slack.com/client/…`, and Google Chat's `https://mail.google.com/chat/` sends them to `https://chat.google.com/`.
 `matches` names the pages that the script reads, wherever the service ends up.
+
+
+[#links]
+=== Where links open
+
+A link of a service's page to another site opens in the system's browser, when the user clicks it or the page opens a window for it.
+What stays in KaSH, in the service's profile: the service's own site, the sign-in pages of Google, Microsoft, Apple, Facebook and GitHub (a window that signs in reports to the page that opened it), and the addresses of `openInKash`, for a sign-in that KaSH does not know.
+
+[source,json]
+.Example: Instagram signs in with Facebook
+----
+"openInKash": ["https://www.facebook.com/oidc/*"]
+----
 
 
 [#the-api]

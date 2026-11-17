@@ -130,6 +130,9 @@ public sealed interface PluginOption {
  * @property url The address of a service of the plugin, where `${id}` is the value of an option.
  * @property matches The addresses of the pages where its script runs, in the top frame: `*` matches any run of characters.
  * @property script The file of its script, next to the manifest.
+ * @property openInKash The addresses of other sites than the service's that its pages open in KaSH, in the service's profile, rather than in the
+ * system's browser: a sign-in with another site's account that KaSH does not know (Instagram's with Facebook: the addresses under `https://www.facebook.com/oidc/`).
+ * `*` matches any run of characters.
  */
 @Serializable
 public data class PluginManifest(
@@ -146,6 +149,7 @@ public data class PluginManifest(
     val matches: List<String>,
     val script: String,
     val options: List<PluginOption> = emptyList(),
+    val openInKash: List<String> = emptyList(),
 ) {
     public companion object {
         /** The version of the format that KaSH reads. */
@@ -167,6 +171,9 @@ public object PluginManifests {
     private val OPTION_ID = Regex("[a-zA-Z][a-zA-Z0-9]*")
     private val SCRIPT = Regex("[A-Za-z0-9_][A-Za-z0-9._-]*\\.js")
     private val COLOR = Regex("#[0-9A-Fa-f]{6}")
+
+    // An address of openInKash: of the web, with a host, which may hold a `*` (`https://*.example.com/login/*`).
+    private val WEB_ADDRESS = Regex("https?://[^/\\s]+(/\\S*)?", RegexOption.IGNORE_CASE)
 
     /** An image that KaSH can draw (Skia: not SVG), in the plugin's folder. */
     private val ICON = Regex("[A-Za-z0-9_][A-Za-z0-9._-]*\\.(png|jpe?g|gif|webp|ico)", RegexOption.IGNORE_CASE)
@@ -201,6 +208,9 @@ public object PluginManifests {
         rule(manifest.matches.isNotEmpty(), "matches", "empty")
         manifest.matches.forEachIndexed { index, match -> rule(match.isNotBlank(), "matches[$index]", "empty") }
         rule(SCRIPT.matches(manifest.script), "script", "a .js file of the plugin's folder: '${manifest.script}'")
+        manifest.openInKash.forEachIndexed { index, address ->
+            rule(WEB_ADDRESS.matches(address), "openInKash[$index]", "an address of the web, http(s)://, with a host: '$address'")
+        }
 
         val ids = mutableSetOf<String>()
         manifest.options.forEachIndexed { index, option ->

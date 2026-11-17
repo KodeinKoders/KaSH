@@ -27,6 +27,8 @@ public class BrowserTab internal constructor(
     internal val profile: BrowserProfile,
     internal val initialUrl: String,
     private val initScripts: List<String>,
+    // The addresses of other sites that the page opens in KaSH (its plugin's openInKash, as patterns: addressPattern).
+    internal val openInKash: List<Regex>,
     private val hiddenSize: AtomicReference<Dimension>,
     private val onClose: (BrowserTab) -> Unit,
 ) {

@@ -82,6 +82,16 @@ class PluginManifestTest {
     }
 
     @Test
+    fun theAddressesOpenedInKashAreAddressesOfTheWeb() {
+        assertEquals(emptyList(), PluginManifests.parse(slack).openInKash)
+        val withOne = slackWith("\"script\": \"plugin.js\",", "\"script\": \"plugin.js\", \"openInKash\": [\"https://www.facebook.com/oidc/*\"],")
+        assertEquals(listOf("https://www.facebook.com/oidc/*"), PluginManifests.parse(withOne).openInKash)
+        refused("openInKash[0]", slackWith("\"script\": \"plugin.js\",", "\"script\": \"plugin.js\", \"openInKash\": [\"facebook.com/oidc/*\"],"))
+        refused("openInKash[0]", slackWith("\"script\": \"plugin.js\",", "\"script\": \"plugin.js\", \"openInKash\": [\"file:///etc/*\"],"))
+        refused("openInKash[0]", slackWith("\"script\": \"plugin.js\",", "\"script\": \"plugin.js\", \"openInKash\": [\"https:///oidc\"],"))
+    }
+
+    @Test
     fun theSquareTheMatchesAndTheScriptAreChecked() {
         refused("square.text", slackWith("\"text\": \"Sl\"", "\"text\": \"Slac\""))
         refused("square.color", slackWith("\"#5B2C6F\"", "\"purple\""))

@@ -64,6 +64,15 @@ internal fun siteOf(host: String): String {
     return labels.takeLast(count).joinToString(".")
 }
 
+/**
+ * The pattern of an address where `*` matches any run of characters and the rest is literal, as a plugin's manifest writes them (`matches`,
+ * `openInKash`).
+ */
+internal fun addressPattern(address: String): Regex =
+    Regex(address.split('*').joinToString(".*") { Regex.escape(it) }, RegexOption.IGNORE_CASE)
+
+private fun List<Regex>.matchAny(target: URI): Boolean = isNotEmpty() && target.toString().let { url -> any { it.matches(url) } }
+
 private fun sameSite(a: URI, b: URI?): Boolean = b != null && b.isWeb() && siteOf(a.host) == siteOf(b.host)
 
 /** Whether [target] is a page where one signs in with an account of another site (Google, Microsoft, Apple, Facebook, GitHub). */
@@ -76,25 +85,27 @@ internal fun isSignIn(target: URI): Boolean {
 
 /**
  * Where a window that a page of the service at [serviceUrl] opens goes (a link to a new window, `window.open`): in KaSH when it is on the
- * service's site or a sign-in page, in the system's browser when it is another site, or the mail, the phone. What is not an address of the web
- * (`about:blank`, which a page fills itself, `blob:`, `data:`) stays in KaSH.
+ * service's site, a sign-in page or one of [openInKash] (its plugin's, [addressPattern]), in the system's browser when it is another site, or the
+ * mail, the phone. What is not an address of the web (`about:blank`, which a page fills itself, `blob:`, `data:`) stays in KaSH.
  */
-internal fun popupTarget(url: String, serviceUrl: String): LinkTarget {
+internal fun popupTarget(url: String, serviceUrl: String, openInKash: List<Regex> = emptyList()): LinkTarget {
     val target = uri(url)?.let(::unwrapped) ?: return LinkTarget.KASH
     val scheme = target.scheme?.lowercase()
     if (scheme in SYSTEM_SCHEMES) return LinkTarget.SYSTEM
     if (scheme != null && scheme !in PAGE_SCHEMES) return LinkTarget.NOWHERE
     if (!target.isWeb()) return LinkTarget.KASH
-    return if (sameSite(target, uri(serviceUrl)) || isSignIn(target)) LinkTarget.KASH else LinkTarget.SYSTEM
+    return if (sameSite(target, uri(serviceUrl)) || isSignIn(target) || openInKash.matchAny(target)) LinkTarget.KASH else LinkTarget.SYSTEM
 }
 
 /**
  * Where a navigation of a service's page goes: nowhere when it is an application's address (see PAGE_SCHEMES); in the system's browser when the
  * user clicked a link (a gesture, a `GET`, not a redirect) to another
- * site than the service's at [serviceUrl] and than the page's at [pageUrl], which is not a sign-in page; in KaSH otherwise. What the site does
- * itself (its redirects, a form that it posts, as when signing in) stays in KaSH.
+ * site than the service's at [serviceUrl] and than the page's at [pageUrl], which is not a sign-in page nor one of [openInKash]; in KaSH otherwise.
+ * What the site does itself (its redirects, a form that it posts, as when signing in) stays in KaSH.
  */
-internal fun navigationTarget(url: String, serviceUrl: String, pageUrl: String?, userGesture: Boolean, isRedirect: Boolean, method: String?): LinkTarget {
+internal fun navigationTarget(
+    url: String, serviceUrl: String, pageUrl: String?, userGesture: Boolean, isRedirect: Boolean, method: String?, openInKash: List<Regex> = emptyList(),
+): LinkTarget {
     val target = uri(url)?.let(::unwrapped) ?: return LinkTarget.KASH
     val scheme = target.scheme?.lowercase()
     val clicked = userGesture && !isRedirect
@@ -104,5 +115,5 @@ internal fun navigationTarget(url: String, serviceUrl: String, pageUrl: String?,
     if (!clicked || !method.equals("GET", ignoreCase = true)) return LinkTarget.KASH
     if (!target.isWeb()) return LinkTarget.KASH
     val page = pageUrl?.let(::uri)
-    return if (sameSite(target, uri(serviceUrl)) || sameSite(target, page) || isSignIn(target)) LinkTarget.KASH else LinkTarget.SYSTEM
+    return if (sameSite(target, uri(serviceUrl)) || sameSite(target, page) || isSignIn(target) || openInKash.matchAny(target)) LinkTarget.KASH else LinkTarget.SYSTEM
 }

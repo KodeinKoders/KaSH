@@ -48,15 +48,17 @@ public class BrowserProfile internal constructor(
     private var closed = false
 
     /**
-     * Opens [url] in a new tab of this profile, with [initScripts] run in every document of the tab before the page's own scripts. The tab's
+     * Opens [url] in a new tab of this profile, with [initScripts] run in every document of the tab before the page's own scripts, and
+     * [openInKash], addresses of other sites than [url]'s that its links open in KaSH rather than in the system's browser (`*` matches any run
+     * of characters). The tab's
      * browser is created now, or once the browsers asked before are ([BrowserEngine.create]), hidden, so that its page runs (and notifies) before it
      * is first shown.
      */
-    public fun openTab(url: String, initScripts: List<String> = emptyList()): BrowserTab {
+    public fun openTab(url: String, initScripts: List<String> = emptyList(), openInKash: List<String> = emptyList()): BrowserTab {
         check(!closed) { "The profile $directory is closed" }
         // The page is loaded once the scripts are registered (BrowserTab.created): loaded right away, its first document would not have them.
         val browser = client.createBrowser(BLANK, CefRendering.DEFAULT, false, context)
-        val tab = BrowserTab(browser, this, url, initScripts, hiddenSize) { closedTab ->
+        val tab = BrowserTab(browser, this, url, initScripts, openInKash.map(::addressPattern), hiddenSize) { closedTab ->
             own -= closedTab
             tabs -= closedTab.browser
             creationEnded(closedTab)

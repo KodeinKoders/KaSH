@@ -87,4 +87,26 @@ class LinksTest {
         // The page is a company's sign-in page, where the service sent it: its own links are part of signing in.
         assertEquals(LinkTarget.KASH, navigationTarget("https://sso.example.com/next", "https://app.service.io/", "https://sso.example.com/login", true, false, "GET"))
     }
+
+    @Test
+    fun theAddressesThatAPluginOpensInKashStayThereClickedOrInAWindow() {
+        val instagram = "https://www.instagram.com/direct/inbox/"
+        val openInKash = listOf(addressPattern("https://www.facebook.com/oidc/*"))
+        val oidc = "https://www.facebook.com/oidc/?app_id=1&redirect_uri=https%3A%2F%2Fwww.instagram.com%2F"
+        // Instagram's sign-in with Facebook: not one of the sign-in pages that KaSH knows.
+        assertEquals(LinkTarget.SYSTEM, navigationTarget(oidc, instagram, instagram, userGesture = true, isRedirect = false, method = "GET"))
+        assertEquals(LinkTarget.KASH, navigationTarget(oidc, instagram, instagram, userGesture = true, isRedirect = false, method = "GET", openInKash = openInKash))
+        assertEquals(LinkTarget.KASH, popupTarget(oidc, instagram, openInKash))
+        // The rest of Facebook still goes to the system's browser.
+        assertEquals(LinkTarget.SYSTEM, navigationTarget("https://www.facebook.com/videos/1", instagram, instagram, userGesture = true, isRedirect = false, method = "GET", openInKash = openInKash))
+        assertEquals(LinkTarget.SYSTEM, popupTarget("https://www.facebook.com/oidc-not/", instagram, openInKash))
+    }
+
+    @Test
+    fun anAddressPatternIsLiteralButItsStars() {
+        val pattern = addressPattern("https://*.example.com/a.b/*")
+        assertTrue(pattern.matches("https://www.example.com/a.b/c?d=e"))
+        assertFalse(pattern.matches("https://www.example.com/axb/c"))
+        assertTrue(addressPattern("https://example.com/").matches("HTTPS://EXAMPLE.COM/"))
+    }
 }
