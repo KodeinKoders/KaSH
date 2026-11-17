@@ -76,6 +76,7 @@ object KashIcons {
     val Code = strokeIcon("code", "M7 6l-4 4 4 4M13 6l4 4-4 4")
     val Close = strokeIcon("close", "M5.5 5.5l9 9M14.5 5.5l-9 9")
     val Clock = strokeIcon("clock", circle(10f, 10f, 7f), "M10 6v4l2.6 1.8")
+    val Info = strokeIcon("info", circle(10f, 10f, 7f), "M10 9.2v4.3", "M10 6.6h.01")
     val ArrowUp = strokeIcon("arrow-up", "M10 16V4.5", "M5 9.5l5-5 5 5", width = 2f)
 }
 

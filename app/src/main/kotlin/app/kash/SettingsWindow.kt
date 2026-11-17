@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -164,6 +166,20 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
                             .padding(horizontal = 10.dp),
                         contentAlignment = Alignment.CenterStart,
                     ) { Text(name, fontWeight = if (p == page) FontWeight.Medium else FontWeight.Normal) }
+                }
+                // At the bottom of the column, discreet: the About window, as the application menu's About item opens it.
+                Spacer(Modifier.weight(1f))
+                val aboutShape = RoundedCornerShape(4.dp)
+                Row(
+                    Modifier.fillMaxWidth().height(26.dp)
+                        .hoverBackground(Kash.colors.hover, aboutShape)
+                        .clickable(role = Role.Button) { model.aboutOpen = true }
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    KashIcon(KashIcons.Info, Kash.colors.faint, size = 14.dp)
+                    Text(s.aboutTitle(APP_NAME), color = Kash.colors.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             Box(Modifier.width(1.dp).fillMaxHeight().background(Kash.colors.separator))

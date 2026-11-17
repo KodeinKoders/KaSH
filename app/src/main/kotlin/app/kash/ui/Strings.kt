@@ -208,6 +208,14 @@ interface Strings {
     val updating: String
     fun updatePlugin(version: String): String
     fun pluginUpdateFailed(name: String): String
+
+    // About
+    fun aboutTitle(name: String): String
+    fun aboutLogo(name: String): String
+    fun aboutVersion(version: String): String
+    fun aboutBranch(branch: String): String
+    fun aboutCommitted(date: String): String
+    val aboutMadeBy: String
 }
 
 object French : Strings {
@@ -407,6 +415,12 @@ object French : Strings {
     override val updating = "Mise à jour…"
     override fun updatePlugin(version: String) = "Mettre à jour le plugin ($version)"
     override fun pluginUpdateFailed(name: String) = "$name ne peut pas être mis à jour"
+    override fun aboutTitle(name: String) = "À propos de $name"
+    override fun aboutLogo(name: String) = "Logo de $name"
+    override fun aboutVersion(version: String) = "Version $version"
+    override fun aboutBranch(branch: String) = "Branche $branch"
+    override fun aboutCommitted(date: String) = "Commit du $date"
+    override val aboutMadeBy = "Fait avec amour par "
 
     private fun s(count: Int) = if (count > 1) "s" else ""
 }
@@ -609,6 +623,12 @@ object English : Strings {
     override val updating = "Updating…"
     override fun updatePlugin(version: String) = "Update the plugin ($version)"
     override fun pluginUpdateFailed(name: String) = "$name cannot be updated"
+    override fun aboutTitle(name: String) = "About $name"
+    override fun aboutLogo(name: String) = "$name logo"
+    override fun aboutVersion(version: String) = "Version $version"
+    override fun aboutBranch(branch: String) = "Branch $branch"
+    override fun aboutCommitted(date: String) = "Committed: $date"
+    override val aboutMadeBy = "Made with love by "
 
     private fun s(count: Int) = if (count > 1) "s" else ""
 }

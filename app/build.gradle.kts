@@ -6,8 +6,34 @@ import java.nio.file.Files
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.buildconfig)
     alias(libs.plugins.kotlin.plugin.compose)
     alias(libs.plugins.compose.multiplatform)
+}
+
+buildConfig {
+    packageName("app.kash")
+    // The version of the project, declared once in the root build script: the About window says it, and it is the bundle's `packageVersion`.
+    buildConfigField("VERSION", project.version.toString())
+    // The short hash of the commit it is built from, which tells two builds of the same version apart; "unknown" outside a git checkout.
+    val commit = providers.exec {
+        commandLine("git", "rev-parse", "--short", "HEAD")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.map { it.trim().ifEmpty { "unknown" } }.orElse("unknown")
+    buildConfigField("GIT_COMMIT", commit)
+    // The branch it is built on, which the About window says when it is not main; empty for a detached HEAD and outside a git checkout.
+    val branch = providers.exec {
+        commandLine("git", "branch", "--show-current")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.map { it.trim() }.orElse("")
+    buildConfigField("GIT_BRANCH", branch)
+    // When the commit it is built from was made, which the About window says: the committer's date, with its offset (`2026-11-03T19:43:42+01:00`),
+    // the same for every build of the commit; empty outside a git checkout.
+    val commitDate = providers.exec {
+        commandLine("git", "log", "-1", "--format=%cI", "HEAD")
+        isIgnoreExitValue = true
+    }.standardOutput.asText.map { it.trim() }.orElse("")
+    buildConfigField("GIT_COMMIT_DATE", commitDate)
 }
 
 val jvmToolchainVersion = findProperty("jvm.toolchain")!!.toString().toInt()
@@ -72,6 +98,8 @@ dependencies {
     runtimeOnly(libs.slf4j.simple)
 
     testImplementation(libs.kotlin.test.junit)
+    // AboutWindowTest composes the About window's content.
+    testImplementation(libs.compose.ui.test.junit4)
 }
 
 tasks.test {

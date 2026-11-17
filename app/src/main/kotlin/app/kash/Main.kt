@@ -203,6 +203,11 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
         }
         onDispose { }
     }
+    // The About window, from the About item of the application menu of macOS, which would show the system's panel (Java's), and from Settings.
+    DisposableEffect(Unit) {
+        takeAboutItem { java.awt.EventQueue.invokeLater { model.aboutOpen = true } }
+        onDispose { }
+    }
 
     val settings = model.state.settings
     val systemDark by rememberSystemDark(follow = settings.theme == ThemeMode.SYSTEM)
@@ -256,6 +261,7 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                     },
                 )
             }
+            if (model.aboutOpen) AboutWindow(onClose = { model.aboutOpen = false })
             if (model.settingsOpen) {
                 SettingsWindow(model, notifier, icons, onClose = { model.settingsOpen = false; model.cacheReset.clear() })
             }

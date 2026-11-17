@@ -1,5 +1,6 @@
 [versions]
 ant = "1.10.15"                     # https://ant.apache.org/bindownload.cgi (only the build of JCEF uses it, see jcef-native)
+buildConfig = "6.1.2"               # https://github.com/gmazzo/gradle-buildconfig-plugin/releases
 composeMultiplatform = "1.12.2"     # https://github.com/JetBrains/compose-multiplatform/releases
 coroutines = "1.11.0"               # https://github.com/Kotlin/kotlinx.coroutines/releases
 jewel = "0.42.0-263.7307.200"       # https://github.com/JetBrains/intellij-community/releases (Jewel is in the platform/jewel directory; its Maven versions are on https://central.sonatype.com/artifact/org.jetbrains.jewel/jewel-int-ui-standalone)
@@ -8,6 +9,7 @@ kotlinxSerialization = "1.12.0"     # https://github.com/Kotlin/kotlinx.serializ
 slf4j = "2.0.20"                    # https://www.slf4j.org/news.html
 
 [plugins]
+buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildConfig" }
 compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -17,6 +19,7 @@ kotlin-plugin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization"
 [libraries]
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
+compose-ui-test-junit4 = { module = "org.jetbrains.compose.ui:ui-test-junit4", version.ref = "composeMultiplatform" }
 
 jewel-decorated-window = { module = "org.jetbrains.jewel:jewel-int-ui-decorated-window", version.ref = "jewel" }
 jewel-int-ui = { module = "org.jetbrains.jewel:jewel-int-ui-standalone", version.ref = "jewel" }

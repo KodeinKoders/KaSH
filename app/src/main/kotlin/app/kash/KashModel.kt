@@ -173,6 +173,9 @@ class KashModel(
     var editing: ServiceId? by mutableStateOf(null)
     var settingsOpen by mutableStateOf(false)
 
+    /** Whether the About window is open: from the About item of the application menu, or Settings' button. */
+    var aboutOpen by mutableStateOf(false)
+
     /** The page that Settings shows when it opens, or goes to while it is open (a notification of a plugin's update); null once it did. */
     var settingsPage: SettingsPage? by mutableStateOf(null)
     var confirmation: Confirmation? by mutableStateOf(null)
