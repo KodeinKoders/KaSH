@@ -1,0 +1,5 @@
+<!-- The chevron of Jewel's combo boxes (AllIconsKeys.General.ChevronDown), which Jewel's standalone theme takes from IntelliJ's icons and does
+     not ship: without it, Jewel draws a pink square. The dark theme's, which Jewel takes in a dark theme; chevronDown.svg is the light theme's. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M4.5 6.25L8 9.75L11.5 6.25" stroke="#CED0D6" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

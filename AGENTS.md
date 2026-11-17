@@ -173,6 +173,8 @@ Every enabled service is loaded at launch (`KashModel`), hidden, so that it noti
 
 ## Jewel
 
+- **Jewel's standalone theme does not ship the icons of IntelliJ that its components draw** (`AllIconsKeys`, looked up as resources of the classpath), and draws a pink square in place of one it cannot find: the combo boxes of Settings had one instead of their chevron. KaSH has the ones that its components use in its resources, at the path that Jewel looks for (`app/src/main/resources/expui/general/chevronDown.svg`, and `_dark` for the dark theme, which Jewel takes there; Jewel does not tint it). `JewelIconsTest` checks the path and that a combo box has no pink in either theme (`build/renders/combo-box-*.png`). A Jewel component that is used for the first time may need another one: Jewel's styles use `General.ChevronDown`, `General.ChevronRight` (a submenu), `General.CloseSmall`, `Actions.Close`, `Actions.Search`, `Actions.SearchWithHistory` and `Ide.External` (a link).
+
 - **`VerticallyScrollableContainer` takes its `ScrollState` by name** (`VerticallyScrollableContainer(modifier, scrollState = rememberScrollState())`): given first, positionally, it selects the overload of a `ScrollableState`, which does not scroll its content itself (the caller has to apply `verticalScroll`). The scrollbar is there, the content does not move: the Unread tab, Settings and the Add service window did not scroll.
 
 ## Checking persistence
