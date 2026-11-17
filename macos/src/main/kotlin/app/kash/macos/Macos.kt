@@ -93,6 +93,20 @@ public object MacosNotifications {
     }
 }
 
+/** KaSH's windows, as AppKit has them. */
+public object MacosWindows {
+    private val nonactivating = MacosLibrary.function("kash_panel_make_nonactivating", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+
+    /**
+     * Makes KaSH's shown panels titled [title] (AWT windows of type `UTILITY`) not activate KaSH when they are clicked, as macOS's notifications:
+     * a click on any other window of KaSH brings it to the front. Done later, on AppKit's thread; nothing outside macOS.
+     */
+    public fun makeNonactivating(title: String) {
+        val function = nonactivating ?: return
+        Arena.ofConfined().use { arena -> function.invoke(MacosLibrary.cString(arena, title)) }
+    }
+}
+
 /** The status of KaSH's login item. */
 public enum class LoginItemStatus {
     NOT_REGISTERED,

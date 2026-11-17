@@ -258,6 +258,11 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                 DisposableEffect(window) {
                     model.activateWindow = {
                         window.isVisible = true
+                        // toFront does not activate KaSH when another application is in front: a click on one of KaSH's own notifications,
+                        // which do not activate it (ToastWindow), has to.
+                        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_REQUEST_FOREGROUND)) {
+                            Desktop.getDesktop().requestForeground(true)
+                        }
                         window.toFront()
                         window.requestFocus()
                     }

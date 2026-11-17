@@ -1,7 +1,9 @@
 // What KaSH asks of macOS that Java has no API for: the notifications of the Notification Center, and the login item of the application.
 // Called from Kotlin through the FFM API (app.kash.macos): plain C functions, strings in UTF-8.
 
+#import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
+#import <objc/message.h>
 #import <ServiceManagement/ServiceManagement.h>
 #import <UserNotifications/UserNotifications.h>
 
@@ -97,6 +99,23 @@ int kash_notifications_alert_style(void) {
         dispatch_semaphore_wait(answered, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC));
         return result;
     }
+}
+
+// Makes KaSH's panels titled [title] (AWT's windows of type UTILITY, which are NSPanels) not activate KaSH when they are clicked, as macOS's
+// notifications do not activate the application in front: AWT has no window of that kind (its POPUP windows are normal ones). Both the style
+// and the window server's flag that it sets when a panel is created with it (`_setPreventsActivation:`, when the panel has it): the style
+// alone, set after the panel was created, may not be read again. On AppKit's thread, later.
+void kash_panel_make_nonactivating(const char *title) {
+    NSString *name = [NSString stringWithUTF8String:title];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        for (NSWindow *window in NSApp.windows) {
+            if (![window isKindOfClass:NSPanel.class] || ![window.title isEqualToString:name]) continue;
+            window.styleMask |= NSWindowStyleMaskNonactivatingPanel;
+            ((NSPanel *)window).hidesOnDeactivate = NO;
+            SEL prevents = NSSelectorFromString(@"_setPreventsActivation:");
+            if ([window respondsToSelector:prevents]) ((void (*)(id, SEL, BOOL))objc_msgSend)(window, prevents, YES);
+        }
+    });
 }
 
 // Shows a notification, which the click callback is given [identifier] of when it is clicked.

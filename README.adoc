@@ -44,6 +44,7 @@ A right click on a service's tile in the rail opens a menu with all of it: back,
 
 A link to another site opens in the system's browser; the service's own pages and the sign-in pages (Google, Microsoft, Apple, Facebook, GitHub) stay in KaSH.
 
+A contact's notifications are one: the last message, and how many are unread.
 KaSH's own notifications go away after a few seconds, or stay until they are closed (Settings › Notifications); how long macOS's stay is its own setting (banners or alerts), which Settings shows and opens.
 
 The window opens again where it was, as big and in the mode it was in (floating, maximized, full screen) when KaSH was closed.
