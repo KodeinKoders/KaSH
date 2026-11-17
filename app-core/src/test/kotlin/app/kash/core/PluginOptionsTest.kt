@@ -18,7 +18,7 @@ class PluginOptionsTest {
     )
     private val threads = PluginOption.Flag(id = "threads", label = LocalizedText(mapOf("en" to "Threads")))
     private val manifest = PluginManifest(
-        manifestVersion = 1, id = "slack", version = "1", name = LocalizedText(mapOf("en" to "Slack")),
+        manifestVersion = 1, id = "slack", version = "1", versionCode = 1, name = LocalizedText(mapOf("en" to "Slack")),
         square = PluginSquare("Sl", "#5B2C6F"), url = "https://\${workspace}.slack.com/", matches = listOf("https://app.slack.com/*"),
         script = "plugin.js", options = listOf(workspace, region, threads),
     )

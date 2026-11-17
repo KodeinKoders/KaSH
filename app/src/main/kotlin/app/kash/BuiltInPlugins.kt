@@ -13,7 +13,7 @@ private val logger = LoggerFactory.getLogger("app.kash.BuiltInPlugins")
 
 /**
  * The plugins that KaSH has in its resources (`app/kash/plugins`): `index.json` lists them, in the order of the catalog, and each one is a folder of
- * that name with its `manifest.json`, its script and its icon. Plugins that the user installs are not loaded yet.
+ * that name with its `manifest.json`, its script and its icon. The plugins that the user installs are [PluginInstaller]'s.
  */
 object BuiltInPlugins {
     internal const val ROOT = "/app/kash/plugins"
@@ -23,7 +23,10 @@ object BuiltInPlugins {
         .jsonArray.map { it.jsonPrimitive.content }
 
     /** Every built-in plugin that is valid: one that is not is logged and left out (a test of the build checks that none is). */
-    fun registry(): PluginRegistry = PluginRegistry(ids().mapNotNull { id -> runCatching { load(id) }.onFailure { logger.error("The plugin {} is not loaded", id, it) }.getOrNull() })
+    fun plugins(): List<Plugin> = ids().mapNotNull { id -> runCatching { load(id) }.onFailure { logger.error("The plugin {} is not loaded", id, it) }.getOrNull() }
+
+    /** The built-in plugins only. */
+    fun registry(): PluginRegistry = PluginRegistry(plugins())
 
     /** The plugin [id]: its manifest, checked, its script and its icon; its folder's name is its id. */
     internal fun load(id: String): Plugin {

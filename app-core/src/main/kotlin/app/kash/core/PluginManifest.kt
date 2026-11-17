@@ -123,7 +123,9 @@ public sealed interface PluginOption {
  * @property schema The JSON Schema that editors check the file with (`$schema`): KaSH does not read it.
  * @property manifestVersion The version of this format: 1.
  * @property id What names the plugin, in the services that use it ([Service.plugin]).
- * @property version The plugin's own version, given to its script.
+ * @property version The plugin's own version, as it is shown and given to its script: any text.
+ * @property versionCode What tells a newer version of the plugin: an integer, at least 1, that each version makes greater (as Android's), which
+ * KaSH compares to propose an update.
  * @property icon The file of its icon, next to the manifest: what the tiles of its services show by default ([ServiceIcon.Plugin]).
  * @property url The address of a service of the plugin, where `${id}` is the value of an option.
  * @property matches The addresses of the pages where its script runs, in the top frame: `*` matches any run of characters.
@@ -135,6 +137,7 @@ public data class PluginManifest(
     val manifestVersion: Int,
     val id: String,
     val version: String,
+    val versionCode: Int,
     val name: LocalizedText,
     val description: LocalizedText? = null,
     val square: PluginSquare,
@@ -188,6 +191,7 @@ public object PluginManifests {
         rule(manifest.manifestVersion == PluginManifest.VERSION, "manifestVersion", "KaSH reads the version ${PluginManifest.VERSION}, not ${manifest.manifestVersion}")
         rule(PLUGIN_ID.matches(manifest.id), "id", "lowercase letters and digits, in words separated by hyphens: '${manifest.id}'")
         rule(manifest.version.isNotBlank(), "version", "empty")
+        rule(manifest.versionCode >= 1, "versionCode", "at least 1: ${manifest.versionCode}")
         text(manifest.name, "name")
         manifest.description?.let { text(it, "description") }
         val squareText = manifest.square.text

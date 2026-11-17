@@ -1,6 +1,7 @@
 package app.kash
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,8 +9,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -21,12 +24,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.kash.browser.BrowserTab
+import app.kash.core.PluginManifest
 import app.kash.core.Service
 import app.kash.ui.Chip
 import app.kash.ui.IconOnlyButton
@@ -40,6 +48,7 @@ import app.kash.ui.menuAnchor
 import app.kash.ui.strings
 import org.jetbrains.jewel.ui.component.MenuScope
 import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.Tooltip
 import org.jetbrains.jewel.ui.component.separator
 import java.awt.Component
 import java.awt.Dimension
@@ -48,6 +57,8 @@ import javax.swing.JPanel
 
 /** What the "…" menu of a service does: the same actions as Settings › Services, and the DevTools. */
 class ServiceActions(
+    /** Installs the new version of the service's plugin (see [KashModel.pluginUpdates]). */
+    val onUpdatePlugin: () -> Unit,
     val onBack: () -> Unit,
     val onForward: () -> Unit,
     val onReload: () -> Unit,
@@ -78,10 +89,17 @@ fun ServiceTitle(service: Service, tab: BrowserTab?, unread: Int, icons: Service
     }
 }
 
-/** The buttons of the selected service, on the right of the title bar: back, forward, reload, mute, and its menu. */
+/**
+ * The buttons of the selected service, on the right of the title bar: Update when its plugin has a new version ([update], [updating] while it is
+ * installed), back, forward, reload, mute, and its menu.
+ */
 @Composable
-fun ServiceButtons(service: Service, tab: BrowserTab?, onToggleMute: () -> Unit, actions: ServiceActions) {
+fun ServiceButtons(service: Service, tab: BrowserTab?, onToggleMute: () -> Unit, actions: ServiceActions, update: PluginManifest?, updating: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (update != null) {
+            UpdateButton(strings.pluginUpdateTitle(update.name.of(strings.code), update.version), updating, actions.onUpdatePlugin)
+            Box(Modifier.width(4.dp))
+        }
         val canGoBack = tab?.canGoBack?.collectAsState()?.value ?: false
         val canGoForward = tab?.canGoForward?.collectAsState()?.value ?: false
         IconOnlyButton(KashIcons.ChevronLeft, strings.back, { tab?.back() }, size = 28.dp, enabled = canGoBack)
@@ -95,6 +113,29 @@ fun ServiceButtons(service: Service, tab: BrowserTab?, onToggleMute: () -> Unit,
             tint = if (service.muted) Kash.colors.text else Kash.colors.muted,
         )
         ServiceMenuButton(service, actions, devToolsEnabled = tab != null, buttonSize = 28.dp)
+    }
+}
+
+/** The title bar's button that installs the new version of the selected service's plugin: [description] says which; disabled while [updating]. */
+@Composable
+private fun UpdateButton(description: String, updating: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(4.dp)
+    Tooltip({ Text(description) }) {
+        Row(
+            Modifier.height(24.dp)
+                .background(Kash.colors.accent.copy(alpha = if (updating) 0.5f else 1f), shape)
+                .clickable(enabled = !updating, onClick = onClick)
+                .semantics {
+                    contentDescription = description
+                    role = Role.Button
+                }
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            KashIcon(KashIcons.ArrowUp, Color.White, size = 12.dp)
+            Text(if (updating) strings.updating else strings.update, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+        }
     }
 }
 
@@ -175,10 +216,17 @@ fun MenuScope.serviceMenu(service: Service, actions: ServiceActions, devToolsEna
 }
 
 /**
- * The items of a service's context menu (a right click on its tile in the rail), which [close] closes: what its header's buttons do on its page
- * ([tab], null while it is not loaded), muting it, what its "…" menu does, and disabling it.
+ * The items of a service's context menu (a right click on its tile in the rail), which [close] closes: updating its plugin when it has a new
+ * version ([update]), what its header's buttons do on its page ([tab], null while it is not loaded), muting it, what its "…" menu does, and
+ * disabling it.
  */
-fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: ServiceActions, close: () -> Unit) {
+fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: ServiceActions, update: PluginManifest?, close: () -> Unit) {
+    if (update != null) {
+        selectableItem(selected = false, onClick = { close(); actions.onUpdatePlugin() }) {
+            MenuRow(KashIcons.ArrowUp, StringsKey.UpdatePlugin, argument = update.version)
+        }
+        separator()
+    }
     // Read when the menu opens: what the page can do then.
     val canGoBack = tab?.canGoBack?.value == true
     val canGoForward = tab?.canGoForward?.value == true
@@ -202,11 +250,12 @@ fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: Se
 }
 
 /** Which text of [strings] a menu row shows: the items are built outside a composition, their text inside. */
-enum class StringsKey { Back, Forward, Reload, Mute, Unmute, DevTools, Edit, ResetCache, Erase, Disable, Delete }
+enum class StringsKey { UpdatePlugin, Back, Forward, Reload, Mute, Unmute, DevTools, Edit, ResetCache, Erase, Disable, Delete }
 
 @Composable
-private fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = false) {
+private fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = false, argument: String = "") {
     val text = when (key) {
+        StringsKey.UpdatePlugin -> strings.updatePlugin(argument)
         StringsKey.Back -> strings.back
         StringsKey.Forward -> strings.forward
         StringsKey.Reload -> strings.reload

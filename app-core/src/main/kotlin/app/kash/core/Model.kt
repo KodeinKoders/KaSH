@@ -131,6 +131,9 @@ public enum class InboxSort { BY_DATE, BY_COUNT, BY_SERVICE }
  *
  * @property launchAtLogin Off by default: registering a login item is the user's decision.
  * @property directOnly Only direct messages and mentions in the Unread tab: kept, but without effect until the services are instrumented.
+ * @property showApproximateTimes Whether the Unread tab shows the times of the conversations that came while KaSH was not watching their services
+ * ([WhileClosed], with a clock). Without, they have no time (last when sorted by date); KaSH still keeps them ([UnreadTimes]), for when it is on
+ * again.
  * @property doNotDisturb Kept across launches.
  */
 @Serializable
@@ -151,6 +154,7 @@ public data class Settings(
     val openInboxOnLaunch: Boolean = true,
     val skipMuted: Boolean = true,
     val directOnly: Boolean = false,
+    val showApproximateTimes: Boolean = true,
     val doNotDisturb: Boolean = false,
 )
 

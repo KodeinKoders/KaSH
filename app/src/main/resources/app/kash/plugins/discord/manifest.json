@@ -1,0 +1,13 @@
+{
+  "$schema": "../manifest.schema.json",
+  "manifestVersion": 1,
+  "id": "discord",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "name": "Discord",
+  "square": { "text": "Dc", "color": "#5865F2" },
+  "icon": "icon.png",
+  "url": "https://discord.com/app",
+  "matches": ["https://discord.com/*"],
+  "script": "plugin.js"
+}

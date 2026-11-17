@@ -86,6 +86,27 @@ class InboxTest {
     }
 
     @Test
+    fun approximateTimesAreShownOrNotUsedAtAll() {
+        val timed = mapOf(
+            whatsApp.id to ServiceUnread(
+                conversations = listOf(
+                    Conversation("seen", "Vue", ConversationKind.DIRECT, 1, time = 3_000L),
+                    Conversation("closed", "Pendant la fermeture", ConversationKind.DIRECT, 1, time = 5_000L, whileClosed = WhileClosed(1_000L)),
+                    Conversation("old", "Ancienne", ConversationKind.DIRECT, 1, time = 2_000L),
+                ),
+            ),
+        )
+        val shown = Inbox.byDate(Inbox.rows(listOf(whatsApp), timed, settings))
+        assertEquals(listOf("Pendant la fermeture", "Vue", "Ancienne"), shown.map { it.name })
+        assertEquals(WhileClosed(1_000L), shown.first().whileClosed)
+
+        val hidden = Inbox.byDate(Inbox.rows(listOf(whatsApp), timed, settings.copy(showApproximateTimes = false)))
+        assertEquals(listOf("Vue", "Ancienne", "Pendant la fermeture"), hidden.map { it.name })
+        assertEquals(listOf(3_000L, 2_000L, null), hidden.map { it.time })
+        assertEquals(null, hidden.last().whileClosed)
+    }
+
+    @Test
     fun directOnlyKeepsTheDirectConversationsAndTheMentions() {
         val rows = Inbox.rows(listOf(whatsApp, discord, custom), unread, settings.copy(directOnly = true))
         assertEquals(listOf("Laila", "Le Cerf Ludique", "Mon app"), rows.map { it.name })

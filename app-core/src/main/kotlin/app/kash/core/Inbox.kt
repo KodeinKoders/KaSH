@@ -8,6 +8,7 @@ package app.kash.core
  * @property preview The start of the conversation's last message; empty for a total, or when the service shows none.
  * @property time When the conversation's last message came, in milliseconds since the epoch; null for a total, or when the service does not tell.
  * @property topic Whether it is a topic (see [Conversation.topic]): in the Topics section, without a count, which no badge counts.
+ * @property whileClosed Whether [time] is when KaSH saw a conversation that came while it was not watching (see [Conversation.whileClosed]).
  */
 public data class InboxRow(
     val service: Service,
@@ -19,6 +20,7 @@ public data class InboxRow(
     val time: Long? = null,
     val dayOnly: Boolean = false,
     val topic: Boolean = false,
+    val whileClosed: WhileClosed? = null,
 ) {
     val isTotal: Boolean get() = kind == null
 }
@@ -62,7 +64,9 @@ public object Inbox {
                 serviceUnread.conversations.isNotEmpty() ->
                     serviceUnread.conversations
                         .filter { (it.topic || it.count > 0) && (!settings.directOnly || (!it.topic && (it.kind == ConversationKind.DIRECT || it.mention))) }
-                        .map { InboxRow(service, it.id, it.name, it.kind, if (it.topic) 0 else it.count, it.preview, it.time, it.dayOnly, it.topic) }
+                        // An approximate time that the settings do not show is not used either: the row has none.
+                        .map { if (it.whileClosed != null && !settings.showApproximateTimes) it.copy(time = null, whileClosed = null) else it }
+                        .map { InboxRow(service, it.id, it.name, it.kind, if (it.topic) 0 else it.count, it.preview, it.time, it.dayOnly, it.topic, it.whileClosed) }
                 (serviceUnread.total ?: 0) > 0 -> listOf(InboxRow(service, null, service.title, null, serviceUnread.total!!))
                 else -> emptyList()
             }

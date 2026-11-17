@@ -51,6 +51,7 @@ import org.jetbrains.jewel.ui.component.SegmentedControl
 import org.jetbrains.jewel.ui.component.SegmentedControlButtonData
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
+import org.jetbrains.jewel.ui.component.Tooltip
 import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 
 /**
@@ -195,7 +196,23 @@ private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolea
         }
         // When the last message came, over the count, as WhatsApp's list shows it.
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            row.time?.let { Text(strings.timeLabel.of(it, dayOnly = row.dayOnly), fontSize = 11.sp, color = Kash.colors.muted, maxLines = 1) }
+            row.time?.let { time ->
+                val label = strings.timeLabel.of(time, dayOnly = row.dayOnly)
+                val whileClosed = row.whileClosed
+                if (whileClosed == null) {
+                    Text(label, fontSize = 11.sp, color = Kash.colors.muted, maxLines = 1)
+                } else {
+                    // When KaSH received it, not when it was sent: some time after KaSH last watched the service. A clock before the time says
+                    // so, and its tooltip explains it.
+                    val after = whileClosed.after?.let { strings.timeLabel.of(it).replaceFirstChar(Char::lowercaseChar) }
+                    Tooltip({ Text(strings.cameWhileClosed(after)) }) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            KashIcon(KashIcons.Clock, Kash.colors.muted, size = 11.dp)
+                            Text(label, fontSize = 11.sp, color = Kash.colors.muted, maxLines = 1)
+                        }
+                    }
+                }
+            }
             if (row.topic) Box(Modifier.padding(horizontal = 8.dp, vertical = 7.dp).size(8.dp).background(Kash.colors.muted, CircleShape))
             else CountPill(UnreadCount.badge(row.count))
         }

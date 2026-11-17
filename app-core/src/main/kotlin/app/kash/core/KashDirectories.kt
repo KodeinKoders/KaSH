@@ -36,6 +36,18 @@ public class KashDirectories(public val support: Path) {
     /** The icon that the plugin's script of the service [id] gave ([serviceIcons]); null for an id that is not a file name. */
     public fun serviceIcon(id: ServiceId): Path? = if (FILE_NAME.matches(id.value)) serviceIcons.resolve(id.value) else null
 
+    /** The plugins that the user installed, a folder each, named by its id ([plugin]). */
+    public val plugins: Path get() = support.resolve("plugins")
+
+    /** Which plugins the user installed, where from, and whether KaSH watches them ([InstalledPluginsFile]). */
+    public val pluginsFile: Path get() = support.resolve("plugins.json")
+
+    /** When KaSH saw the unread conversations whose service does not tell when they came ([UnreadTimesFile]). */
+    public val unreadTimesFile: Path get() = support.resolve("unread-times.json")
+
+    /** The folder of the installed plugin [id] ([plugins]); null for an id that is not a plugin's (it would name another folder). */
+    public fun plugin(id: String): Path? = if (PLUGIN_ID.matches(id)) plugins.resolve(id) else null
+
     /**
      * The profile [profile]: its cookies, cache, IndexedDB, local storage, service workers.
      *
@@ -47,6 +59,9 @@ public class KashDirectories(public val support: Path) {
     public companion object {
         // A service's id is a UUID: what is not a plain name would name another file than its own.
         private val FILE_NAME = Regex("[A-Za-z0-9][A-Za-z0-9-]*")
+
+        // A plugin's id, as its manifest has it (PluginManifests).
+        private val PLUGIN_ID = Regex("[a-z0-9]+(-[a-z0-9]+)*")
 
         /** The system property that changes the directory, for tests and for running a second copy of the application. */
         public const val PROPERTY: String = "kash.support"

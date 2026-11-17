@@ -23,6 +23,8 @@ public enum class ConversationKind {
  * @property dayOnly Whether [time] only tells the day (the service shows no time for it): it is then the start of that day.
  * @property topic Whether the service shows its new messages without counting them (a channel in bold, without a badge, and no mention): it is
  * a topic of the Unread tab, which no badge counts, and its [count] is 0.
+ * @property whileClosed Whether [time] is not the service's but when KaSH saw the conversation, which came while KaSH was not watching the
+ * service (see [UnreadTimes]); null when the service tells the time, or KaSH saw the conversation come.
  */
 public data class Conversation(
     val id: String,
@@ -34,6 +36,7 @@ public data class Conversation(
     val time: Long? = null,
     val dayOnly: Boolean = false,
     val topic: Boolean = false,
+    val whileClosed: WhileClosed? = null,
 )
 
 /**

@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,18 +85,20 @@ import org.jetbrains.jewel.window.TitleBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private enum class Page { GENERAL, APPEARANCE, NOTIFICATIONS, INBOX, SERVICES }
+/** The pages of Settings. */
+enum class SettingsPage { GENERAL, APPEARANCE, NOTIFICATIONS, INBOX, SERVICES, PLUGINS }
 
 /** The title of [page], and the texts of its settings, which the search of the navigation looks into. */
-private fun Strings.page(page: Page): Pair<String, List<String>> = when (page) {
-    Page.GENERAL -> general to listOf(startup, launchAtLogin, language, interfaceLanguage)
-    Page.APPEARANCE -> appearance to listOf(theme, light, dark, system, sidebar, iconSize, position, showLabels, showBadges)
-    Page.NOTIFICATIONS -> notifications to listOf(
+private fun Strings.page(page: SettingsPage): Pair<String, List<String>> = when (page) {
+    SettingsPage.GENERAL -> general to listOf(startup, launchAtLogin, language, interfaceLanguage)
+    SettingsPage.APPEARANCE -> appearance to listOf(theme, light, dark, system, sidebar, iconSize, position, showLabels, showBadges)
+    SettingsPage.NOTIFICATIONS -> notifications to listOf(
         alerts, desktopNotifications, playSound, notificationStyle, kashNotifications, systemNotifications, sendTestNotification,
         dockBadge, dockTotal, dockDot, dockNone, doNotDisturb,
     )
-    Page.INBOX -> inboxTab to listOf(display, defaultSort, openInboxOnLaunch, content, skipMuted, directOnly)
-    Page.SERVICES -> services to listOf(enabled, edit, resetCache, eraseData, delete, addService)
+    SettingsPage.INBOX -> inboxTab to listOf(display, defaultSort, openInboxOnLaunch, showApproximateTimes, content, skipMuted, directOnly)
+    SettingsPage.SERVICES -> services to listOf(enabled, edit, resetCache, eraseData, delete, addService)
+    SettingsPage.PLUGINS -> plugins to listOf(pluginsHint, installZip, installFolder, installAddress, watch, uninstall)
 }
 
 /**
@@ -115,7 +118,12 @@ fun SettingsWindow(model: KashModel, notifier: Notifier, icons: ServiceIcons, on
 
 @Composable
 private fun SettingsContent(model: KashModel, notifier: Notifier, icons: ServiceIcons, onClose: () -> Unit) {
-    var page by remember { mutableStateOf(Page.APPEARANCE) }
+    var page by remember { mutableStateOf(model.settingsPage ?: SettingsPage.APPEARANCE) }
+    // A page that is asked while Settings is open (a plugin's update notification): it goes to it once.
+    LaunchedEffect(model.settingsPage) {
+        model.settingsPage?.let { page = it }
+        model.settingsPage = null
+    }
     var draft by remember { mutableStateOf(model.settings) }
     // The services' draft: their order and whether they are enabled, applied to the services as they are then (one may be edited meanwhile).
     var order by remember { mutableStateOf(model.services.map { it.id }) }
@@ -144,7 +152,7 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
                     placeholder = { Text(s.search, color = Kash.colors.faint) },
                     leadingIcon = { KashIcon(KashIcons.Search, Kash.colors.muted, Modifier.padding(end = 6.dp), size = 14.dp) },
                 )
-                for (p in Page.entries) {
+                for (p in SettingsPage.entries) {
                     val (name, texts) = s.page(p)
                     if (q.isNotEmpty() && (listOf(name) + texts).none { it.lowercase().contains(q) }) continue
                     val shape = RoundedCornerShape(4.dp)
@@ -164,11 +172,12 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
                 VerticallyScrollableContainer(Modifier.weight(1f), scrollState = rememberScrollState()) {
                     Column(Modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, top = 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
                         when (page) {
-                            Page.GENERAL -> GeneralPage(draft) { draft = it }
-                            Page.APPEARANCE -> AppearancePage(draft, services, model, icons) { draft = it }
-                            Page.NOTIFICATIONS -> NotificationsPage(draft, notifier) { draft = it }
-                            Page.INBOX -> InboxPage(draft) { draft = it }
-                            Page.SERVICES -> ServicesPage(
+                            SettingsPage.GENERAL -> GeneralPage(draft) { draft = it }
+                            SettingsPage.APPEARANCE -> AppearancePage(draft, services, model, icons) { draft = it }
+                            SettingsPage.NOTIFICATIONS -> NotificationsPage(draft, notifier) { draft = it }
+                            SettingsPage.INBOX -> InboxPage(draft) { draft = it }
+                            SettingsPage.PLUGINS -> PluginsPage(model, icons)
+                            SettingsPage.SERVICES -> ServicesPage(
                                 services, model, icons,
                                 onToggle = { id, on -> enabled = enabled + (id to on) },
                                 onMove = { id, neighbor -> order = ServiceOrder.moveNextTo(services.map { it.id }, id, neighbor) },
@@ -365,6 +374,8 @@ private fun InboxPage(draft: Settings, onChange: (Settings) -> Unit) {
             }
         }
         CheckboxRow(strings.openInboxOnLaunch, draft.openInboxOnLaunch, { onChange(draft.copy(openInboxOnLaunch = it)) })
+        CheckboxRow(strings.showApproximateTimes, draft.showApproximateTimes, { onChange(draft.copy(showApproximateTimes = it)) })
+        Hint(strings.showApproximateTimesHint, Modifier.padding(start = 24.dp))
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(strings.content)

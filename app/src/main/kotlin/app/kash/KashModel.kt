@@ -13,9 +13,17 @@ import app.kash.core.ConversationKind
 import app.kash.core.KashDirectories
 import app.kash.core.KashState
 import app.kash.core.PageLanguages
+import app.kash.core.InstalledPlugin
+import app.kash.core.Plugin
 import app.kash.core.PluginIcon
+import app.kash.core.PluginManifest
+import app.kash.core.PluginPackage
+import app.kash.core.PluginPackageException
 import app.kash.core.PluginRegistry
+import app.kash.core.PluginSource
+import app.kash.core.PluginUpdates
 import app.kash.core.ProfileId
+import app.kash.core.SeenService
 import app.kash.core.Selection
 import app.kash.core.Service
 import app.kash.core.ServiceId
@@ -24,8 +32,12 @@ import app.kash.core.ServiceUnread
 import app.kash.core.Settings
 import app.kash.core.StateFile
 import app.kash.core.UnreadCount
+import app.kash.core.UnreadTimes
+import app.kash.core.UnreadTimesFile
 import app.kash.ui.stringsOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -48,6 +60,9 @@ private val logger = LoggerFactory.getLogger(KashModel::class.java)
 /** A service whose page is loaded: its profile, its tab, and what watches them. */
 class LoadedService(val profile: BrowserProfile, val tab: BrowserTab, val jobs: List<Job>)
 
+/** An update of the plugin named [name] that failed, and why. */
+data class PluginUpdateFailure(val name: String, val message: String)
+
 /** What the user asked to confirm before it is done. */
 sealed interface Confirmation {
     val service: Service
@@ -67,14 +82,42 @@ class KashModel(
     private val file: StateFile,
     private val directories: KashDirectories,
     private val engine: BrowserEngine,
-    /** The plugins that services may be of: their names, their addresses and their scripts. */
-    val plugins: PluginRegistry,
-    /** The scripts that the pages of a service are given, in a language (`fr`, `en`): the notifications' for all, and its plugin's. */
-    private val scriptsFor: (Service, String) -> List<String>,
+    /** The plugins that KaSH has in its resources, which come first in the catalog. */
+    private val builtInPlugins: List<Plugin>,
+    /** The plugins that the user installs, updates and uninstalls (Settings › Plugins). */
+    private val installer: PluginInstaller,
+    /** The installed plugins that could be loaded at launch ([PluginInstaller.plugins]). */
+    installedPlugins: List<Plugin>,
+    /** The scripts that the pages of a service are given, with its plugin (null for a web application) in a language (`fr`, `en`). */
+    private val scriptsFor: (Service, Plugin?, String) -> List<String>,
     /** KaSH's theme when it starts, which the pages see as the system's (see [colorScheme]). */
     initialColorScheme: ColorScheme,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    /**
+     * The plugins that services may be of (their names, their addresses and their scripts): the built-in ones, then those that the user installed.
+     * They change when a plugin is installed, updated or uninstalled.
+     */
+    var plugins: PluginRegistry by mutableStateOf(PluginRegistry(builtInPlugins + installedPlugins))
+        private set
+
+    /** The plugins that the user installed, where they come from, and whether they are watched. */
+    var installedPlugins: List<InstalledPlugin> by mutableStateOf(installer.installed)
+        private set
+
+    /** The new versions that the watched plugins' sources have, by plugin: what Settings › Plugins offers to install. */
+    val pluginUpdates = mutableStateMapOf<String, PluginManifest>()
+
+    /** The plugins whose new version is being installed from the rail or the title bar ([startPluginUpdate]). */
+    var updatingPlugins: Set<String> by mutableStateOf(emptySet())
+        private set
+
+    /** Why the last update that [startPluginUpdate] started failed, until the user dismisses it. */
+    var pluginUpdateFailure: PluginUpdateFailure? by mutableStateOf(null)
+
+    // The errors of the watched sources that were logged: each one once.
+    private val watchErrors = HashSet<String>()
 
     var state: KashState by mutableStateOf(
         initial.copy(
@@ -114,12 +157,24 @@ class KashModel(
     /** The unread total of each plugin's service whose script only tells that (`kash.unread.setCount`). */
     private val totals = mutableStateMapOf<ServiceId, Int>()
 
+    // When KaSH saw the unread conversations whose service does not tell their time (UnreadTimes), kept across launches; the services that no
+    // longer exist are forgotten.
+    private val unreadTimesFile = UnreadTimesFile(directories.unreadTimesFile)
+    private val seen = unreadTimesFile.load().filterKeys { id -> initial.services.any { it.id == id } }.toMutableMap()
+
+    // When each service's page was loaded, and when KaSH had last watched the service before: what UnreadTimes.update needs.
+    private val pageLoads = HashMap<ServiceId, Pair<Long, Long?>>()
+    private var unreadTimesSave: Job? = null
+
     /** The services whose cache was just reset, which Settings › Services says until the window is closed. */
     val cacheReset = mutableStateMapOf<ServiceId, Boolean>()
 
     var addServiceOpen by mutableStateOf(false)
     var editing: ServiceId? by mutableStateOf(null)
     var settingsOpen by mutableStateOf(false)
+
+    /** The page that Settings shows when it opens, or goes to while it is open (a notification of a plugin's update); null once it did. */
+    var settingsPage: SettingsPage? by mutableStateOf(null)
     var confirmation: Confirmation? by mutableStateOf(null)
 
     /** Brings the main window to the front: set by the window. */
@@ -128,6 +183,12 @@ class KashModel(
     /** Called with each notification that a page shows (`notification-shim.js`): set by the [Notifier]. */
     var onPageNotification: (Service, JsonObject) -> Unit = { _, _ -> }
 
+    /** Called with the new version of a watched plugin, once per version: set by the [Notifier]. */
+    var onPluginUpdate: (PluginManifest) -> Unit = {}
+
+    /** Called with the id of a plugin that was installed, updated or uninstalled: set by [ServiceIcons], which forgets its icon. */
+    var onPluginChanged: (String) -> Unit = {}
+
     /** Called with the icon that a plugin's script gives its service (`kash.setIcon`), and with [PluginIcon.None] when it is deleted or erased. */
     var onIcon: (ServiceId, PluginIcon) -> Unit = { _, _ -> }
 
@@ -135,6 +196,7 @@ class KashModel(
         // Before the pages load: a site that follows the browser's language shows itself in KaSH's.
         engine.setPageLanguages(PageLanguages.acceptLanguages(language))
         services.filter { it.enabled }.forEach(::load)
+        watchPlugins()
     }
 
     fun service(id: ServiceId): Service? = services.firstOrNull { it.id == id }
@@ -152,13 +214,14 @@ class KashModel(
     private fun load(service: Service) {
         if (service.id in loaded) return
         val profile = engine.profile(directories.profile(service.profile))
-        val tab = profile.openTab(service.url, scriptsFor(service, language))
+        val tab = profile.openTab(service.url, scriptsFor(service, plugins[service.plugin], language))
         tab.setColorScheme(colorScheme)
         val jobs = listOf(
             scope.launch { tab.title.collect { titles[service.id] = it } },
             scope.launch { tab.messages.collect { message -> received(service.id, message) } },
         )
         loaded[service.id] = LoadedService(profile, tab, jobs)
+        pageLoads[service.id] = System.currentTimeMillis() to seen[service.id]?.until
     }
 
     /** A message of a page: a notification, or its unread conversations. */
@@ -206,7 +269,7 @@ class KashModel(
                         dayOnly = conversation["timePrecision"]?.jsonPrimitive?.contentOrNull == "day",
                         topic = topic,
                     )
-                }.also { logger.debug("Unread of {}: {} conversations, {} messages, {} topics", service.title, it.count { c -> !c.topic }, it.sumOf { c -> c.count }, it.count { c -> c.topic }); totals.remove(id) }
+                }.let { read -> withSeenTimes(id, read) }.also { logger.debug("Unread of {}: {} conversations, {} messages, {} topics", service.title, it.count { c -> !c.topic }, it.sumOf { c -> c.count }, it.count { c -> c.topic }); totals.remove(id) }
             } catch (e: Exception) {
                 logger.warn("The unread conversations of {} cannot be read", service.title, e)
                 return
@@ -214,8 +277,45 @@ class KashModel(
         }
     }
 
+    // The conversations [read] of the service [id] with the time when KaSH saw those whose service does not tell it (UnreadTimes), which is saved.
+    private fun withSeenTimes(id: ServiceId, read: List<Conversation>): List<Conversation> {
+        val (loadedAt, watchedUntil) = pageLoads[id] ?: return read
+        val updated = UnreadTimes.update(seen[id] ?: SeenService(), read, System.currentTimeMillis(), loadedAt, watchedUntil)
+        seen[id] = updated
+        saveUnreadTimesLater()
+        return UnreadTimes.withTimes(read, updated)
+    }
+
+    // Writes the unread conversations' times a few seconds after they last changed, off Swing's thread; save() writes them at once.
+    private fun saveUnreadTimesLater() {
+        unreadTimesSave?.cancel()
+        val snapshot = seen.toMap()
+        unreadTimesSave = scope.launch {
+            delay(UNREAD_TIMES_SAVE_MS)
+            withContext(Dispatchers.IO) { saveUnreadTimes(snapshot) }
+        }
+    }
+
+    private fun saveUnreadTimes(services: Map<ServiceId, SeenService>) {
+        try {
+            unreadTimesFile.save(services)
+        } catch (e: Exception) {
+            logger.error("Cannot save the unread conversations' times", e)
+        }
+    }
+
+    // KaSH stops watching the service [id] now (its page is closed, KaSH quits): what comes after came while it did not.
+    private fun stopWatching(id: ServiceId) {
+        seen[id]?.let { seen[id] = it.copy(until = System.currentTimeMillis()) }
+        pageLoads.remove(id)
+    }
+
     /** Closes the page of [id], off Swing's thread (its profile writes its cookies first), then runs [then] on Swing's thread. */
     private fun unload(id: ServiceId, then: () -> Unit = {}) {
+        if (id in loaded) {
+            stopWatching(id)
+            saveUnreadTimesLater()
+        }
         val loadedService = loaded.remove(id)
         titles.remove(id)
         conversations.remove(id)
@@ -236,13 +336,16 @@ class KashModel(
         save()
     }
 
-    /** Writes the state to its file. */
+    /** Writes the state to its file, and when KaSH saw the unread conversations (until now: KaSH is quitting, or may be). */
     fun save() {
         try {
             file.save(state)
         } catch (e: Exception) {
             logger.error("Cannot save the state", e)
         }
+        unreadTimesSave?.cancel()
+        val now = System.currentTimeMillis()
+        saveUnreadTimes(seen.mapValues { (id, service) -> if (id in loaded) service.copy(until = now) else service })
     }
 
     fun select(selection: Selection) = update { it.copy(selection = selection) }
@@ -335,12 +438,17 @@ class KashModel(
         }
         onIcon(id, PluginIcon.None)
         unload(id) { service(id)?.takeIf { it.enabled }?.let(::load) }
+        // Its conversations are the ones of an account that is not logged in any more.
+        seen.remove(id)
+        saveUnreadTimesLater()
     }
 
     /** Deletes the service: its page is closed now, its profile deleted at the next launch. */
     fun delete(id: ServiceId) {
         val service = service(id) ?: return
         unload(id)
+        seen.remove(id)
+        saveUnreadTimesLater()
         onIcon(id, PluginIcon.None)
         update { state ->
             state.copy(
@@ -365,8 +473,127 @@ class KashModel(
         loaded[service.id]?.tab?.execute("window.__kashOpenConversation && window.__kashOpenConversation($quoted)")
     }
 
+    /** Opens Settings on [page]. */
+    fun openSettings(page: SettingsPage) {
+        settingsPage = page
+        settingsOpen = true
+        activateWindow()
+    }
+
+    /** The plugin at [source], read whole off Swing's thread: what the confirmation of its installation shows. */
+    suspend fun readPlugin(source: PluginSource): PluginPackage = withContext(Dispatchers.IO) { installer.read(source) }
+
+    /** Installs [plugin] from [source] (or updates it: the same id): the pages of its services are loaded again, with its new script. */
+    suspend fun installPlugin(plugin: PluginPackage, source: PluginSource, watch: Boolean) {
+        withContext(Dispatchers.IO) { installer.install(plugin, source, watch) }
+        pluginUpdates.remove(plugin.id)
+        pluginsChanged(plugin.id)
+    }
+
+    /** Installs the plugin [id] again from its source: its new version. */
+    suspend fun updatePlugin(id: String) {
+        val entry = installedPlugins.firstOrNull { it.id == id } ?: return
+        val plugin = withContext(Dispatchers.IO) { installer.read(entry.source) }
+        if (plugin.id != id) throw PluginPackageException("Its source now has the plugin '${plugin.id}'")
+        installPlugin(plugin, entry.source, entry.watch)
+    }
+
+    /**
+     * Installs the new version of the plugin [id] (see [pluginUpdates]) without waiting for it: what the rail and the title bar do. Its failure is
+     * [pluginUpdateFailure], and its new version stays offered.
+     */
+    fun startPluginUpdate(id: String) {
+        if (id in updatingPlugins || id !in pluginUpdates) return
+        val name = plugins[id]?.manifest?.name?.of(language) ?: id
+        updatingPlugins = updatingPlugins + id
+        scope.launch {
+            try {
+                updatePlugin(id)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e !is PluginPackageException) logger.warn("The plugin {} could not be updated", id, e)
+                pluginUpdateFailure = PluginUpdateFailure(name, e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName)
+            } finally {
+                updatingPlugins = updatingPlugins - id
+            }
+        }
+    }
+
+    /** Uninstalls the plugin [id]: its services stay, without its script (a service whose plugin KaSH does not have). */
+    suspend fun uninstallPlugin(id: String) {
+        withContext(Dispatchers.IO) { installer.uninstall(id) }
+        pluginUpdates.remove(id)
+        pluginsChanged(id)
+    }
+
+    /** Whether KaSH watches the plugin [id]'s source for a new version. */
+    fun setPluginWatch(id: String, watch: Boolean) {
+        scope.launch {
+            withContext(Dispatchers.IO) { installer.setWatch(id, watch) }
+            installedPlugins = installer.installed
+            if (!watch) pluginUpdates.remove(id)
+        }
+    }
+
+    // The plugin [id] changed: the plugins are read again, its services take their names and addresses from it, and their pages are loaded
+    // again, with its script (or none).
+    private suspend fun pluginsChanged(id: String) {
+        val installed = withContext(Dispatchers.IO) { installer.plugins() }
+        installedPlugins = installer.installed
+        plugins = PluginRegistry(builtInPlugins + installed)
+        onPluginChanged(id)
+        update { state -> state.copy(services = state.services.map { plugins.refresh(it, language) }) }
+        services.filter { it.plugin == id && it.enabled }.forEach { service ->
+            unload(service.id) { service(service.id)?.takeIf { it.enabled }?.let(::load) }
+        }
+    }
+
+    // The watched plugins' sources: a folder every 10 s, an address every hour (and at launch). A new version is offered once.
+    private fun watchPlugins() {
+        scope.launch {
+            while (true) {
+                delay(FOLDER_WATCH_MS)
+                checkPluginUpdates { it is PluginSource.Folder }
+            }
+        }
+        scope.launch {
+            while (true) {
+                checkPluginUpdates { it is PluginSource.Url }
+                delay(ADDRESS_WATCH_MS)
+            }
+        }
+    }
+
+    private suspend fun checkPluginUpdates(of: (PluginSource) -> Boolean) {
+        for (entry in installedPlugins.filter { it.watch && of(it.source) }) {
+            val manifest = try {
+                withContext(Dispatchers.IO) { installer.readManifest(entry.source) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A folder being written, an address that does not answer: the next check may read it.
+                if (watchErrors.add("${entry.id}|${e.message}")) logger.warn("The source of the plugin {} cannot be read: {}", entry.id, e.message)
+                continue
+            }
+            // Read again: it may have been uninstalled, updated or no longer watched meanwhile.
+            val current = installedPlugins.firstOrNull { it.id == entry.id && it.watch } ?: continue
+            if (PluginUpdates.isNewer(current, manifest) && pluginUpdates[entry.id]?.versionCode != manifest.versionCode) {
+                pluginUpdates[entry.id] = manifest
+                logger.info("Plugin {}: version {} ({}) available", entry.id, manifest.version, manifest.versionCode)
+                onPluginUpdate(manifest)
+            }
+        }
+    }
+
     fun close() {
         scope.cancel()
+    }
+
+    private companion object {
+        const val FOLDER_WATCH_MS = 10_000L
+        const val ADDRESS_WATCH_MS = 60 * 60 * 1000L
+        const val UNREAD_TIMES_SAVE_MS = 5_000L
     }
 }
 

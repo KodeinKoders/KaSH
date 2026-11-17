@@ -3,6 +3,7 @@
   "manifestVersion": 1,
   "id": "google-chat",
   "version": "1.0.0",
+  "versionCode": 1,
   "name": "Google Chat",
   "square": { "text": "GC", "color": "#0B7A75" },
   "icon": "icon.png",

@@ -41,16 +41,30 @@ fun ConfirmDialog(confirmation: Confirmation, onConfirm: () -> Unit, onDismiss: 
         is Confirmation.Delete -> strings.delete.removeSuffix("…")
         is Confirmation.Erase -> strings.erase
     }
+    MessageDialog(title, body, onDismiss) {
+        OutlinedButton(onClick = onDismiss) { Text(strings.cancel) }
+        DefaultButton(onClick = onConfirm) { Text(action) }
+    }
+}
+
+/** A failed update of a plugin, which the rail or the title bar started ([KashModel.startPluginUpdate]): its name and why. */
+@Composable
+fun PluginUpdateFailureDialog(failure: PluginUpdateFailure, onDismiss: () -> Unit) {
+    MessageDialog(strings.pluginUpdateFailed(failure.name), failure.message, onDismiss) {
+        DefaultButton(onClick = onDismiss) { Text(strings.ok) }
+    }
+}
+
+// A dialog of its own (not drawn over the page): its title, its text, and its buttons at the bottom right.
+@Composable
+private fun MessageDialog(title: String, body: String, onDismiss: () -> Unit, buttons: @Composable () -> Unit) {
     DialogWindow(onCloseRequest = onDismiss, state = rememberDialogState(size = DpSize(440.dp, 200.dp)), title = title, resizable = false) {
         Box(Modifier.fillMaxSize().background(Kash.colors.panel).padding(20.dp)) {
             Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Text(body, color = Kash.colors.muted)
                 Box(Modifier.weight(1f))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                    OutlinedButton(onClick = onDismiss) { Text(strings.cancel) }
-                    DefaultButton(onClick = onConfirm) { Text(action) }
-                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) { buttons() }
             }
         }
     }

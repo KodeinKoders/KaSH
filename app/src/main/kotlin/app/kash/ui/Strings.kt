@@ -16,6 +16,9 @@ interface Strings {
 
     /** How the Unread tab says when a conversation's last message came. */
     val timeLabel: TimeLabel
+
+    /** What a time of the Unread tab is when KaSH saw the conversation, which came while it was not watching the service, [after] then (null: never). */
+    fun cameWhileClosed(after: String?): String
     val inbox: String
     fun inboxSummary(messages: Int, conversations: Int): String
     fun topicsSummary(topics: Int): String
@@ -160,6 +163,8 @@ interface Strings {
     val skipMuted: String
     val directOnly: String
     val directOnlyHint: String
+    val showApproximateTimes: String
+    val showApproximateTimesHint: String
     fun servicesCount(services: Int, enabled: Int): String
     val enabled: String
     fun actionsFor(title: String): String
@@ -167,10 +172,49 @@ interface Strings {
     val apply: String
     val ok: String
     val noService: String
+    // Settings › Plugins
+    val plugins: String
+    val pluginsHint: String
+    val installZip: String
+    val installFolder: String
+    val installAddress: String
+    val chooseZip: String
+    val chooseFolder: String
+    val builtIn: String
+    fun sourceZip(name: String): String
+    fun sourceFolder(path: String): String
+    fun sourceAddress(address: String): String
+    fun versionCode(code: Int): String
+    val watch: String
+    val watchFolderHint: String
+    val watchAddressHint: String
+    fun updateTo(version: String): String
+    val uninstall: String
+    fun uninstallTitle(name: String): String
+    fun uninstallBody(services: Int): String
+    val pluginAddress: String
+    val pluginAddressHint: String
+    val readPlugin: String
+    val readingPlugin: String
+    fun installTitle(name: String, version: String): String
+    fun replaceTitle(name: String, installed: String, version: String): String
+    val pluginPages: String
+    val install: String
+    val replace: String
+    val pluginError: String
+    fun pluginUpdateTitle(name: String, version: String): String
+    val pluginUpdateBody: String
+    val update: String
+    val updating: String
+    fun updatePlugin(version: String): String
+    fun pluginUpdateFailed(name: String): String
 }
 
 object French : Strings {
     override val code = "fr"
+    override fun cameWhileClosed(after: String?) =
+        if (after == null) "L'heure à laquelle KaSH a reçu ce message, et non celle de son envoi : il était déjà là quand KaSH l'a vu pour la première fois."
+        else "L'heure à laquelle KaSH a reçu ce message, et non celle de son envoi : il est arrivé pendant que KaSH ne surveillait pas ce service, après $after."
     override val timeLabel = TimeLabel(Locale.FRENCH, "HH:mm", "'Hier', HH:mm", "d MMM, HH:mm", "d MMM yyyy, HH:mm", "'Aujourd''hui'", "'Hier'", "d MMM", "d MMM yyyy")
     override val alreadyRunning = "KaSH est déjà ouvert. Quittez-le (⌘Q) avant de le relancer."
     override val inbox = "Non lus"
@@ -316,6 +360,8 @@ object French : Strings {
     override val skipMuted = "Ignorer les services dont les notifications sont coupées"
     override val directOnly = "Uniquement les messages directs et les mentions"
     override val directOnlyHint = "Pour les services dont KaSH lit les conversations, comme WhatsApp."
+    override val showApproximateTimes = "Afficher les heures approximatives"
+    override val showApproximateTimesHint = "Les messages arrivés pendant que KaSH était fermé, pour les services qui ne donnent pas l'heure (Slack, Discord). Sans elles, ils vont en bas de la liste."
     override fun servicesCount(services: Int, enabled: Int) = "$services service${s(services)} · $enabled activé${s(enabled)}"
     override val enabled = "Activé"
     override fun actionsFor(title: String) = "Actions pour $title"
@@ -323,12 +369,53 @@ object French : Strings {
     override val apply = "Appliquer"
     override val ok = "OK"
     override val noService = "Aucun service. Ajoutez-en un avec le bouton + de la barre latérale."
+    override val plugins = "Plugins"
+    override val pluginsHint = "Un plugin ajoute un service au catalogue, et lit ses messages non lus."
+    override val installZip = "Installer un zip…"
+    override val installFolder = "Installer un dossier…"
+    override val installAddress = "Installer depuis une adresse…"
+    override val chooseZip = "Choisir le zip d'un plugin"
+    override val chooseFolder = "Choisir le dossier d'un plugin"
+    override val builtIn = "Intégré à KaSH"
+    override fun sourceZip(name: String) = "Zip : $name"
+    override fun sourceFolder(path: String) = "Dossier : $path"
+    override fun sourceAddress(address: String) = "Adresse : $address"
+    override fun versionCode(code: Int) = "Code de version $code"
+    override val watch = "Surveiller"
+    override val watchFolderHint = "KaSH relit le dossier toutes les 10 secondes, et propose chaque nouvelle version."
+    override val watchAddressHint = "KaSH relit l'adresse toutes les heures, et propose chaque nouvelle version."
+    override fun updateTo(version: String) = "Mettre à jour vers $version"
+    override val uninstall = "Désinstaller…"
+    override fun uninstallTitle(name: String) = "Désinstaller $name ?"
+    override fun uninstallBody(services: Int) = when (services) {
+        0 -> "Aucun service ne l'utilise."
+        else -> "$services service${s(services)} l'utilise${if (services > 1) "nt" else ""} : ${if (services > 1) "ils restent" else "il reste"}, mais KaSH ne lira plus ${if (services > 1) "leurs" else "ses"} messages non lus."
+    }
+    override val pluginAddress = "Adresse du plugin"
+    override val pluginAddressHint = "L'adresse d'un zip, ou d'un manifest.json avec ses fichiers à côté (https)."
+    override val readPlugin = "Continuer"
+    override val readingPlugin = "Lecture du plugin…"
+    override fun installTitle(name: String, version: String) = "Installer $name $version ?"
+    override fun replaceTitle(name: String, installed: String, version: String) = "Remplacer $name $installed par $version ?"
+    override val pluginPages = "Son script s'exécutera dans ces pages, et pourra lire tout ce qu'elles affichent :"
+    override val install = "Installer"
+    override val replace = "Remplacer"
+    override val pluginError = "Ce plugin ne peut pas être installé"
+    override fun pluginUpdateTitle(name: String, version: String) = "$name $version est disponible"
+    override val pluginUpdateBody = "Mettez-le à jour dans Paramètres › Plugins."
+    override val update = "Mettre à jour"
+    override val updating = "Mise à jour…"
+    override fun updatePlugin(version: String) = "Mettre à jour le plugin ($version)"
+    override fun pluginUpdateFailed(name: String) = "$name ne peut pas être mis à jour"
 
     private fun s(count: Int) = if (count > 1) "s" else ""
 }
 
 object English : Strings {
     override val code = "en"
+    override fun cameWhileClosed(after: String?) =
+        if (after == null) "When KaSH received this message, not when it was sent: it was already there when KaSH first saw it."
+        else "When KaSH received this message, not when it was sent: it came while KaSH was not watching this service, after $after."
     override val timeLabel = TimeLabel(Locale.ENGLISH, "h:mm a", "'Yesterday', h:mm a", "MMM d, h:mm a", "MMM d, yyyy, h:mm a", "'Today'", "'Yesterday'", "MMM d", "MMM d, yyyy")
     override val alreadyRunning = "KaSH is already open. Quit it (⌘Q) before launching it again."
     override val inbox = "Unread"
@@ -474,6 +561,8 @@ object English : Strings {
     override val skipMuted = "Ignore the services whose notifications are muted"
     override val directOnly = "Only direct messages and mentions"
     override val directOnlyHint = "For the services whose conversations KaSH reads, such as WhatsApp."
+    override val showApproximateTimes = "Show approximate times"
+    override val showApproximateTimesHint = "The messages that came while KaSH was closed, for the services that do not tell the time (Slack, Discord). Without them, they go to the bottom of the list."
     override fun servicesCount(services: Int, enabled: Int) = "$services service${s(services)} · $enabled enabled"
     override val enabled = "Enabled"
     override fun actionsFor(title: String) = "Actions for $title"
@@ -481,6 +570,45 @@ object English : Strings {
     override val apply = "Apply"
     override val ok = "OK"
     override val noService = "No service. Add one with the + button of the sidebar."
+    override val plugins = "Plugins"
+    override val pluginsHint = "A plugin adds a service to the catalog, and reads its unread messages."
+    override val installZip = "Install a zip…"
+    override val installFolder = "Install a folder…"
+    override val installAddress = "Install from an address…"
+    override val chooseZip = "Choose a plugin's zip"
+    override val chooseFolder = "Choose a plugin's folder"
+    override val builtIn = "Built into KaSH"
+    override fun sourceZip(name: String) = "Zip: $name"
+    override fun sourceFolder(path: String) = "Folder: $path"
+    override fun sourceAddress(address: String) = "Address: $address"
+    override fun versionCode(code: Int) = "Version code $code"
+    override val watch = "Watch"
+    override val watchFolderHint = "KaSH reads the folder again every 10 seconds, and offers each new version."
+    override val watchAddressHint = "KaSH reads the address again every hour, and offers each new version."
+    override fun updateTo(version: String) = "Update to $version"
+    override val uninstall = "Uninstall…"
+    override fun uninstallTitle(name: String) = "Uninstall $name?"
+    override fun uninstallBody(services: Int) = when (services) {
+        0 -> "No service uses it."
+        1 -> "1 service uses it: it stays, but KaSH will no longer read its unread messages."
+        else -> "$services services use it: they stay, but KaSH will no longer read their unread messages."
+    }
+    override val pluginAddress = "Plugin's address"
+    override val pluginAddressHint = "The address of a zip, or of a manifest.json with its files next to it (https)."
+    override val readPlugin = "Continue"
+    override val readingPlugin = "Reading the plugin…"
+    override fun installTitle(name: String, version: String) = "Install $name $version?"
+    override fun replaceTitle(name: String, installed: String, version: String) = "Replace $name $installed with $version?"
+    override val pluginPages = "Its script will run in these pages, and will be able to read everything they show:"
+    override val install = "Install"
+    override val replace = "Replace"
+    override val pluginError = "This plugin cannot be installed"
+    override fun pluginUpdateTitle(name: String, version: String) = "$name $version is available"
+    override val pluginUpdateBody = "Update it in Settings › Plugins."
+    override val update = "Update"
+    override val updating = "Updating…"
+    override fun updatePlugin(version: String) = "Update the plugin ($version)"
+    override fun pluginUpdateFailed(name: String) = "$name cannot be updated"
 
     private fun s(count: Int) = if (count > 1) "s" else ""
 }

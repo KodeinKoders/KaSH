@@ -3,6 +3,7 @@
   "manifestVersion": 1,
   "id": "telegram",
   "version": "1.0.0",
+  "versionCode": 1,
   "name": "Telegram",
   "square": { "text": "TG", "color": "#2AABEE" },
   "icon": "icon.webp",

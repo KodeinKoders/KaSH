@@ -3,6 +3,7 @@
   "manifestVersion": 1,
   "id": "google-messages",
   "version": "1.0.0",
+  "versionCode": 1,
   "name": "Google Messages",
   "square": { "text": "GM", "color": "#0B57D0" },
   "icon": "icon.webp",

@@ -15,6 +15,7 @@ import app.kash.browser.ColorScheme
 import app.kash.core.Inbox
 import app.kash.core.KashDirectories
 import app.kash.core.PageLanguages
+import app.kash.core.Plugin
 import app.kash.core.Service
 import app.kash.core.StateFile
 import app.kash.core.ThemeMode
@@ -79,10 +80,13 @@ fun main() {
     // given by KashModel.
     val engine = BrowserEngine.start(jcefBundle(), directories.profiles, inspectPort(), PageLanguages.locale(stringsOf(state.settings.language).code))
     val shim = resource("notification-shim.js")
-    val plugins = BuiltInPlugins.registry()
+    // The built-in plugins, then those that the user installed (a built-in plugin's id cannot be installed).
+    val builtInPlugins = BuiltInPlugins.plugins()
+    val installer = PluginInstaller(directories, builtInPlugins.map { it.id }.toSet())
+    val installedPlugins = installer.plugins()
     // Every page gets the notifications; a plugin's service also gets its plugin's script, with the API that it reads the page with.
-    val scriptsFor = { service: Service, language: String ->
-        listOf(shim) + listOfNotNull(plugins[service.plugin]?.let { PluginScripts.of(it, service.options, language) })
+    val scriptsFor = { service: Service, plugin: Plugin?, language: String ->
+        listOf(shim) + listOfNotNull(plugin?.let { PluginScripts.of(it, service.options, language) })
     }
     // The main window opens where it was, as big and in the mode it was in when KaSH was closed, on a screen that is still there.
     val windowFile = WindowFile(directories.windowFile)
@@ -90,8 +94,15 @@ fun main() {
     // The pages that are not shown yet are laid out at the window's size, so that their plugins have something to read.
     engine.setHiddenPageSize(geometry.width.toInt(), geometry.height.toInt())
     application {
-        val model = remember { KashModel(state, file, directories, engine, plugins, scriptsFor, initialColorScheme(state.settings.theme)) }
-        val icons = remember { ServiceIcons(directories, model.plugins).also { icons -> model.onIcon = icons::report } }
+        val model = remember {
+            KashModel(state, file, directories, engine, builtInPlugins, installer, installedPlugins, scriptsFor, initialColorScheme(state.settings.theme))
+        }
+        val icons = remember {
+            ServiceIcons(directories) { model.plugins }.also { icons ->
+                model.onIcon = icons::report
+                model.onPluginChanged = icons::forgetPluginIcon
+            }
+        }
         Kash(engine, model, icons, windowFile, geometry, directories.hangs)
     }
 }
@@ -261,6 +272,7 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                     onDismiss = { model.confirmation = null },
                 )
             }
+            model.pluginUpdateFailure?.let { failure -> PluginUpdateFailureDialog(failure, onDismiss = { model.pluginUpdateFailure = null }) }
         }
     }
 }

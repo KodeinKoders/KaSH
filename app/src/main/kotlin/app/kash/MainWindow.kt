@@ -71,7 +71,11 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
         ) {
             if (selected != null) {
                 key(selected.id) {
-                    ServiceButtons(selected, selectedTab, onToggleMute = { model.toggleMute(selected.id) }, actions = serviceActions(model, selected.id))
+                    ServiceButtons(
+                        selected, selectedTab, onToggleMute = { model.toggleMute(selected.id) }, actions = serviceActions(model, selected.id),
+                        update = selected.plugin?.let(model.pluginUpdates::get),
+                        updating = selected.plugin in model.updatingPlugins,
+                    )
                 }
                 Box(Modifier.width(1.dp).height(16.dp).background(Kash.colors.divider))
             }
@@ -93,8 +97,13 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
         onAdd = { model.editing = null; model.addServiceOpen = true },
         onToggleDoNotDisturb = model::toggleDoNotDisturb,
         onSettings = { model.settingsOpen = true },
+        settingsDot = model.pluginUpdates.isNotEmpty(),
+        updates = enabled.filter { it.plugin in model.pluginUpdates }.map { it.id }.toSet(),
         onMove = model::moveNextTo,
-        contextMenu = { service, close -> serviceContextMenu(service, model.loaded[service.id]?.tab, serviceActions(model, service.id), close) },
+        contextMenu = { service, close ->
+            val update = service.plugin?.takeIf { it !in model.updatingPlugins }?.let(model.pluginUpdates::get)
+            serviceContextMenu(service, model.loaded[service.id]?.tab, serviceActions(model, service.id), update, close)
+        },
     )
     val metrics = RailMetrics.of(settings.iconSize)
     val content: @Composable () -> Unit = {
@@ -118,6 +127,7 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
 
 /** What a service's menu does, wherever it is (its header, Settings › Services). */
 fun serviceActions(model: KashModel, id: app.kash.core.ServiceId) = ServiceActions(
+    onUpdatePlugin = { model.service(id)?.plugin?.let(model::startPluginUpdate) },
     onBack = { model.loaded[id]?.tab?.back() },
     onForward = { model.loaded[id]?.tab?.forward() },
     onReload = { model.loaded[id]?.tab?.reload() },

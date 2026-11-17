@@ -1,5 +1,7 @@
 package app.kash
 
+import app.kash.core.PluginManifest
+import app.kash.ui.stringsOf
 import androidx.compose.runtime.mutableStateListOf
 import app.kash.core.NotificationPolicy
 import app.kash.core.NotificationStyle
@@ -29,6 +31,9 @@ private const val TOAST_DURATION_MS = 6_000L
 /** The key of a test notification ([Notifier.test]): no service's. */
 private const val TEST_KEY = "test"
 
+/** The key of the notification of a plugin's new version ([Notifier.pluginUpdate]), followed by the plugin's id. */
+private const val PLUGIN_KEY = "plugin"
+
 /** A notification shown in KaSH's own window ([ToastWindow]): of a service, or a test (no service). */
 data class Toast(val key: String, val service: Service?, val title: String, val body: String)
 
@@ -52,6 +57,19 @@ class Notifier(private val model: KashModel) {
         val system = usesSystem(model.settings)
         logger.info("Notifications are shown {}", if (system) "by the Notification Center" else "in KaSH's own window")
         model.onPageNotification = ::received
+        model.onPluginUpdate = ::pluginUpdate
+    }
+
+    /**
+     * Says that a watched plugin has a new version ([manifest]), which Settings › Plugins installs: KaSH's own notification, as the settings show
+     * one, unless they turn the notifications off or Do Not Disturb is on.
+     */
+    private fun pluginUpdate(manifest: PluginManifest) {
+        val settings = model.settings
+        if (!settings.notifications || settings.doNotDisturb) return
+        val strings = stringsOf(settings.language)
+        val title = strings.pluginUpdateTitle(manifest.name.of(strings.code), manifest.version)
+        show("$PLUGIN_KEY|${manifest.id}", null, title, "KaSH", strings.pluginUpdateBody, settings.sound, usesSystem(settings))
     }
 
     /** Whether a notification goes to the Notification Center with [settings]: they say so, and KaSH is an application bundle (KaSH.app). */
@@ -107,6 +125,8 @@ class Notifier(private val model: KashModel) {
         val serviceId = key.substringBefore('|')
         // A test notification is no service's: KaSH comes to the front, as a click on a notification brings it.
         if (serviceId == TEST_KEY) return model.activateWindow()
+        // A plugin's new version: Settings › Plugins, which installs it.
+        if (serviceId == PLUGIN_KEY) return model.openSettings(SettingsPage.PLUGINS)
         val notificationId = key.substringAfter('|')
         val service = model.service(ServiceId(serviceId)) ?: return
         model.show(service)

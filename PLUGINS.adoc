@@ -9,11 +9,9 @@
 [.lead]
 A plugin teaches KaSH a messaging service: where it is, what to ask the user when they add it, and how to read its unread conversations.
 
-Every service that KaSH knows is a plugin: WhatsApp, Google Chat and Slack are the built-in ones, in `app/src/main/resources/app/kash/plugins/`.
+Every service that KaSH knows is a plugin: WhatsApp, Google Chat, Slack, Google Messages, Telegram and Discord are the built-in ones, in `app/src/main/resources/app/kash/plugins/`.
+The user installs others in Settings › Plugins, from a zip, a folder or an address (see <<installing-a-plugin>>).
 A web application that the user adds by its address is not a plugin: it has no options and no script, and KaSH reads its unread count from its page's title (`(3) My application`).
-
-NOTE: KaSH only loads its built-in plugins for now.
-The format is meant for plugins that the user installs too, which a later version will load.
 
 
 == What a plugin is
@@ -97,7 +95,12 @@ It also refuses a field that it does not know, which is most often a typo.
 
 | `version`
 | yes
-| The plugin's own version, which its script is given (`kash.plugin.version`).
+| The plugin's own version, as KaSH shows it and its script is given it (`kash.plugin.version`): any text (`1.2.0`, `2026-11-17`).
+
+| `versionCode`
+| yes
+| What tells a newer version: an integer, at least 1, that each version makes greater, as Android's.
+KaSH offers an update when the source of an installed plugin has a greater one, whatever its `version` says.
 
 | `name`
 | yes
@@ -345,6 +348,7 @@ Its `count` and its `mention` are ignored.
 | `time`
 | no
 | When its last message came, in milliseconds since the epoch. `null` by default.
+Without it, KaSH shows when it saw the conversation unread, or saw its `count` grow, which it keeps across its launches; one that came while KaSH was closed shows when KaSH saw it at its launch, after a small clock.
 
 | `timePrecision`
 | no
@@ -490,3 +494,40 @@ Rules that every plugin follows:
 
 To add a built-in plugin, put its folder in `app/src/main/resources/app/kash/plugins/` and its id in `index.json`.
 The build's tests check that every built-in plugin is listed, valid, and has its script.
+
+
+[#installing-a-plugin]
+== Installing a plugin
+
+The user installs a plugin in Settings › Plugins, in one of three ways.
+In each one, KaSH copies the plugin's files into a folder of its own (`plugins/<id>/` in its support directory), and the plugin is in the catalog of the Add service window from then on.
+
+[cols="1,4"]
+|===
+| From | What KaSH does
+
+| A zip
+| It copies its files once.
+The plugin's folder is the zip's root, or the zip's only folder (a folder that the Finder zipped).
+
+| A folder
+| It copies its files, and may watch the folder: it reads its `manifest.json` again every 10 seconds.
+
+| An address
+| It downloads the plugin, and may watch the address: it reads it again every hour.
+The address is the one of a zip, or of a `manifest.json`, whose script and icon are then downloaded next to it (resolved against its address).
+It is an `https` address, or an `http` one of the same machine (`http://localhost:8000/manifest.json`, to try a plugin as it is written).
+|===
+
+When a watched source has a greater `versionCode`, KaSH says so once (a notification, a dot on the settings' button), and Settings › Plugins offers to update the plugin: KaSH installs it again from its source, and loads the pages of its services again, with its new script.
+A plugin is updated when its `versionCode` grows: a folder whose files change without it is not.
+
+What KaSH refuses:
+
+* the id of a built-in plugin;
+* a file whose name leaves the plugin's folder (`../`, an absolute path);
+* more than 200 files, or more than 10 MB;
+* a manifest that is not valid, or that names a script or an icon that is not there.
+
+Before it installs a plugin, KaSH shows the pages where its script runs (`matches`): it can read everything that they show.
+Uninstalling a plugin keeps the services of the plugin, without its script: KaSH no longer reads their unread conversations.

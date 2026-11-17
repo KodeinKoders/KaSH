@@ -3,6 +3,7 @@
   "manifestVersion": 1,
   "id": "slack",
   "version": "1.0.0",
+  "versionCode": 1,
   "name": "Slack",
   "square": { "text": "Sl", "color": "#5B2C6F" },
   "icon": "icon.webp",

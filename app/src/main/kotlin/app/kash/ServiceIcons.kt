@@ -51,7 +51,10 @@ private val logger = LoggerFactory.getLogger(ServiceIcons::class.java)
  * icons ([ServiceIcon.Favicon]), both kept on disk, and the images that the user chose ([ServiceIcon.Image]). They are read off Swing's thread;
  * until they are there, a tile shows the service's square.
  */
-class ServiceIcons(private val directories: KashDirectories, val plugins: PluginRegistry) {
+class ServiceIcons(private val directories: KashDirectories, private val registry: () -> PluginRegistry) {
+    /** The plugins of KaSH, as they are now (they change when one is installed, updated or uninstalled). */
+    val plugins: PluginRegistry get() = registry()
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val favicons = mutableStateMapOf<String, ImageBitmap>()
     private val images = mutableStateMapOf<String, ImageBitmap>()
@@ -82,6 +85,11 @@ class ServiceIcons(private val directories: KashDirectories, val plugins: Plugin
         return pluginIcons.getOrPut(plugin.id) {
             plugin.icon?.let(::decode).also { if (it == null && plugin.icon != null) logger.warn("The icon of the plugin {} cannot be drawn", plugin.id) }
         }
+    }
+
+    /** Forgets the decoded icon of the plugin [id], which was installed, updated or uninstalled. */
+    fun forgetPluginIcon(id: String) {
+        pluginIcons.remove(id)
     }
 
     /** The image that the script of the service [id] gave, kept from a launch to the next; null while it is read, or when it gave none. */

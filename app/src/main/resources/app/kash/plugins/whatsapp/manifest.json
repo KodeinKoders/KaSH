@@ -3,6 +3,7 @@
   "manifestVersion": 1,
   "id": "whatsapp",
   "version": "1.0.0",
+  "versionCode": 1,
   "name": "WhatsApp",
   "square": { "text": "WA", "color": "#1A7F4B" },
   "icon": "icon.webp",

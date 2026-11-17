@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -35,6 +36,7 @@ import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -91,6 +93,10 @@ class RailModel(
     val onAdd: () -> Unit,
     val onToggleDoNotDisturb: () -> Unit,
     val onSettings: () -> Unit,
+    /** Whether a dot on the settings' button says that something waits there: a plugin's new version. */
+    val settingsDot: Boolean = false,
+    /** The services whose plugin has a new version: an arrow at the bottom left of their tiles. */
+    val updates: Set<ServiceId> = emptySet(),
     /** Moves a service past its neighbor in the rail (a tile dragged over it): see [KashModel.moveNextTo]. */
     val onMove: (ServiceId, ServiceId) -> Unit,
     /** The items of a service's context menu (a right click on its tile), which the function given closes. */
@@ -136,6 +142,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
                     selected = model.selection == Selection.OfService(service.id),
                     label = service.label,
                     badge = if (count > 0) UnreadCount.badge(count) else null,
+                    update = service.id in model.updates,
                     description = strings.serviceTileLabel(service.title, count),
                     side = side,
                     metrics = metrics,
@@ -164,7 +171,10 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
             if (model.doNotDisturb) KashIcons.BellOff else KashIcons.Bell, strings.doNotDisturb, model.onToggleDoNotDisturb,
             size = 44.dp, iconSize = 20.dp, tint = if (model.doNotDisturb) Kash.colors.text else Kash.colors.muted,
         )
-        IconOnlyButton(KashIcons.Settings, strings.settings, model.onSettings, size = 44.dp, iconSize = 20.dp)
+        Box {
+            IconOnlyButton(KashIcons.Settings, strings.settings, model.onSettings, size = 44.dp, iconSize = 20.dp)
+            if (model.settingsDot) Box(Modifier.align(Alignment.TopEnd).padding(9.dp).size(7.dp).background(Kash.colors.accent, CircleShape))
+        }
     }
     menu?.let { (id, anchor) ->
         val service = model.services.firstOrNull { it.id == id }
@@ -237,7 +247,7 @@ private fun Modifier.onContextClick(onContextClick: () -> Unit): Modifier = onPo
 
 /**
  * A tile of the rail: the selection's indicator on the edge next to the content, and its ring around the tile; the label under it; the unread
- * badge over its top right corner.
+ * badge over its top right corner, and an arrow over its bottom left one when its plugin has a new version ([update]).
  */
 @Composable
 private fun RailItem(
@@ -245,6 +255,7 @@ private fun RailItem(
     selected: Boolean,
     label: String,
     badge: String?,
+    update: Boolean = false,
     description: String,
     side: RailSide,
     metrics: RailMetrics,
@@ -277,6 +288,15 @@ private fun RailItem(
                 if (badge != null) {
                     // Over the tile's top right corner, as in the design: 14 dp inside its right edge, 4 dp above its top.
                     UnreadBadge(badge, Kash.colors.panel, Modifier.offset(x = 4.dp + metrics.tile - 14.dp, y = 0.dp))
+                }
+                if (update) {
+                    // Over the tile's bottom left corner, as the badge over its top right one: 4 dp out of the tile.
+                    Box(
+                        Modifier.align(Alignment.BottomStart).size(16.dp)
+                            .background(Kash.colors.accent, CircleShape)
+                            .border(2.dp, Kash.colors.panel, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) { KashIcon(KashIcons.ArrowUp, Color.White, size = 9.dp) }
                 }
             }
             if (showLabel && label.isNotBlank()) {

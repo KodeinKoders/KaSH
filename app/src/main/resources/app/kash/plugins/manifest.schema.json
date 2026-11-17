@@ -4,7 +4,7 @@
   "description": "The manifest of a KaSH plugin (manifest.json): what the plugin is, its options, the address of its services, and its script. See PLUGINS.adoc.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["manifestVersion", "id", "version", "name", "square", "url", "matches", "script"],
+  "required": ["manifestVersion", "id", "version", "versionCode", "name", "square", "url", "matches", "script"],
   "properties": {
     "$schema": {
       "description": "The JSON Schema that editors check the file with. KaSH does not read it.",
@@ -20,10 +20,15 @@
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
     },
     "version": {
-      "description": "The plugin's own version, given to its script (kash.plugin.version).",
+      "description": "The plugin's own version, as it is shown and given to its script (kash.plugin.version): any text.",
       "type": "string",
       "minLength": 1,
       "pattern": "\\S"
+    },
+    "versionCode": {
+      "description": "What tells a newer version: an integer that each version makes greater (as Android's). KaSH proposes an update when it sees a greater one.",
+      "type": "integer",
+      "minimum": 1
     },
     "name": {
       "description": "The name of the plugin's services.",

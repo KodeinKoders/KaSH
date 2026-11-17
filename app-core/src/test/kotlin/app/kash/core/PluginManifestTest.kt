@@ -13,6 +13,7 @@ class PluginManifestTest {
           "manifestVersion": 1,
           "id": "slack",
           "version": "1.0.0",
+          "versionCode": 3,
           "name": "Slack",
           "description": {"en": "One workspace", "fr": "Un espace de travail"},
           "square": {"text": "Sl", "color": "#5B2C6F"},
@@ -72,6 +73,10 @@ class PluginManifestTest {
         refused("manifestVersion", slackWith("\"manifestVersion\": 1", "\"manifestVersion\": 2"))
         refused("id", slackWith("\"id\": \"slack\"", "\"id\": \"Slack App\""))
         refused("version", slackWith("\"version\": \"1.0.0\"", "\"version\": \" \""))
+        refused("versionCode", slackWith("\"versionCode\": 3", "\"versionCode\": 0"))
+        refused("versionCode", slackWith("\"versionCode\": 3", "\"versionCode\": -2"))
+        // Without it: the file is not a manifest.
+        refused("", slackWith("\"versionCode\": 3,", ""))
         refused("name", slackWith("\"name\": \"Slack\"", "\"name\": {}"))
         refused("name.en", slackWith("\"name\": \"Slack\"", "\"name\": \"\""))
     }
