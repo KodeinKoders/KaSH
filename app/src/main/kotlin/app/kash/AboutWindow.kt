@@ -42,6 +42,7 @@ import org.jetbrains.jewel.window.DecoratedWindow
 import org.jetbrains.jewel.window.TitleBar
 import org.slf4j.LoggerFactory
 import java.awt.Desktop
+import java.awt.EventQueue
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -87,6 +88,21 @@ internal fun takeAboutItem(onAbout: () -> Unit) {
         }
     } catch (e: Throwable) {
         logger.warn("Could not take the About item of the application menu", e)
+    }
+}
+
+/**
+ * Makes the Settings item of the application menu of macOS (⌘, there), after the About item, call [onSettings], which opens Settings, as KaTTY's
+ * does. Nothing is done elsewhere, and a failure leaves the item disabled, as it was.
+ */
+internal fun takeSettingsItem(onSettings: () -> Unit) {
+    if (!System.getProperty("os.name").startsWith("Mac")) return
+    try {
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_PREFERENCES)) {
+            Desktop.getDesktop().setPreferencesHandler { EventQueue.invokeLater(onSettings) }
+        }
+    } catch (e: Throwable) {
+        logger.warn("Could not take the Settings item of the application menu", e)
     }
 }
 

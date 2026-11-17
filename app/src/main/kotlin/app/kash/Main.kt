@@ -208,6 +208,11 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
         takeAboutItem { java.awt.EventQueue.invokeLater { model.aboutOpen = true } }
         onDispose { }
     }
+    // Settings, from the Settings item of the application menu of macOS (⌘,), as the rail's gear opens it.
+    DisposableEffect(Unit) {
+        takeSettingsItem { model.settingsOpen = true }
+        onDispose { }
+    }
 
     val settings = model.state.settings
     val systemDark by rememberSystemDark(follow = settings.theme == ThemeMode.SYSTEM)
