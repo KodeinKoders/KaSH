@@ -10,7 +10,7 @@
 //
 // A direct message counts, with its badge. A server with unread messages is a topic (the user's choice), whether the user is mentioned in it (its
 // badge) or not (its pill): the column tells neither which of its channels nor how many messages. The column has no time nor preview. Its
-// servers and direct messages are also the search's topics and contacts (`kash.contacts`).
+// servers and direct messages are also the search's topics and contacts (`kash.contacts`), with the list of every direct message of `/channels/@me`.
 //
 // Not seen yet when it was written: a group direct message (its image is not a user's avatar), a closed folder of servers (whose servers may not
 // be in the page, and whose badge is the folder's), a muted server (Discord gives it no pill; its mentions keep their badge).
@@ -72,13 +72,35 @@ kash.watch(() => {
     return conversations;
 });
 
-// The servers of the column and its direct messages, which the search lists: every server (in an open folder), and the direct messages that it
-// shows, those with unread ones; once seen, KaSH keeps them. Not yet the list of the direct messages of `/channels/@me`, which has them all
-// while it is shown: it was not inspected yet.
+// The list of the direct messages of `/channels/@me` (`data-list-id="private-channels-uid_…"`), there only while that page is shown: each one is
+// a link to `/channels/@me/<id>`, whose `data-list-item-id` ends with its id (the list's other entries are Friends, Nitro, the shop…). A
+// virtual list: only the rows that fit are rendered.
+const directMessageRows = () =>
+    [...document.querySelectorAll('[data-list-id^="private-channels"] a[data-list-item-id][href^="/channels/@me/"]')]
+        .filter((row) => /___\d+$/.test(row.getAttribute('data-list-item-id')));
+
+const directMessageId = (row) => row.getAttribute('data-list-item-id').split('___').pop();
+
+// The name of a direct message of the list: its name's text, without the tag of a server that a user may show next to it (a "chiplet") nor what
+// is only read to screen readers. A display name with a style of its own has it in an element of its own.
+const directMessageName = (row) => {
+    const box = row.querySelector('[class*="name_"] [class*="overflow_"]') || row.querySelector('[class*="name_"]');
+    if (!box) return '';
+    const copy = box.cloneNode(true);
+    copy.querySelectorAll('[class*="chiplet"], [class*="hiddenVisually_"]').forEach((element) => element.remove());
+    return kash.dom.text(copy);
+};
+
+// The servers of the column and the direct messages, which the search lists: every server (in an open folder), the direct messages that the
+// column shows (those with unread ones), and those of the list of `/channels/@me` while it is shown; once seen, KaSH keeps them. A group's image is
+// its members' (no `avatarStack_`, which a person's has, with their status).
 kash.contacts.watch(() => {
     const nav = column();
     if (!nav) return null;
     const contacts = [];
+    for (const row of directMessageRows()) {
+        contacts.push({ id: `@me/${directMessageId(row)}`, name: directMessageName(row), kind: row.querySelector('[class*="avatarStack_"]') ? 'direct' : 'group' });
+    }
     for (const entry of nav.querySelectorAll('[class*="listItem_"]')) {
         const item = entry.querySelector(`[data-list-item-id^="${ENTRY_PREFIX}"]`);
         if (!item) continue;
@@ -100,7 +122,8 @@ kash.contacts.watch(() => {
 kash.onOpenConversation((id) => {
     // Its entry of the column, clicked as the user would: Discord shows it without loading the page again.
     const entryId = id.startsWith('@me/') ? id.slice(4) : id;
-    const item = column()?.querySelector(`[data-list-item-id="${ENTRY_PREFIX}${CSS.escape(entryId)}"]`);
+    const item = column()?.querySelector(`[data-list-item-id="${ENTRY_PREFIX}${CSS.escape(entryId)}"]`)
+        || (id.startsWith('@me/') ? directMessageRows().find((row) => directMessageId(row) === entryId) : null);
     if (item) {
         item.click();
         return;
