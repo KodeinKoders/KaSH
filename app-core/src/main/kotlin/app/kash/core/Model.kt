@@ -94,6 +94,8 @@ public data class Service(
     val desktopNotifications: Boolean = true,
     val muted: Boolean = false,
     val icon: ServiceIcon = ServiceIcon.Favicon,
+    // Its own ranges of Do Not Disturb, when its notifications are not shown (DoNotDisturb.isQuiet).
+    val quietHours: List<QuietRange> = emptyList(),
 ) {
     /** The name with its label: `WhatsApp · Perso`. */
     val title: String get() = if (label.isBlank()) name else "$name · $label"
@@ -164,6 +166,9 @@ public data class Settings(
     val directOnly: Boolean = false,
     val showApproximateTimes: Boolean = true,
     val doNotDisturb: Boolean = false,
+    // The ranges of Do Not Disturb (DoNotDisturb), and until when the rail's bell resumed the one going on (a local date and time, ISO).
+    val quietHours: List<QuietRange> = emptyList(),
+    val quietResumedUntil: String? = null,
 )
 
 /** What is selected in the rail: the Unread tab, or a service. */

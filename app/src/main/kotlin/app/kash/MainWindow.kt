@@ -79,7 +79,8 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
                 }
                 Box(Modifier.width(1.dp).height(16.dp).background(Kash.colors.divider))
             }
-            if (settings.doNotDisturb) Chip(strings.doNotDisturb, height = 22.dp)
+            // The switch, or a range of the settings (until when it ends).
+            if (model.doNotDisturb) Chip(model.doNotDisturbUntil?.let { strings.doNotDisturbUntil(untilLabel(it)) } ?: strings.doNotDisturb, height = 22.dp)
             ThemeMenu(settings.theme, systemDark) { mode -> model.updateSettings { it.copy(theme = mode) } }
         }
         // Last: Jewel's title bar measures its children in their order and leaves out those that do not fit, and in a narrow window the field is
@@ -95,7 +96,8 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
         inboxCount = Inbox.sections(rows, model.priorities).count,
         showBadges = settings.showBadges,
         showLabels = settings.showLabels,
-        doNotDisturb = settings.doNotDisturb,
+        doNotDisturb = model.doNotDisturb,
+        doNotDisturbLabel = model.doNotDisturbUntil?.let { strings.doNotDisturbUntil(untilLabel(it)) } ?: strings.doNotDisturb,
         onSelect = model::select,
         onAdd = { model.editing = null; model.addServiceOpen = true },
         onToggleDoNotDisturb = model::toggleDoNotDisturb,
@@ -197,3 +199,8 @@ private fun modeIcon(mode: ThemeMode) = when (mode) {
     ThemeMode.DARK -> KashIcons.Moon
     ThemeMode.SYSTEM -> KashIcons.Monitor
 }
+
+/** When a range of Do Not Disturb ends, as the Unread tab writes a time: the time today, the day and the time another day. */
+@Composable
+private fun untilLabel(end: java.time.LocalDateTime): String =
+    strings.timeLabel.of(end.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli())

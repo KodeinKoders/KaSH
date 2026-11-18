@@ -49,6 +49,8 @@ import app.kash.core.WebApplications
 import app.kash.ui.FieldLabel
 import app.kash.ui.Hint
 import app.kash.ui.Kash
+import app.kash.ui.SectionTitle
+import app.kash.ui.QuietHoursEditor
 import app.kash.ui.KashIcon
 import app.kash.ui.KashIcons
 import app.kash.ui.strings
@@ -97,6 +99,7 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     var showBadge by remember { mutableStateOf(editing?.showBadge ?: true) }
     var includeInInbox by remember { mutableStateOf(editing?.includeInInbox ?: true) }
     var notifications by remember { mutableStateOf(editing?.desktopNotifications ?: true) }
+    var quietHours by remember { mutableStateOf(editing?.quietHours.orEmpty()) }
     val icon = editing?.icon
     // A new service of a plugin that has an icon takes it.
     var iconMode by remember {
@@ -157,16 +160,21 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
     Column(Modifier.fillMaxSize().background(Kash.colors.panel)) {
         VerticallyScrollableContainer(Modifier.weight(1f), scrollState = rememberScrollState()) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-                // The catalog: the plugins, then a web application. A service that is edited keeps its plugin.
+                // The catalog: the plugins, then a web application. A service that is edited keeps its plugin: only its own tile is shown,
+                // which cannot be picked (the user's choice: the others, grayed out, looked like they could).
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(strings.service, fontWeight = FontWeight.SemiBold)
-                    val tiles: List<Pair<String?, String>> = plugins.all.map { it.id to it.manifest.name.of(language) } + (null to strings.custom)
+                    val tiles: List<Pair<String?, String>> = if (editing != null) {
+                        listOf(editing.plugin to (plugins[editing.plugin]?.manifest?.name?.of(language) ?: if (editing.plugin == null) strings.custom else editing.name))
+                    } else {
+                        plugins.all.map { it.id to it.manifest.name.of(language) } + (null to strings.custom)
+                    }
                     for (row in tiles.chunked(3)) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             for ((tilePlugin, tileName) in row) {
                                 CatalogTile(
                                     content = if (tilePlugin == null) null else tileContent(tilePlugin, "", ServiceIcon.Plugin, icons), name = tileName,
-                                    selected = pluginId == tilePlugin, enabled = editing == null || editing.plugin == tilePlugin, modifier = Modifier.weight(1f),
+                                    selected = pluginId == tilePlugin, enabled = editing == null, modifier = Modifier.weight(1f),
                                 ) {
                                     // The icon of the plugin picked, when it has one; the site's otherwise.
                                     val picked = plugins[tilePlugin]
@@ -210,6 +218,14 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                             CheckboxRow(strings.showBadge, showBadge, { showBadge = it })
                             CheckboxRow(strings.includeInInbox, includeInInbox, { includeInInbox = it })
                             CheckboxRow(strings.desktopNotifications, notifications, { notifications = it })
+                        }
+                    }
+                    // Its own hours of Do Not Disturb, when its notifications are on.
+                    if (notifications) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SectionTitle(strings.quietHours)
+                            Hint(strings.serviceQuietHoursHint)
+                            QuietHoursEditor(quietHours) { quietHours = it }
                         }
                     }
                 }
@@ -271,6 +287,7 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                         showBadge = showBadge,
                         includeInInbox = includeInInbox,
                         desktopNotifications = notifications,
+                        quietHours = quietHours,
                         icon = draftIcon,
                     )
                     onDone(service)
@@ -348,7 +365,7 @@ private fun CatalogTile(content: TileContent?, name: String, selected: Boolean, 
                 KashIcon(KashIcons.Plus, Kash.colors.text)
             }
         }
-        Text(name, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, color = if (enabled) Kash.colors.text else Kash.colors.faint)
+        Text(name, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, color = if (enabled || selected) Kash.colors.text else Kash.colors.faint)
     }
 }
 

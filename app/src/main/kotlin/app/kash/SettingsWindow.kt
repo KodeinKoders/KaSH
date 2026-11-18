@@ -66,6 +66,7 @@ import app.kash.macos.NotificationAlertStyle
 import app.kash.macos.NotificationAuthorization
 import app.kash.macos.inAppBundle
 import app.kash.ui.Hint
+import app.kash.ui.QuietHoursEditor
 import app.kash.ui.IconOnlyButton
 import app.kash.ui.Kash
 import app.kash.ui.LocalAwtWindow
@@ -103,7 +104,7 @@ private fun Strings.page(page: SettingsPage): Pair<String, List<String>> = when 
     SettingsPage.NOTIFICATIONS -> notifications to listOf(
         alerts, desktopNotifications, playSound, notificationStyle, kashNotifications, systemNotifications, sendTestNotification,
         notificationDuration, temporaryNotifications, permanentNotifications,
-        priorityContacts, priorityContactsHint, dockBadge, dockTotal, dockDot, dockNone, doNotDisturb,
+        quietHours, quietHoursHint, addQuietRange, priorityContacts, priorityContactsHint, dockBadge, dockTotal, dockDot, dockNone, doNotDisturb,
     )
     SettingsPage.INBOX -> inboxTab to listOf(display, defaultSort, openInboxOnLaunch, showApproximateTimes, content, skipMuted, directOnly)
     SettingsPage.SERVICES -> services to listOf(enabled, edit, resetCache, eraseData, delete, addService)
@@ -415,6 +416,11 @@ private fun NotificationsPage(draft: Settings, notifier: Notifier, model: KashMo
             Hint(strings.systemDurationHint)
             OutlinedButton(onClick = ::openSystemNotificationSettings, modifier = Modifier.padding(top = 4.dp)) { Text(strings.openSystemNotificationSettings) }
         }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle(strings.quietHours)
+        Hint(strings.quietHoursHint)
+        QuietHoursEditor(draft.quietHours) { onChange(draft.copy(quietHours = it)) }
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(strings.priorityContacts)

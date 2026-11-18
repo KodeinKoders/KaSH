@@ -115,7 +115,7 @@ class Notifier(private val model: KashModel) {
      */
     private fun pluginUpdate(manifest: PluginManifest) {
         val settings = model.settings
-        if (!settings.notifications || settings.doNotDisturb) return
+        if (!settings.notifications || model.doNotDisturb) return
         val strings = stringsOf(settings.language)
         val title = strings.pluginUpdateTitle(manifest.name.of(strings.code), manifest.version)
         show("$PLUGIN_KEY|${manifest.id}", null, title, "KaSH", strings.pluginUpdateBody, settings.sound, usesSystem(settings), settings.notificationDuration)
@@ -150,7 +150,7 @@ class Notifier(private val model: KashModel) {
         // A priority contact's goes through Do Not Disturb and the service's mute (the user's choice).
         val conversation = NotificationGroups.conversationOf(model.unread[service.id]?.conversations.orEmpty(), title.ifBlank { service.title })
         val priority = Priorities.isNotification(model.priorities, service.id, title.ifBlank { service.title }, conversation?.id)
-        val decision = NotificationPolicy.decide(model.settings, service, priority)
+        val decision = NotificationPolicy.decide(model.settings, service, priority, java.time.LocalDateTime.now())
         // Never what the notification says: it is the user's messages.
         logger.debug("Notification of {}: {}", service.title, decision)
         if (!decision.show) return

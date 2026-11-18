@@ -89,6 +89,8 @@ class RailModel(
     val showBadges: Boolean,
     val showLabels: Boolean,
     val doNotDisturb: Boolean,
+    // What the bell says: Do Not Disturb, until when during a range of it.
+    val doNotDisturbLabel: String = "",
     val onSelect: (Selection) -> Unit,
     val onAdd: () -> Unit,
     val onToggleDoNotDisturb: () -> Unit,
@@ -168,7 +170,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
     }
     val buttons: @Composable () -> Unit = {
         IconOnlyButton(
-            if (model.doNotDisturb) KashIcons.BellOff else KashIcons.Bell, strings.doNotDisturb, model.onToggleDoNotDisturb,
+            if (model.doNotDisturb) KashIcons.BellOff else KashIcons.Bell, model.doNotDisturbLabel.ifEmpty { strings.doNotDisturb }, model.onToggleDoNotDisturb,
             size = 44.dp, iconSize = 20.dp, tint = if (model.doNotDisturb) Kash.colors.text else Kash.colors.muted,
         )
         Box {

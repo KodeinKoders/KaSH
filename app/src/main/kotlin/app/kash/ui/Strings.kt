@@ -36,6 +36,18 @@ interface Strings {
     fun open(name: String): String
     fun noResults(query: String): String
 
+    // Do Not Disturb's hours
+    val quietHours: String
+    val quietHoursHint: String
+    val serviceQuietHoursHint: String
+    val quietFrom: String
+    val quietTo: String
+    val addQuietRange: String
+    val removeQuietRange: String
+    val quietRangeHelp: String
+    val dayLetters: List<String>
+    val dayNames: List<String>
+
     // Priority contacts
     val prioritySection: String
     val markPriority: String
@@ -74,6 +86,7 @@ interface Strings {
     val unnamedGroup: String
     val unnamedConversation: String
     val doNotDisturb: String
+    fun doNotDisturbUntil(time: String): String
     val theme: String
     val light: String
     val dark: String
@@ -275,6 +288,16 @@ object French : Strings {
     override val byService = "Par service"
     override fun open(name: String) = "Ouvrir $name"
     override fun noResults(query: String) = "Aucune conversation non lue ne correspond à « $query »."
+    override val quietHours = "Horaires de Ne pas déranger"
+    override val quietHoursHint = "Ne pas déranger se met en route à ces heures. Pendant une plage, la cloche du rail le lève jusqu'à la fin de la plage."
+    override val serviceQuietHoursHint = "À ces heures, les notifications de ce service ne s'affichent pas, sauf celles des contacts prioritaires."
+    override val quietFrom = "de"
+    override val quietTo = "à"
+    override val addQuietRange = "Ajouter une plage"
+    override val removeQuietRange = "Supprimer la plage"
+    override val quietRangeHelp = "Une plage qui finit avant de commencer se termine le lendemain ; la même heure au début et à la fin, c'est toute la journée."
+    override val dayLetters = listOf("L", "M", "M", "J", "V", "S", "D")
+    override val dayNames = listOf("Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche")
     override val prioritySection = "Prioritaires"
     override val markPriority = "Marquer comme prioritaire"
     override val unmarkPriority = "Retirer des prioritaires"
@@ -308,6 +331,7 @@ object French : Strings {
     override val unnamedGroup = "Groupe sans nom"
     override val unnamedConversation = "Sans nom"
     override val doNotDisturb = "Ne pas déranger"
+    override fun doNotDisturbUntil(time: String) = "Ne pas déranger jusqu'à $time"
     override val theme = "Thème"
     override val light = "Clair"
     override val dark = "Sombre"
@@ -514,6 +538,16 @@ object English : Strings {
     override val byService = "By service"
     override fun open(name: String) = "Open $name"
     override fun noResults(query: String) = "No unread conversation matches “$query”."
+    override val quietHours = "Do Not Disturb hours"
+    override val quietHoursHint = "Do Not Disturb turns on at these hours. During a range, the rail's bell lifts it until the range ends."
+    override val serviceQuietHoursHint = "At these hours, this service's notifications are not shown, but the priority contacts'."
+    override val quietFrom = "from"
+    override val quietTo = "to"
+    override val addQuietRange = "Add a range"
+    override val removeQuietRange = "Remove the range"
+    override val quietRangeHelp = "A range that ends before it starts ends the next day; the same time at its start and its end is the whole day."
+    override val dayLetters = listOf("M", "T", "W", "T", "F", "S", "S")
+    override val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
     override val prioritySection = "Priority"
     override val markPriority = "Mark as priority"
     override val unmarkPriority = "Remove from priority"
@@ -547,6 +581,7 @@ object English : Strings {
     override val unnamedGroup = "Unnamed group"
     override val unnamedConversation = "Unnamed"
     override val doNotDisturb = "Do not disturb"
+    override fun doNotDisturbUntil(time: String) = "Do not disturb until $time"
     override val theme = "Theme"
     override val light = "Light"
     override val dark = "Dark"

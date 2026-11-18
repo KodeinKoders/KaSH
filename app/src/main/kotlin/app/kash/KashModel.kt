@@ -13,6 +13,7 @@ import app.kash.core.Contact
 import app.kash.core.Conversation
 import app.kash.core.ConversationKind
 import app.kash.core.Directory
+import app.kash.core.DoNotDisturb
 import app.kash.core.DirectoryFile
 import app.kash.core.KashDirectories
 import app.kash.core.KashState
@@ -46,6 +47,7 @@ import app.kash.ui.stringsOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -247,6 +249,13 @@ class KashModel(
         engine.setPageLanguages(PageLanguages.acceptLanguages(language))
         services.filter { it.enabled }.forEach(::load)
         watchPlugins()
+        // Each minute, at its start: the ranges of Do Not Disturb begin and end on a minute.
+        scope.launch {
+            while (true) {
+                delay(60_000L - System.currentTimeMillis() % 60_000L)
+                now = LocalDateTime.now()
+            }
+        }
     }
 
     fun service(id: ServiceId): Service? = services.firstOrNull { it.id == id }
@@ -536,7 +545,21 @@ class KashModel(
         update { state -> state.copy(services = state.services.map { if (it.id == id) service.copy(muted = !service.muted) else it }) }
     }
 
-    fun toggleDoNotDisturb() = updateSettings { it.copy(doNotDisturb = !it.doNotDisturb) }
+    /**
+     * The time, again at each minute: what Do Not Disturb's ranges are read at ([doNotDisturb]), so that the bell, the title bar and the
+     * notifications follow them without the user doing anything.
+     */
+    var now: LocalDateTime by mutableStateOf(LocalDateTime.now())
+        private set
+
+    /** Whether Do Not Disturb is on now: the rail's switch, or a range of the settings that the bell did not resume ([DoNotDisturb.isOn]). */
+    val doNotDisturb: Boolean get() = DoNotDisturb.isOn(settings, now)
+
+    /** When the range that makes Do Not Disturb on now ends; null for the switch, or when it is off. */
+    val doNotDisturbUntil: LocalDateTime? get() = DoNotDisturb.until(settings, now)
+
+    /** The rail's bell: the switch, or, during a range, resumes it until it ends ([DoNotDisturb.toggle]). */
+    fun toggleDoNotDisturb() = updateSettings { DoNotDisturb.toggle(it, LocalDateTime.now()) }
 
     /** Empties the HTTP cache of [id]: it stays logged in. */
     fun resetCache(id: ServiceId) {
