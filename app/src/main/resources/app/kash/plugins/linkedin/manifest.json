@@ -1,0 +1,13 @@
+{
+  "$schema": "../manifest.schema.json",
+  "manifestVersion": 1,
+  "id": "linkedin",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "name": "LinkedIn",
+  "square": { "text": "in", "color": "#0A66C2" },
+  "icon": "icon.webp",
+  "url": "https://www.linkedin.com/messaging/",
+  "matches": ["https://www.linkedin.com/*"],
+  "script": "plugin.js"
+}
