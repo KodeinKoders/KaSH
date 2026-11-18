@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,6 +62,10 @@ import app.kash.ui.KashIcons
 import app.kash.ui.IconOnlyButton
 import app.kash.ui.UnreadBadge
 import app.kash.ui.MenuAnchor
+import app.kash.ui.LocalAwtWindow
+import app.kash.ui.WindowTooltip
+import app.kash.ui.menuAnchor
+import kotlinx.coroutines.delay
 import app.kash.ui.ReorderState
 import app.kash.ui.reorderable
 import app.kash.ui.WindowMenu
@@ -123,6 +130,8 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
             label = strings.inbox,
             badge = if (model.showBadges && model.inboxCount > 0) UnreadCount.badge(model.inboxCount) else null,
             description = strings.inboxTileLabel(model.inboxCount),
+            tooltip = strings.inbox,
+            shortcut = INBOX_SHORTCUT,
             side = side,
             metrics = metrics,
             showLabel = true,
@@ -135,7 +144,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
         Box(
             if (vertical) Modifier.padding(vertical = 4.dp).width(32.dp).height(1.dp) else Modifier.padding(horizontal = 4.dp).height(32.dp).width(1.dp),
         ) { Box(Modifier.matchParentSize().background(Kash.colors.divider)) }
-        for (service in model.services) {
+        model.services.forEachIndexed { index, service ->
             // Its own place in the composition, which moves with it: its drag goes on when it takes another tile's place.
             key(service.id) {
                 val count = model.badges[service.id] ?: 0
@@ -146,6 +155,9 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
                     badge = if (count > 0) UnreadCount.badge(count) else null,
                     update = service.id in model.updates,
                     description = strings.serviceTileLabel(service.title, count),
+                    tooltip = service.title,
+                    // ⌘1 to ⌘9, the first nine of the rail (KashModel.shortcut).
+                    shortcut = serviceShortcut(index),
                     side = side,
                     metrics = metrics,
                     showLabel = model.showLabels,
@@ -224,6 +236,15 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
 // Between the tiles of the rail.
 private val RAIL_SPACING = 2.dp
 
+/** The Unread tab's shortcut, as its tooltip shows it. */
+const val INBOX_SHORTCUT = "⌘0"
+
+/** The shortcut of the service at [index] of the rail (from 0), as its tooltip shows it: ⌘1 to ⌘9, none past the ninth. */
+fun serviceShortcut(index: Int): String? = if (index in 0..8) "⌘${index + 1}" else null
+
+// How long the pointer stays over a tile before its tooltip shows.
+private const val TOOLTIP_DELAY_MS = 600L
+
 /** Where the pointer is on the screen, for a context menu that opens there. */
 internal fun pointerAnchor(): MenuAnchor {
     val location = MouseInfo.getPointerInfo()?.location
@@ -251,6 +272,7 @@ internal fun Modifier.onContextClick(onContextClick: () -> Unit): Modifier = onP
  * A tile of the rail: the selection's indicator on the edge next to the content, and its ring around the tile; the label under it; the unread
  * badge over its top right corner, and an arrow over its bottom left one when its plugin has a new version ([update]).
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun RailItem(
     modifier: Modifier = Modifier,
@@ -259,6 +281,8 @@ private fun RailItem(
     badge: String?,
     update: Boolean = false,
     description: String,
+    tooltip: String,
+    shortcut: String?,
     side: RailSide,
     metrics: RailMetrics,
     showLabel: Boolean,
@@ -268,10 +292,29 @@ private fun RailItem(
 ) {
     val vertical = side == RailSide.LEFT || side == RailSide.RIGHT
     val ringed = metrics.tile + 8.dp
+    // Its tooltip, its name and its shortcut: once the pointer stayed over it, while KaSH's window is the active one (a window that shows itself
+    // could bring KaSH to the front), until the pointer leaves it, presses it (a click, a drag) or opens its menu.
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val window = LocalAwtWindow.current
+    var showTooltip by remember { mutableStateOf(false) }
+    LaunchedEffect(hovered) {
+        showTooltip = false
+        if (hovered) {
+            delay(TOOLTIP_DELAY_MS)
+            showTooltip = window?.isActive == true
+        }
+    }
+    val anchor = remember { MenuAnchor() }
+    if (showTooltip) WindowTooltip(anchor, side, tooltip, shortcut)
     Box(
         modifier.then(if (vertical) Modifier.width(metrics.rail) else Modifier.padding(horizontal = 6.dp))
-            .then(if (onContextMenu != null) Modifier.onContextClick(onContextMenu) else Modifier)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .menuAnchor(anchor)
+            .hoverable(interaction)
+            // Any press, before the click and the drag see it, which it leaves to them.
+            .onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) { showTooltip = false }
+            .then(if (onContextMenu != null) Modifier.onContextClick { showTooltip = false; onContextMenu() } else Modifier)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .semantics {
                 contentDescription = description
                 role = Role.Tab

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
 import app.kash.ui.Kash
+import app.kash.ui.UiScaled
 import app.kash.ui.strings
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.OutlinedButton
@@ -59,12 +60,15 @@ fun PluginUpdateFailureDialog(failure: PluginUpdateFailure, onDismiss: () -> Uni
 @Composable
 private fun MessageDialog(title: String, body: String, onDismiss: () -> Unit, buttons: @Composable () -> Unit) {
     DialogWindow(onCloseRequest = onDismiss, state = rememberDialogState(size = DpSize(440.dp, 200.dp)), title = title, resizable = false) {
-        Box(Modifier.fillMaxSize().background(Kash.colors.panel).padding(20.dp)) {
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text(body, color = Kash.colors.muted)
-                Box(Modifier.weight(1f))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) { buttons() }
+        // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
+        UiScaled {
+            Box(Modifier.fillMaxSize().background(Kash.colors.panel).padding(20.dp)) {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(body, color = Kash.colors.muted)
+                    Box(Modifier.weight(1f))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) { buttons() }
+                }
             }
         }
     }

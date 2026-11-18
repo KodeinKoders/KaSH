@@ -31,6 +31,9 @@ import androidx.compose.ui.window.rememberWindowState
 import app.kash.core.UnreadCount
 import app.kash.macos.MacosWindows
 import app.kash.ui.CountPill
+import app.kash.ui.UiScaled
+import app.kash.ui.LocalUiScale
+import app.kash.ui.uiScaleFactor
 import app.kash.ui.Kash
 import app.kash.ui.KashIcon
 import app.kash.ui.KashIcons
@@ -64,7 +67,9 @@ fun ToastWindow(notifier: Notifier, icons: ServiceIcons) {
     val toasts = notifier.toasts.takeLast(4)
     if (toasts.isEmpty()) return
     val screen = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
-    val height = TOAST_HEIGHT * toasts.size + TOAST_GAP * (toasts.size - 1)
+    // As tall as their text is big (Settings › Appearance › Text size): the window is made outside them, from the scale itself.
+    val toastHeight = TOAST_HEIGHT * LocalUiScale.current
+    val height = toastHeight * toasts.size + TOAST_GAP * (toasts.size - 1)
     val state = rememberWindowState(
         position = WindowPosition((screen.x + screen.width).dp - TOAST_WIDTH - SCREEN_MARGIN, screen.y.dp + SCREEN_MARGIN),
         size = DpSize(TOAST_WIDTH, height),
@@ -86,10 +91,13 @@ fun ToastWindow(notifier: Notifier, icons: ServiceIcons) {
             })
         },
     ) {
-        ToastContent(
-            toasts, icons, notifier::countOf, onClick = { notifier.clicked(it.key) }, onClose = { notifier.dismiss(it.key) },
-            markReadOf = notifier::markReadOf, onMarkRead = { notifier.markRead(it.key) },
-        )
+        // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
+        UiScaled {
+            ToastContent(
+                toasts, icons, notifier::countOf, onClick = { notifier.clicked(it.key) }, onClose = { notifier.dismiss(it.key) },
+                markReadOf = notifier::markReadOf, onMarkRead = { notifier.markRead(it.key) },
+            )
+        }
     }
 }
 
@@ -102,7 +110,7 @@ internal fun ToastContent(
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(TOAST_GAP)) {
         for (toast in toasts) {
             Row(
-                Modifier.fillMaxWidth().height(TOAST_HEIGHT)
+                Modifier.fillMaxWidth().height(TOAST_HEIGHT * uiScaleFactor())
                     .background(Kash.colors.panel, RoundedCornerShape(10.dp))
                     .border(1.dp, Kash.colors.control, RoundedCornerShape(10.dp))
                     .clickable { onClick(toast) }

@@ -43,6 +43,11 @@ public class BrowserTab internal constructor(
     @Volatile
     private var colorScheme: ColorScheme? = null
 
+    // The zoom of the page, Chromium's level (0 is 100 %, each level 20 % more): given again at the end of each load, since Chromium keeps a
+    // zoom per host, and a page that goes to another one (a sign-in) would come back at that host's.
+    @Volatile
+    private var zoomLevel = 0.0
+
     // Whether the page has a renderer to give a size to: its first load (of the service's address) ended. Given at onAfterCreated, before that,
     // the size crashes Chromium (a null view in ExecuteDevToolsMethod).
     @Volatile
@@ -162,6 +167,12 @@ public class BrowserTab internal constructor(
     /** Opens Chrome's DevTools on the page, in a window of their own: in the page's profile, so they show its cookies and storage. */
     public fun openDevTools(): Unit = browser.openDevTools()
 
+    /** Zooms the page to Chromium's [level] (0 is 100 %, each level 20 % more: `Zoom.chromiumLevel`), now and at the end of each load. */
+    public fun setZoomLevel(level: Double) {
+        zoomLevel = level
+        if (_created.value) browser.setZoomLevel(level)
+    }
+
     /** Closes the page. */
     public fun close() {
         browser.closeDevTools()
@@ -217,6 +228,7 @@ public class BrowserTab internal constructor(
 
     internal fun loadingStateChanged(loading: Boolean, canGoBack: Boolean, canGoForward: Boolean) {
         _loading.value = loading
+        if (!loading) browser.setZoomLevel(zoomLevel)
         if (!loading && loadingService && !rendered) {
             rendered = true
             applyHiddenSize()

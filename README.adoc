@@ -51,6 +51,8 @@ A conversation is marked as read without showing its service, from the Unread ta
 A contact marked as priority (from the Unread tab, the search or Settings) has its unread conversations at the top of the Unread tab, and its notifications even in Do Not Disturb and when its service is muted.
 Do Not Disturb turns on at the hours of its ranges (each with its days, and which may go past midnight), for all of KaSH (Settings › Notifications) or a service alone (its Edit window); during a range, the rail's bell lifts it until the range ends.
 ⌘1 to ⌘9 show the services of the rail, ⌘0 the Unread tab, ⇧⌘K the search.
+In the service shown, ⌘R reloads its page, ⌘[ and ⌘] go back and forward, ⌥⌘I opens the developer tools; the menus of a service show these shortcuts.
+Each service's page has its own zoom (⌘+ and ⌘−, or its "…" menu, which also brings it back to the default), and Settings › Appearance sets the pages' default zoom and the size of KaSH's own text, in percent.
 KaSH's own notifications go away after a few seconds, or stay until they are closed (Settings › Notifications); how long macOS's stay is its own setting (banners or alerts), which Settings shows and opens.
 
 The window opens again where it was, as big and in the mode it was in (floating, maximized, full screen) when KaSH was closed.

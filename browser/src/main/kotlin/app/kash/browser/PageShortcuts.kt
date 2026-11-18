@@ -56,7 +56,34 @@ public sealed interface BrowserShortcut {
 
     /** ⌘1 to ⌘9: the service at [index] (from 0) of the rail. */
     public data class Service(val index: Int) : BrowserShortcut
+
+    /** ⌘+ (or ⌘=): the page's zoom one step up. */
+    public data object ZoomIn : BrowserShortcut
+
+    /** ⌘−: the page's zoom one step down. */
+    public data object ZoomOut : BrowserShortcut
+
+    /** ⌘R: the page loaded again. */
+    public data object Reload : BrowserShortcut
+
+    /** ⌘[: the page before. */
+    public data object Back : BrowserShortcut
+
+    /** ⌘]: the page after. */
+    public data object Forward : BrowserShortcut
+
+    /** ⌥⌘I: the developer tools of the page. */
+    public data object DevTools : BrowserShortcut
 }
+
+// The key codes of the keypad's + and −, Windows'.
+private const val KEY_ADD = 0x6B
+private const val KEY_SUBTRACT = 0x6D
+
+// The key codes of the keys of `[` and `]` on a QWERTY keyboard, Windows' (`VK_OEM_4`, `VK_OEM_6`), of the key's place, which Chromium gives for a
+// key that is not a letter nor a digit: ⌘[ and ⌘] are those keys too where `[` and `]` are typed with ⌥ (AZERTY, whose keys there are `^` and `$`).
+private const val KEY_OPEN_BRACKET = 0xDB
+private const val KEY_CLOSE_BRACKET = 0xDD
 
 // The key codes of the digits, Windows' (which Chromium gives on every platform), of the key's place: the key of `1` on an AZERTY keyboard,
 // which types `&`, is 1, as Chrome reads its own ⌘1.
@@ -65,16 +92,26 @@ private const val KEY_9 = 0x39
 
 /**
  * KaSH's shortcut of a key press, or null: ⇧⌘K (the key that types `k`, [character] being read as [editCommandOf]'s), ⌘0 to ⌘9 (by
- * [keyCode], the key's place: the digits are shifted on some layouts).
+ * [keyCode], the key's place: the digits are shifted on some layouts), ⌘+ and ⌘− (the keys that type `=` or `+`, `-`, with ⇧ or not, as Chrome's,
+ * or the keypad's), and Chrome's for the page: ⌘R, ⌘[ and ⌘] (the keys that type them, or their places on a QWERTY keyboard), ⌥⌘I.
  */
 internal fun browserShortcutOf(type: CefKeyEvent.EventType, modifiers: Int, character: Char, keyCode: Int = 0): BrowserShortcut? {
     if (type != CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN) return null
     val command = EventFlags.EVENTFLAG_COMMAND_DOWN
-    return when (modifiers and MODIFIERS) {
+    val pressed = modifiers and MODIFIERS
+    if (pressed == command || pressed == command or EventFlags.EVENTFLAG_SHIFT_DOWN) {
+        if (character == '=' || character == '+' || keyCode == KEY_ADD) return BrowserShortcut.ZoomIn
+        if (character == '-' || keyCode == KEY_SUBTRACT) return BrowserShortcut.ZoomOut
+    }
+    return when (pressed) {
         command or EventFlags.EVENTFLAG_SHIFT_DOWN -> if (character.lowercaseChar() == 'k') BrowserShortcut.Search else null
-        command -> when (keyCode) {
-            KEY_0 -> BrowserShortcut.Inbox
-            in KEY_0 + 1..KEY_9 -> BrowserShortcut.Service(keyCode - KEY_0 - 1)
+        command or EventFlags.EVENTFLAG_ALT_DOWN -> if (character.lowercaseChar() == 'i') BrowserShortcut.DevTools else null
+        command -> when {
+            keyCode == KEY_0 -> BrowserShortcut.Inbox
+            keyCode in KEY_0 + 1..KEY_9 -> BrowserShortcut.Service(keyCode - KEY_0 - 1)
+            character.lowercaseChar() == 'r' -> BrowserShortcut.Reload
+            character == '[' || keyCode == KEY_OPEN_BRACKET -> BrowserShortcut.Back
+            character == ']' || keyCode == KEY_CLOSE_BRACKET -> BrowserShortcut.Forward
             else -> null
         }
         else -> null
@@ -84,7 +121,7 @@ internal fun browserShortcutOf(type: CefKeyEvent.EventType, modifiers: Int, char
 /**
  * The shortcuts of the pages, the client's only keyboard handler (a `CefClient` keeps the first one that it is given, and ignores the others).
  *
- * - KaSH's own ([browserShortcutOf]: ⇧⌘K, ⌘0 to ⌘9), before the page sees them (`onPreKeyEvent`): they go to [onShortcut], on Swing's thread, whatever the
+ * - KaSH's own ([browserShortcutOf]: ⇧⌘K, ⌘0 to ⌘9, ⌘+ and ⌘−, ⌘R, ⌘[ and ⌘], ⌥⌘I), before the page sees them (`onPreKeyEvent`): they go to [onShortcut], on Swing's thread, whatever the
  *   service does with them.
  * - The editing shortcuts of macOS ([editCommandOf]: ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z, ⇧⌘Z), which do nothing in them otherwise. In Chrome, they are the Edit
  *   menu's: macOS gives a shortcut to the menu bar, whose item sends `copy:` to the focused view. KaSH's menu bar has no Edit menu, and Chromium's

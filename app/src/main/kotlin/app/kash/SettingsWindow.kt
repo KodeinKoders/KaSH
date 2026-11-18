@@ -1,6 +1,7 @@
 package app.kash
 
 import app.kash.ui.reorderable
+import app.kash.ui.UiScaled
 import app.kash.ui.ReorderState
 import app.kash.core.ServiceOrder
 import androidx.compose.runtime.key
@@ -59,6 +60,8 @@ import app.kash.core.ServiceId
 import app.kash.core.Settings
 import app.kash.core.ThemeMode
 import app.kash.core.UnreadCount
+import app.kash.core.UiScales
+import app.kash.core.Zoom
 import app.kash.macos.LoginItemStatus
 import app.kash.macos.MacosLoginItem
 import app.kash.macos.MacosNotifications
@@ -100,7 +103,7 @@ enum class SettingsPage { GENERAL, APPEARANCE, NOTIFICATIONS, INBOX, SERVICES, P
 /** The title of [page], and the texts of its settings, which the search of the navigation looks into. */
 private fun Strings.page(page: SettingsPage): Pair<String, List<String>> = when (page) {
     SettingsPage.GENERAL -> general to listOf(startup, launchAtLogin, language, interfaceLanguage)
-    SettingsPage.APPEARANCE -> appearance to listOf(theme, light, dark, system, sidebar, iconSize, position, showLabels, showBadges)
+    SettingsPage.APPEARANCE -> appearance to listOf(theme, light, dark, system, textSize, defaultZoom, sidebar, iconSize, position, showLabels, showBadges)
     SettingsPage.NOTIFICATIONS -> notifications to listOf(
         alerts, desktopNotifications, playSound, notificationStyle, kashNotifications, systemNotifications, sendTestNotification,
         notificationDuration, temporaryNotifications, permanentNotifications,
@@ -119,9 +122,12 @@ private fun Strings.page(page: SettingsPage): Pair<String, List<String>> = when 
 fun SettingsWindow(model: KashModel, notifier: Notifier, icons: ServiceIcons, onClose: () -> Unit) {
     val title = strings.settings
     DecoratedWindow(onCloseRequest = onClose, state = rememberWindowState(size = DpSize(960.dp, 720.dp)), title = title, icon = remember { AppIcon.painter() }) {
-        TitleBar { Text(title, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally)) }
-        CompositionLocalProvider(LocalAwtWindow provides window) {
-            SettingsContent(model, notifier, icons, onClose)
+        // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
+        UiScaled {
+            TitleBar { Text(title, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally)) }
+            CompositionLocalProvider(LocalAwtWindow provides window) {
+                SettingsContent(model, notifier, icons, onClose)
+            }
         }
     }
 }
@@ -167,7 +173,7 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
                     if (q.isNotEmpty() && (listOf(name) + texts).none { it.lowercase().contains(q) }) continue
                     val shape = RoundedCornerShape(4.dp)
                     Box(
-                        Modifier.fillMaxWidth().height(30.dp)
+                        Modifier.fillMaxWidth().heightIn(min = 30.dp)
                             .background(if (p == page) Kash.colors.selection else androidx.compose.ui.graphics.Color.Transparent, shape)
                             .hoverBackground(Kash.colors.hover, shape)
                             .clickable { page = p }
@@ -179,7 +185,7 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
                 Spacer(Modifier.weight(1f))
                 val aboutShape = RoundedCornerShape(4.dp)
                 Row(
-                    Modifier.fillMaxWidth().height(26.dp)
+                    Modifier.fillMaxWidth().heightIn(min = 26.dp)
                         .hoverBackground(Kash.colors.hover, aboutShape)
                         .clickable(role = Role.Button) { model.aboutOpen = true }
                         .padding(horizontal = 10.dp),
@@ -265,6 +271,30 @@ private fun AppearancePage(draft: Settings, services: List<Service>, model: Kash
             listOf(ThemeMode.LIGHT to strings.light, ThemeMode.DARK to strings.dark, ThemeMode.SYSTEM to strings.system),
             draft.theme,
         ) { onChange(draft.copy(theme = it)) }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle(strings.textSize)
+        // KaSH's windows (UiScaled), as KaTTY's; then the services' pages that have no zoom of their own (Zoom).
+        LabeledRow(strings.textSize) {
+            val sizes = UiScales.LEVELS
+            ListComboBox(
+                items = sizes.map { "$it %" },
+                selectedIndex = sizes.indexOf(UiScales.nearest(draft.uiScale)),
+                onSelectedItemChange = { onChange(draft.copy(uiScale = sizes[it])) },
+                modifier = Modifier.width(120.dp),
+            )
+        }
+        Hint(strings.textSizeHint)
+        LabeledRow(strings.defaultZoom) {
+            val zooms = Zoom.LEVELS
+            ListComboBox(
+                items = zooms.map { "$it %" },
+                selectedIndex = zooms.indexOf(Zoom.nearest(draft.defaultZoom)),
+                onSelectedItemChange = { onChange(draft.copy(defaultZoom = zooms[it])) },
+                modifier = Modifier.width(120.dp),
+            )
+        }
+        Hint(strings.defaultZoomHint)
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(strings.sidebar)
@@ -433,7 +463,7 @@ private fun NotificationsPage(draft: Settings, notifier: Notifier, model: KashMo
             for (contact in priorities) {
                 val service = model.service(contact.service) ?: continue
                 Row(
-                    Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 2.dp),
+                    Modifier.fillMaxWidth().heightIn(min = 32.dp).padding(horizontal = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {

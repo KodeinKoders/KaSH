@@ -75,6 +75,8 @@ import app.kash.core.SearchMatch
 import app.kash.core.SearchSection
 import app.kash.core.UnreadCount
 import app.kash.ui.CountPill
+import app.kash.ui.UiScaled
+import app.kash.ui.uiScaleFactor
 import app.kash.ui.Kash
 import app.kash.ui.KashIcon
 import app.kash.ui.KashIcons
@@ -112,7 +114,7 @@ fun SearchField(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val label = strings.searchLabel
     val shape = RoundedCornerShape(6.dp)
     Row(
-        modifier.width(260.dp).height(26.dp).clip(shape).background(colors.field).border(1.dp, colors.divider, shape)
+        modifier.width(260.dp * uiScaleFactor()).heightIn(min = 26.dp).clip(shape).background(colors.field).border(1.dp, colors.divider, shape)
             .semantics { contentDescription = label }
             .pointerHoverIcon(PointerIcon.Text)
             .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 8.dp),
@@ -163,15 +165,18 @@ fun SearchWindow(
             }
         },
     ) {
-        DisposableEffect(window) {
-            val listener = object : WindowFocusListener {
-                override fun windowGainedFocus(e: WindowEvent) = Unit
-                override fun windowLostFocus(e: WindowEvent) = latest()
+        // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
+        UiScaled {
+            DisposableEffect(window) {
+                val listener = object : WindowFocusListener {
+                    override fun windowGainedFocus(e: WindowEvent) = Unit
+                    override fun windowLostFocus(e: WindowEvent) = latest()
+                }
+                window.addWindowFocusListener(listener)
+                onDispose { window.removeWindowFocusListener(listener) }
             }
-            window.addWindowFocusListener(listener)
-            onDispose { window.removeWindowFocusListener(listener) }
+            SearchContent(entries, icons, onOpen, onDismiss, priority)
         }
-        SearchContent(entries, icons, onOpen, onDismiss, priority)
     }
 }
 

@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import app.kash.ui.Kash
+import app.kash.ui.UiScaled
 import app.kash.ui.Strings
 import app.kash.ui.strings
 import org.jetbrains.jewel.ui.component.Text
@@ -127,8 +128,11 @@ internal fun AboutWindow(onClose: () -> Unit) {
             close
         },
     ) {
-        TitleBar { Text(title, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally)) }
-        AboutContent()
+        // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
+        UiScaled {
+            TitleBar { Text(title, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally)) }
+            AboutContent()
+        }
     }
 }
 

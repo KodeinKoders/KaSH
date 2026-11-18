@@ -16,13 +16,27 @@ private val DIGITS = listOf(Key.Zero, Key.One, Key.Two, Key.Three, Key.Four, Key
 
 /**
  * KaSH's shortcut of a key press in one of its windows, or null: the same as a page's (`PageShortcuts`, which takes them before the page),
- * ⇧⌘K for the search ([isSearchShortcut]), ⌘0 for the Unread tab, ⌘1 to ⌘9 for the services of the rail.
+ * ⇧⌘K for the search ([isSearchShortcut]), ⌘0 for the Unread tab, ⌘1 to ⌘9 for the services of the rail, ⌘+ and ⌘− for the zoom of the
+ * service shown, ⌘R, ⌘[, ⌘] and ⌥⌘I for its page (reload, back, forward, the developer tools).
  */
 fun windowShortcutOf(event: KeyEvent): BrowserShortcut? {
     if (isSearchShortcut(event)) return BrowserShortcut.Search
-    if (event.type != KeyEventType.KeyDown || !event.isMetaPressed || event.isShiftPressed || event.isAltPressed || event.isCtrlPressed) return null
+    // ⌘+ (or ⌘=, with ⇧ or not) and ⌘−, as Chrome's, and the keypad's.
+    if (event.type == KeyEventType.KeyDown && event.isMetaPressed && !event.isAltPressed && !event.isCtrlPressed) {
+        when (event.key) {
+            Key.Equals, Key.Plus, Key.NumPadAdd -> return BrowserShortcut.ZoomIn
+            Key.Minus, Key.NumPadSubtract -> return BrowserShortcut.ZoomOut
+        }
+    }
+    if (event.type != KeyEventType.KeyDown || !event.isMetaPressed || event.isShiftPressed || event.isCtrlPressed) return null
+    if (event.isAltPressed) return if (event.key == Key.I) BrowserShortcut.DevTools else null
     return when (val digit = DIGITS.indexOf(event.key)) {
-        -1 -> null
+        -1 -> when (event.key) {
+            Key.R -> BrowserShortcut.Reload
+            Key.LeftBracket -> BrowserShortcut.Back
+            Key.RightBracket -> BrowserShortcut.Forward
+            else -> null
+        }
         0 -> BrowserShortcut.Inbox
         else -> BrowserShortcut.Service(digit - 1)
     }

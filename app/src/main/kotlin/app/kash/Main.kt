@@ -25,6 +25,9 @@ import app.kash.core.WindowGeometry
 import app.kash.core.deleteClosedProfiles
 import app.kash.macos.inAppBundle
 import app.kash.ui.KashTheme
+import app.kash.ui.LocalUiScale
+import app.kash.ui.UiScaled
+import app.kash.core.UiScales
 import app.kash.ui.LocalAwtWindow
 import app.kash.ui.LocalStrings
 import app.kash.ui.rememberSystemDark
@@ -238,7 +241,7 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
         if (supported) Taskbar.getTaskbar().setIconBadge(dockBadge)
     }
 
-    CompositionLocalProvider(LocalStrings provides stringsOf(settings.language)) {
+    CompositionLocalProvider(LocalStrings provides stringsOf(settings.language), LocalUiScale provides UiScales.nearest(settings.uiScale) / 100f) {
         KashTheme(dark) {
             DecoratedWindow(
                 onCloseRequest = quit,
@@ -252,35 +255,38 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                     shortcut != null
                 },
             ) {
-                DisposableEffect(window) {
-                    model.activateWindow = {
-                        window.isVisible = true
-                        // toFront does not activate KaSH when another application is in front: a click on one of KaSH's own notifications,
-                        // which do not activate it (ToastWindow), has to.
-                        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_REQUEST_FOREGROUND)) {
-                            Desktop.getDesktop().requestForeground(true)
+                // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
+                UiScaled {
+                    DisposableEffect(window) {
+                        model.activateWindow = {
+                            window.isVisible = true
+                            // toFront does not activate KaSH when another application is in front: a click on one of KaSH's own notifications,
+                            // which do not activate it (ToastWindow), has to.
+                            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_REQUEST_FOREGROUND)) {
+                                Desktop.getDesktop().requestForeground(true)
+                            }
+                            window.toFront()
+                            window.requestFocus()
                         }
-                        window.toFront()
-                        window.requestFocus()
+                        onDispose { model.activateWindow = {} }
                     }
-                    onDispose { model.activateWindow = {} }
-                }
-                CompositionLocalProvider(LocalAwtWindow provides window) {
-                    MainWindowContent(model, icons, systemDark)
-                }
-                if (model.searchOpen) {
-                    SearchWindow(
-                        window, model.searchEntries, icons,
-                        onOpen = { entry ->
-                            model.dismissSearch()
-                            model.openConversation(entry.service, entry.conversation)
-                        },
-                        onDismiss = model::dismissSearch,
-                        priority = PriorityActions(
-                            isPriority = { entry -> model.isPriority(entry.service.id, entry.conversation) },
-                            onToggle = { entry -> model.togglePriority(entry.service.id, entry.conversation, entry.name) },
-                        ),
-                    )
+                    CompositionLocalProvider(LocalAwtWindow provides window) {
+                        MainWindowContent(model, icons, systemDark)
+                    }
+                    if (model.searchOpen) {
+                        SearchWindow(
+                            window, model.searchEntries, icons,
+                            onOpen = { entry ->
+                                model.dismissSearch()
+                                model.openConversation(entry.service, entry.conversation)
+                            },
+                            onDismiss = model::dismissSearch,
+                            priority = PriorityActions(
+                                isPriority = { entry -> model.isPriority(entry.service.id, entry.conversation) },
+                                onToggle = { entry -> model.togglePriority(entry.service.id, entry.conversation, entry.name) },
+                            ),
+                        )
+                    }
                 }
             }
             ToastWindow(notifier, icons)

@@ -36,6 +36,15 @@ interface Strings {
     fun open(name: String): String
     fun noResults(query: String): String
 
+    // The zoom of the pages and the size of the text
+    val zoomIn: String
+    val zoomOut: String
+    fun zoomReset(percent: String): String
+    val textSize: String
+    val textSizeHint: String
+    val defaultZoom: String
+    val defaultZoomHint: String
+
     // Do Not Disturb's hours
     val quietHours: String
     val quietHoursHint: String
@@ -288,6 +297,13 @@ object French : Strings {
     override val byService = "Par service"
     override fun open(name: String) = "Ouvrir $name"
     override fun noResults(query: String) = "Aucune conversation non lue ne correspond à « $query »."
+    override val zoomIn = "Zoom avant"
+    override val zoomOut = "Zoom arrière"
+    override fun zoomReset(percent: String) = "Zoom par défaut (actuellement $percent %)"
+    override val textSize = "Taille du texte"
+    override val textSizeHint = "La taille du texte des fenêtres de KaSH, pas celle des pages des services."
+    override val defaultZoom = "Zoom des pages"
+    override val defaultZoomHint = "Le zoom des pages des services qui n'en ont pas un à elles (⌘+ et ⌘−, ou le menu « … » d'un service)."
     override val quietHours = "Horaires de Ne pas déranger"
     override val quietHoursHint = "Ne pas déranger se met en route à ces heures. Pendant une plage, la cloche du rail le lève jusqu'à la fin de la plage."
     override val serviceQuietHoursHint = "À ces heures, les notifications de ce service ne s'affichent pas, sauf celles des contacts prioritaires."
@@ -538,6 +554,13 @@ object English : Strings {
     override val byService = "By service"
     override fun open(name: String) = "Open $name"
     override fun noResults(query: String) = "No unread conversation matches “$query”."
+    override val zoomIn = "Zoom in"
+    override val zoomOut = "Zoom out"
+    override fun zoomReset(percent: String) = "Default zoom (now $percent%)"
+    override val textSize = "Text size"
+    override val textSizeHint = "The size of the text of KaSH's windows, not of the services' pages."
+    override val defaultZoom = "Zoom of the pages"
+    override val defaultZoomHint = "The zoom of the services' pages that have none of their own (⌘+ and ⌘−, or a service's \"…\" menu)."
     override val quietHours = "Do Not Disturb hours"
     override val quietHoursHint = "Do Not Disturb turns on at these hours. During a range, the rail's bell lifts it until the range ends."
     override val serviceQuietHoursHint = "At these hours, this service's notifications are not shown, but the priority contacts'."

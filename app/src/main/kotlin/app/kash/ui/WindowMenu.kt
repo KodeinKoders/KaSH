@@ -42,10 +42,11 @@ import org.jetbrains.jewel.ui.component.styling.LocalMenuStyle
 import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
 
-/** Where a menu's button is on the screen, in points (AWT's coordinates): set by [menuAnchor], read by [WindowMenu]. */
+/** Where a menu's button is on the screen, in points (AWT's coordinates): set by [menuAnchor], read by [WindowMenu] (and [WindowTooltip]). */
 class MenuAnchor {
     var left by mutableStateOf(0f)
     var right by mutableStateOf(0f)
+    var top by mutableStateOf(0f)
     var bottom by mutableStateOf(0f)
 }
 
@@ -87,6 +88,7 @@ fun Modifier.menuAnchor(anchor: MenuAnchor): Modifier {
         val position = coordinates.positionInWindow()
         anchor.left = origin.x + position.x / density
         anchor.right = origin.x + (position.x + coordinates.size.width) / density
+        anchor.top = origin.y + position.y / density
         anchor.bottom = origin.y + (position.y + coordinates.size.height) / density
     }
 }
@@ -105,9 +107,11 @@ fun WindowMenu(anchor: MenuAnchor, width: Dp, alignEnd: Boolean, onDismiss: () -
     // new object at each drawing (KaTTY's `KattyMenu` says the same).
     val latest by rememberUpdatedState(onDismiss)
     val controller = remember { DefaultMenuController(onDismissRequest = { latest(); true }) }
+    // As wide as its text is big (Settings › Appearance › Text size): at its width of 100 %, the longer items would be cut.
+    val menuWidth = width * LocalUiScale.current
     val state = rememberWindowState(
         size = DpSize.Unspecified,
-        position = WindowPosition((if (alignEnd) anchor.right - width.value else anchor.left).dp - MARGIN, (anchor.bottom + GAP).dp - MARGIN),
+        position = WindowPosition((if (alignEnd) anchor.right - menuWidth.value else anchor.left).dp - MARGIN, (anchor.bottom + GAP).dp - MARGIN),
     )
     Window(
         onCloseRequest = { latest() },
@@ -126,22 +130,25 @@ fun WindowMenu(anchor: MenuAnchor, width: Dp, alignEnd: Boolean, onDismiss: () -
             }
         },
     ) {
-        DisposableEffect(window) {
-            val listener = object : WindowFocusListener {
-                override fun windowGainedFocus(e: WindowEvent) = Unit
-                override fun windowLostFocus(e: WindowEvent) = latest()
+        // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
+        UiScaled {
+            DisposableEffect(window) {
+                val listener = object : WindowFocusListener {
+                    override fun windowGainedFocus(e: WindowEvent) = Unit
+                    override fun windowLostFocus(e: WindowEvent) = latest()
+                }
+                window.addWindowFocusListener(listener)
+                onDispose { window.removeWindowFocusListener(listener) }
             }
-            window.addWindowFocusListener(listener)
-            onDispose { window.removeWindowFocusListener(listener) }
-        }
-        // Under its button, starting where the button starts, or ending where it ends; again when the button moves. The window is larger than the
-        // menu by its margin, where the shadow is drawn.
-        LaunchedEffect(anchor.left, anchor.right, anchor.bottom, alignEnd) {
-            val x = if (alignEnd) anchor.right - width.value else anchor.left
-            window.setLocation((x - MARGIN.value).toInt(), (anchor.bottom + GAP - MARGIN.value).toInt())
-        }
-        CompositionLocalProvider(LocalMenuController provides controller) {
-            MenuFrame(width, content)
+            // Under its button, starting where the button starts, or ending where it ends; again when the button moves. The window is larger than the
+            // menu by its margin, where the shadow is drawn.
+            LaunchedEffect(anchor.left, anchor.right, anchor.bottom, alignEnd) {
+                val x = if (alignEnd) anchor.right - menuWidth.value else anchor.left
+                window.setLocation((x - MARGIN.value).toInt(), (anchor.bottom + GAP - MARGIN.value).toInt())
+            }
+            CompositionLocalProvider(LocalMenuController provides controller) {
+                MenuFrame(menuWidth, content)
+            }
         }
     }
 }

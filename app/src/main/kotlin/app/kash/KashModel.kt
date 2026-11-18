@@ -43,6 +43,7 @@ import app.kash.core.StateFile
 import app.kash.core.UnreadCount
 import app.kash.core.UnreadTimes
 import app.kash.core.UnreadTimesFile
+import app.kash.core.Zoom
 import app.kash.ui.stringsOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -244,6 +245,10 @@ class KashModel(
     /** Called with the icon that a plugin's script gives its service (`kash.setIcon`), and with [PluginIcon.None] when it is deleted or erased. */
     var onIcon: (ServiceId, PluginIcon) -> Unit = { _, _ -> }
 
+    // The zoom given to each loaded page, in percent: given again when it changes (⌘+, ⌘−, the service's menu, the default of Settings).
+    // Before `init`, which loads the pages: declared after it, it was still null there.
+    private val zooms = HashMap<ServiceId, Int>()
+
     init {
         // Before the pages load: a site that follows the browser's language shows itself in KaSH's.
         engine.setPageLanguages(PageLanguages.acceptLanguages(language))
@@ -276,6 +281,10 @@ class KashModel(
         val plugin = plugins[service.plugin]
         val tab = profile.openTab(service.url, scriptsFor(service, plugin, language), plugin?.manifest?.openInKash.orEmpty())
         tab.setColorScheme(colorScheme)
+        Zoom.of(service, settings).let { zoom ->
+            zooms[service.id] = zoom
+            tab.setZoomLevel(Zoom.chromiumLevel(zoom))
+        }
         val jobs = listOf(
             scope.launch { tab.title.collect { titles[service.id] = it } },
             scope.launch { tab.messages.collect { message -> received(service.id, message) } },
@@ -429,6 +438,7 @@ class KashModel(
             saveUnreadTimesLater()
         }
         val loadedService = loaded.remove(id)
+        zooms.remove(id)
         titles.remove(id)
         conversations.remove(id)
         totals.remove(id)
@@ -447,7 +457,34 @@ class KashModel(
     private fun update(change: (KashState) -> KashState) {
         state = change(state)
         save()
+        applyZooms()
     }
+
+
+    private fun applyZooms() {
+        for ((id, loadedService) in loaded) {
+            val service = service(id) ?: continue
+            val zoom = Zoom.of(service, settings)
+            if (zooms[id] == zoom) continue
+            zooms[id] = zoom
+            loadedService.tab.setZoomLevel(Zoom.chromiumLevel(zoom))
+        }
+    }
+
+    /** The zoom of [id]'s page, in percent: its own, else the default of Settings. */
+    fun zoomOf(id: ServiceId): Int = service(id)?.let { Zoom.of(it, settings) } ?: Zoom.DEFAULT
+
+    /** Zooms [id]'s page one step up (Chrome's steps), which it keeps across launches. */
+    fun zoomIn(id: ServiceId) = setZoom(id, Zoom.zoomIn(zoomOf(id)))
+
+    /** Zooms [id]'s page one step down. */
+    fun zoomOut(id: ServiceId) = setZoom(id, Zoom.zoomOut(zoomOf(id)))
+
+    /** Gives [id]'s page the default zoom of Settings again. */
+    fun resetZoom(id: ServiceId) = setZoom(id, null)
+
+    private fun setZoom(id: ServiceId, zoom: Int?) =
+        update { state -> state.copy(services = state.services.map { if (it.id == id) it.copy(zoom = zoom) else it }) }
 
     /** Writes the state to its file, and when KaSH saw the unread conversations (until now: KaSH is quitting, or may be). */
     fun save() {
@@ -481,8 +518,18 @@ class KashModel(
             BrowserShortcut.Search -> toggleSearch()
             BrowserShortcut.Inbox -> select(Selection.Inbox)
             is BrowserShortcut.Service -> services.filter { it.enabled }.getOrNull(shortcut.index)?.let { select(Selection.OfService(it.id)) }
+            // The service shown: nothing on the Unread tab.
+            BrowserShortcut.ZoomIn -> (state.selection as? Selection.OfService)?.let { zoomIn(it.id) }
+            BrowserShortcut.ZoomOut -> (state.selection as? Selection.OfService)?.let { zoomOut(it.id) }
+            BrowserShortcut.Reload -> shownTab()?.reload()
+            BrowserShortcut.Back -> shownTab()?.back()
+            BrowserShortcut.Forward -> shownTab()?.forward()
+            BrowserShortcut.DevTools -> shownTab()?.openDevTools()
         }
     }
+
+    // The page of the service shown, when it is loaded: null on the Unread tab.
+    private fun shownTab(): BrowserTab? = (state.selection as? Selection.OfService)?.let { loaded[it.id]?.tab }
 
     fun updateSettings(change: (Settings) -> Settings) = update { state ->
         val settings = change(state.settings)

@@ -51,6 +51,7 @@ object KashIcons {
     val ChevronRight = strokeIcon("chevron-right", "M8 5l5 5-5 5")
     val Inbox = strokeIcon("inbox", "M3 12h4l1.5 2.5h3L13 12h4", "M5.2 4h9.6l2.2 8v3.2a.8.8 0 0 1-.8.8H3.8a.8.8 0 0 1-.8-.8V12z")
     val Plus = strokeIcon("plus", "M10 4v12M4 10h12")
+    val Minus = strokeIcon("minus", "M4 10h12")
     val Bell = strokeIcon("bell", "M6 8a4 4 0 0 1 8 0v3l1.5 3h-11L6 11z", "M8.5 16.5a1.6 1.6 0 0 0 3 0")
     val BellOff = strokeIcon("bell-off", "M6 8a4 4 0 0 1 8 0v3l1.5 3h-11L6 11z", "M8.5 16.5a1.6 1.6 0 0 0 3 0", "M3.5 3.5l13 13")
     val Settings = strokeIcon(

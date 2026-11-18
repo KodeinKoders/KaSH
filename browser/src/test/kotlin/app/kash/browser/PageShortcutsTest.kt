@@ -66,4 +66,32 @@ class PageShortcutsTest {
         assertNull(browserShortcutOf(down, command, 'a', 0x41))
         assertNull(browserShortcutOf(EventType.KEYEVENT_KEYUP, command, '1', 0x31))
     }
+
+    @Test
+    fun commandPlusAndMinusZoomThePage() {
+        assertEquals(BrowserShortcut.ZoomIn, browserShortcutOf(down, command, '=', 0xBB))
+        assertEquals(BrowserShortcut.ZoomIn, browserShortcutOf(down, command or EventFlags.EVENTFLAG_SHIFT_DOWN, '+', 0xBB))
+        assertEquals(BrowserShortcut.ZoomOut, browserShortcutOf(down, command, '-', 0xBD))
+        // The keypad's.
+        assertEquals(BrowserShortcut.ZoomIn, browserShortcutOf(down, command, '+', 0x6B))
+        assertEquals(BrowserShortcut.ZoomOut, browserShortcutOf(down, command, '-', 0x6D))
+        // Not without ⌘, nor with ⌥.
+        assertNull(browserShortcutOf(down, EventFlags.EVENTFLAG_NONE, '=', 0xBB))
+        assertNull(browserShortcutOf(down, command or EventFlags.EVENTFLAG_ALT_DOWN, '-', 0xBD))
+    }
+
+    @Test
+    fun chromesShortcutsOfThePageAreKashs() {
+        assertEquals(BrowserShortcut.Reload, browserShortcutOf(down, command, 'r', 0x52))
+        assertEquals(BrowserShortcut.Back, browserShortcutOf(down, command, '[', 0xDB))
+        assertEquals(BrowserShortcut.Forward, browserShortcutOf(down, command, ']', 0xDD))
+        // On an AZERTY keyboard, the keys at the places of `[` and `]` (`^` and `$`), and the characters typed with ⌥ elsewhere.
+        assertEquals(BrowserShortcut.Back, browserShortcutOf(down, command, '^', 0xDB))
+        assertEquals(BrowserShortcut.Forward, browserShortcutOf(down, command, '$', 0xDD))
+        assertEquals(BrowserShortcut.DevTools, browserShortcutOf(down, command or EventFlags.EVENTFLAG_ALT_DOWN, 'i', 0x49))
+        // ⇧⌘R, ⌘I (a page's italic) and ⌥R are the page's.
+        assertNull(browserShortcutOf(down, command or EventFlags.EVENTFLAG_SHIFT_DOWN, 'r', 0x52))
+        assertNull(browserShortcutOf(down, command, 'i', 0x49))
+        assertNull(browserShortcutOf(down, EventFlags.EVENTFLAG_ALT_DOWN, 'r', 0x52))
+    }
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,6 +48,7 @@ import app.kash.core.ServiceId
 import app.kash.core.SquareColors
 import app.kash.core.WebApplications
 import app.kash.ui.FieldLabel
+import app.kash.ui.UiScaled
 import app.kash.ui.Hint
 import app.kash.ui.Kash
 import app.kash.ui.SectionTitle
@@ -81,8 +83,11 @@ private enum class IconMode { PLUGIN, FAVICON, IMAGE, SQUARE }
 fun AddServiceWindow(editing: Service?, icons: ServiceIcons, onClose: () -> Unit, onDone: (Service) -> Unit) {
     val title = if (editing == null) strings.addService else strings.editService
     DecoratedWindow(onCloseRequest = onClose, state = rememberWindowState(size = DpSize(720.dp, 900.dp)), title = title, icon = remember { AppIcon.painter() }) {
-        TitleBar { Text(title, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally)) }
-        AddServiceContent(editing, icons, onClose, onDone)
+        // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
+        UiScaled {
+            TitleBar { Text(title, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.CenterHorizontally)) }
+            AddServiceContent(editing, icons, onClose, onDone)
+        }
     }
 }
 
@@ -349,7 +354,7 @@ private fun OptionField(option: PluginOption, draft: OptionsDraft, value: String
 private fun CatalogTile(content: TileContent?, name: String, selected: Boolean, enabled: Boolean, modifier: Modifier, onPick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
     Row(
-        modifier.height(56.dp)
+        modifier.heightIn(min = 56.dp)
             .background(if (selected) Kash.colors.selection else Kash.colors.panel, shape)
             .border(1.dp, if (selected) Kash.colors.accent else Kash.colors.divider, shape)
             .then(if (enabled) Modifier.clickable(onClick = onPick) else Modifier)

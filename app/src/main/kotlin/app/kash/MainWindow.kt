@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -151,6 +152,10 @@ fun serviceActions(model: KashModel, id: app.kash.core.ServiceId) = ServiceActio
     onResetCache = { model.resetCache(id) },
     onErase = { model.service(id)?.let { model.confirmation = Confirmation.Erase(it) } },
     onDelete = { model.service(id)?.let { model.confirmation = Confirmation.Delete(it) } },
+    zoom = { model.zoomOf(id) },
+    onZoomIn = { model.zoomIn(id) },
+    onZoomOut = { model.zoomOut(id) },
+    onZoomReset = { model.resetZoom(id) },
 )
 
 /** The theme button of the title bar: the current mode's icon, and a menu of the three modes, the system's current one as a hint. */
@@ -162,7 +167,7 @@ private fun ThemeMenu(mode: ThemeMode, systemDark: Boolean, onPick: (ThemeMode) 
     val anchor = remember { MenuAnchor() }
     Box(Modifier.menuAnchor(anchor)) {
         Row(
-            Modifier.height(30.dp)
+            Modifier.heightIn(min = 30.dp)
                 .background(if (menu.open) Kash.colors.hover else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(4.dp))
                 .hoverBackground(Kash.colors.hover, RoundedCornerShape(4.dp))
                 .clickable { menu.toggle() }

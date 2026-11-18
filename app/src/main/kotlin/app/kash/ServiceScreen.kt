@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
@@ -69,6 +70,11 @@ class ServiceActions(
     val onResetCache: () -> Unit,
     val onErase: () -> Unit,
     val onDelete: () -> Unit,
+    // The zoom of its page, in percent, as it is now, and what changes it.
+    val zoom: () -> Int = { 100 },
+    val onZoomIn: () -> Unit = {},
+    val onZoomOut: () -> Unit = {},
+    val onZoomReset: () -> Unit = {},
 )
 
 /**
@@ -205,8 +211,15 @@ fun ServiceMenuButton(service: Service, actions: ServiceActions, devToolsEnabled
 
 /** The items of a service's menu, which [close] closes. */
 fun MenuScope.serviceMenu(service: Service, actions: ServiceActions, devToolsEnabled: Boolean, close: () -> Unit) {
+    // The zoom of its page: one step up or down, and back to the default of Settings, which says the zoom that it has now.
+    selectableItem(selected = false, onClick = { close(); actions.onZoomIn() }) { MenuRow(KashIcons.Plus, StringsKey.ZoomIn, shortcut = ZOOM_IN_SHORTCUT) }
+    selectableItem(selected = false, onClick = { close(); actions.onZoomOut() }) { MenuRow(KashIcons.Minus, StringsKey.ZoomOut, shortcut = ZOOM_OUT_SHORTCUT) }
+    selectableItem(selected = false, onClick = { close(); actions.onZoomReset() }, enabled = service.zoom != null) {
+        MenuRow(KashIcons.Search, StringsKey.ZoomReset, argument = actions.zoom().toString(), enabled = service.zoom != null)
+    }
+    separator()
     selectableItem(selected = false, onClick = { close(); actions.onDevTools() }, enabled = devToolsEnabled) {
-        MenuRow(KashIcons.Code, StringsKey.DevTools)
+        MenuRow(KashIcons.Code, StringsKey.DevTools, enabled = devToolsEnabled, shortcut = DEV_TOOLS_SHORTCUT)
     }
     selectableItem(selected = false, onClick = { close(); actions.onEdit() }) { MenuRow(KashIcons.Pencil, StringsKey.Edit) }
     selectableItem(selected = false, onClick = { close(); actions.onResetCache() }) { MenuRow(KashIcons.Refresh, StringsKey.ResetCache) }
@@ -231,21 +244,28 @@ fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: Se
     val canGoBack = tab?.canGoBack?.value == true
     val canGoForward = tab?.canGoForward?.value == true
     selectableItem(selected = false, onClick = { close(); actions.onBack() }, enabled = canGoBack) {
-        MenuRow(KashIcons.ChevronLeft, StringsKey.Back, enabled = canGoBack)
+        MenuRow(KashIcons.ChevronLeft, StringsKey.Back, enabled = canGoBack, shortcut = BACK_SHORTCUT)
     }
     selectableItem(selected = false, onClick = { close(); actions.onForward() }, enabled = canGoForward) {
-        MenuRow(KashIcons.ChevronRight, StringsKey.Forward, enabled = canGoForward)
+        MenuRow(KashIcons.ChevronRight, StringsKey.Forward, enabled = canGoForward, shortcut = FORWARD_SHORTCUT)
     }
     selectableItem(selected = false, onClick = { close(); actions.onReload() }, enabled = tab != null) {
-        MenuRow(KashIcons.Refresh, StringsKey.Reload, enabled = tab != null)
+        MenuRow(KashIcons.Refresh, StringsKey.Reload, enabled = tab != null, shortcut = RELOAD_SHORTCUT)
     }
     separator()
     selectableItem(selected = false, onClick = { close(); actions.onToggleMute() }) {
         if (service.muted) MenuRow(KashIcons.Bell, StringsKey.Unmute) else MenuRow(KashIcons.BellOff, StringsKey.Mute)
     }
     separator()
+    // The zoom of its page: one step up or down, and back to the default of Settings, which says the zoom that it has now.
+    selectableItem(selected = false, onClick = { close(); actions.onZoomIn() }) { MenuRow(KashIcons.Plus, StringsKey.ZoomIn, shortcut = ZOOM_IN_SHORTCUT) }
+    selectableItem(selected = false, onClick = { close(); actions.onZoomOut() }) { MenuRow(KashIcons.Minus, StringsKey.ZoomOut, shortcut = ZOOM_OUT_SHORTCUT) }
+    selectableItem(selected = false, onClick = { close(); actions.onZoomReset() }, enabled = service.zoom != null) {
+        MenuRow(KashIcons.Search, StringsKey.ZoomReset, argument = actions.zoom().toString(), enabled = service.zoom != null)
+    }
+    separator()
     selectableItem(selected = false, onClick = { close(); actions.onDevTools() }, enabled = tab != null) {
-        MenuRow(KashIcons.Code, StringsKey.DevTools, enabled = tab != null)
+        MenuRow(KashIcons.Code, StringsKey.DevTools, enabled = tab != null, shortcut = DEV_TOOLS_SHORTCUT)
     }
     selectableItem(selected = false, onClick = { close(); actions.onEdit() }) { MenuRow(KashIcons.Pencil, StringsKey.Edit) }
     selectableItem(selected = false, onClick = { close(); actions.onResetCache() }) { MenuRow(KashIcons.Refresh, StringsKey.ResetCache) }
@@ -255,13 +275,25 @@ fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: Se
     selectableItem(selected = false, onClick = { close(); actions.onDelete() }) { MenuRow(KashIcons.Trash, StringsKey.Delete, destructive = true) }
 }
 
-/** Which text of [strings] a menu row shows: the items are built outside a composition, their text inside. */
-enum class StringsKey { UpdatePlugin, Back, Forward, Reload, Mute, Unmute, DevTools, Edit, ResetCache, Erase, Disable, Delete, OpenConversation, MarkRead, MarkReadByOpening, MarkPriority, UnmarkPriority }
+/** The shortcuts of the menus' actions, as their rows show them: those that [windowShortcutOf] and a page's `BrowserShortcut` read. */
+const val ZOOM_IN_SHORTCUT = "⌘+"
+const val ZOOM_OUT_SHORTCUT = "⌘−"
+const val RELOAD_SHORTCUT = "⌘R"
+const val BACK_SHORTCUT = "⌘["
+const val FORWARD_SHORTCUT = "⌘]"
+const val DEV_TOOLS_SHORTCUT = "⌥⌘I"
 
+/** Which text of [strings] a menu row shows: the items are built outside a composition, their text inside. */
+enum class StringsKey { UpdatePlugin, Back, Forward, Reload, Mute, Unmute, DevTools, Edit, ResetCache, Erase, Disable, Delete, OpenConversation, MarkRead, MarkReadByOpening, MarkPriority, UnmarkPriority, ZoomIn, ZoomOut, ZoomReset }
+
+/** A row of a menu: its icon, its text, and the shortcut of its action ([shortcut]) at its end, when it has one. */
 @Composable
-internal fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = false, argument: String = "", enabled: Boolean = true) {
+internal fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = false, argument: String = "", enabled: Boolean = true, shortcut: String? = null) {
     val text = when (key) {
         StringsKey.UpdatePlugin -> strings.updatePlugin(argument)
+        StringsKey.ZoomIn -> strings.zoomIn
+        StringsKey.ZoomOut -> strings.zoomOut
+        StringsKey.ZoomReset -> strings.zoomReset(argument)
         StringsKey.Back -> strings.back
         StringsKey.Forward -> strings.forward
         StringsKey.Reload -> strings.reload
@@ -285,10 +317,12 @@ internal fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = 
         destructive -> Kash.colors.error
         else -> Kash.colors.text
     }
-    Row(Modifier.height(22.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 22.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         KashIcon(icon, if (!enabled) Kash.colors.faint else if (destructive) Kash.colors.error else Kash.colors.muted)
         // On one line: a row is one line high, and a second line was cut off ("Effacer toutes les").
-        Text(text, color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+        Text(text, Modifier.weight(1f), color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+        // As macOS's menus: the shortcut at the right, fainter than the text.
+        if (shortcut != null) Text(shortcut, color = if (enabled) Kash.colors.muted else Kash.colors.faint, maxLines = 1, softWrap = false)
     }
 }
 

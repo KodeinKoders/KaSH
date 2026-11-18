@@ -105,7 +105,7 @@ fun UnreadBadge(text: String, ring: Color, modifier: Modifier = Modifier) {
 @Composable
 fun CountPill(text: String) {
     Box(
-        Modifier.defaultMinSize(minWidth = 24.dp).height(22.dp).background(Kash.colors.count, RoundedCornerShape(11.dp)).padding(horizontal = 8.dp),
+        Modifier.defaultMinSize(minWidth = 24.dp, minHeight = 22.dp).background(Kash.colors.count, RoundedCornerShape(11.dp)).padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)

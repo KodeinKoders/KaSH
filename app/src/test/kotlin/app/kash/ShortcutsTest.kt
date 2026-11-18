@@ -57,12 +57,39 @@ class ShortcutsTest {
     }
 
     @Test
+    fun commandPlusAndMinusZoomTheServiceShown() {
+        val found = shortcutsOf {
+            withKeyDown(Key.MetaLeft) {
+                pressKey(Key.Equals)
+                pressKey(Key.Minus)
+                pressKey(Key.NumPadAdd)
+            }
+        }
+        assertEquals(listOf(BrowserShortcut.ZoomIn, BrowserShortcut.ZoomOut, BrowserShortcut.ZoomIn), found)
+    }
+
+    @Test
+    fun commandRBracketsAndOptionCommandIAreThoseOfThePage() {
+        val found = shortcutsOf {
+            withKeyDown(Key.MetaLeft) {
+                pressKey(Key.R)
+                pressKey(Key.LeftBracket)
+                pressKey(Key.RightBracket)
+                withKeyDown(Key.AltLeft) { pressKey(Key.I) }
+            }
+        }
+        assertEquals(listOf(BrowserShortcut.Reload, BrowserShortcut.Back, BrowserShortcut.Forward, BrowserShortcut.DevTools), found)
+    }
+
+    @Test
     fun otherKeysAndModifiersAreNotKashs() {
         val found = shortcutsOf {
             pressKey(Key.One)
             withKeyDown(Key.MetaLeft) { withKeyDown(Key.ShiftLeft) { pressKey(Key.One) } }
             withKeyDown(Key.MetaLeft) { withKeyDown(Key.AltLeft) { pressKey(Key.One) } }
             withKeyDown(Key.MetaLeft) { pressKey(Key.A) }
+            withKeyDown(Key.MetaLeft) { withKeyDown(Key.ShiftLeft) { pressKey(Key.R) } }
+            withKeyDown(Key.MetaLeft) { withKeyDown(Key.AltLeft) { pressKey(Key.R) } }
         }
         assertEquals(emptyList(), found)
     }

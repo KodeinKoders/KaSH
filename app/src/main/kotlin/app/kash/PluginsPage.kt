@@ -39,6 +39,7 @@ import app.kash.core.PluginPackage
 import app.kash.core.PluginPackageException
 import app.kash.core.PluginSource
 import app.kash.ui.Hint
+import app.kash.ui.UiScaled
 import app.kash.ui.Kash
 import app.kash.ui.LocalAwtWindow
 import app.kash.ui.strings
@@ -278,11 +279,14 @@ private fun PluginDialog(
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     DialogWindow(onCloseRequest = onDismiss, state = rememberDialogState(size = DpSize(480.dp, height.dp)), title = title, resizable = false) {
-        Box(Modifier.fillMaxSize().background(Kash.colors.panel).padding(20.dp)) {
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) { actions() }
+        // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
+        UiScaled {
+            Box(Modifier.fillMaxSize().background(Kash.colors.panel).padding(20.dp)) {
+                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) { actions() }
+                }
             }
         }
     }
