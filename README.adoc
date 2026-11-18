@@ -18,6 +18,7 @@ toc::[]
 == Services
 
 WhatsApp, Google Chat, Slack, Google Messages, Telegram, Discord, Instagram, Messenger and LinkedIn are in the catalog, as plugins: each one is a manifest, which describes the service and its options, and a script, which reads its unread conversations (see link:PLUGINS.adoc[the plugins' guide]).
+What KaSH does for each of them, and for those to come, is in link:SERVICES.adoc[the services' table].
 Other plugins are installed in Settings › Plugins, from a zip, a folder or an address, which KaSH can watch for a new version.
 Any web application can also be added as a custom service, by its address.
 A Slack service is one workspace, given by its name (`my-team` for `my-team.slack.com`).

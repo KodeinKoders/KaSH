@@ -1,0 +1,165 @@
+= KaSH: the services
+:toc: 
+:toclevels: 2
+:icons: font
+
+[.lead]
+What KaSH does for each messaging service that it knows, and for those that it will know.
+
+Each state is one of:
+
+* *YES*: KaSH does it, and it was seen working on the service.
+* *NO*: KaSH does not do it, because the service does not show it or it means nothing there.
+* *TODO*: still to do, or written but not seen yet on a real case (see <<notes>>).
+
+Every service, whether it is a plugin or a web application added by its address, also has what KaSH gives to all of them: its own profile, kept across launches, the notifications that its page shows, its unread total in the rail and the Dock, its zoom, its Do Not Disturb hours, and its links opened in the system's browser.
+A web application added by its address tells only its total, by its title (`(3) Name`): no conversation, no search, no action.
+
+
+== The services
+
+[cols="4,1,1,1,1,1,1,1,1,1,1,1,1",options="header"]
+|===
+| | WhatsApp | Google Chat | Slack | Google Messages | Telegram | Discord | Instagram | Messenger | LinkedIn | TikTok | Snapchat | Teams
+
+13+h| The plugin
+
+| Built-in plugin
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+
+| Page inspected while signed in
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+
+| Logo as the service's icon
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+
+| Image of the workspace as the service's icon
+| NO | NO | YES | NO | NO | NO | NO | NO | NO | TODO | TODO | TODO
+
+13+h| The unread conversations (the Unread tab, the badges)
+
+| Unread conversations
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+
+| Their number of unread messages (otherwise 1 each)
+| YES | YES | YES | NO | YES | YES | NO | NO | YES | TODO | TODO | TODO
+
+| Topics: what is new without being counted (a channel in bold)
+| NO | TODO | YES | NO | NO | YES | NO | NO | NO | TODO | TODO | TODO
+
+| Groups told from people
+| YES | YES | YES | TODO | TODO | TODO | TODO | YES | YES | TODO | TODO | TODO
+
+| Muted conversations left out
+| YES | TODO | YES | YES | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO
+
+| Time of the last message
+| YES | YES | NO | YES | YES | NO | YES | YES | YES | TODO | TODO | TODO
+
+| Start of the last message
+| YES | YES | NO | YES | YES | NO | YES | YES | YES | TODO | TODO | TODO
+
+| Conversations whose row the page has not loaded
+| YES | NO | NO | NO | NO | NO | TODO | TODO | TODO | TODO | TODO | TODO
+
+13+h| The search
+
+| Contacts and topics in the search
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+
+| Every conversation, not only those that the page showed
+| YES | NO | NO | NO | NO | NO | NO | NO | NO | TODO | TODO | TODO
+
+| Opening a conversation from KaSH
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+
+13+h| Marking a conversation as read
+
+| By the service's own action
+| YES | YES | YES | NO | YES | YES | NO | YES | YES | TODO | TODO | TODO
+
+| By opening it in the background, then going back
+| NO | NO | NO | YES | NO | NO | TODO | NO | NO | TODO | TODO | TODO
+|===
+
+
+[#notes]
+== Notes
+
+=== WhatsApp
+
+It reads WhatsApp Web's own model, which has every conversation, read or not: nothing depends on what the page shows, but the preview, which only a conversation whose row was shown has.
+A version of WhatsApp that renames its model breaks the plugin until it is inspected again.
+
+=== Google Chat
+
+A direct message has its count; a space counts only when the user is mentioned in it, and is a topic when it is only in bold.
+Its message requests (accounts outside the organization) are one row for all of them.
+The preview is the Home list's, only while Home is shown.
+
+*TODO*: a mention in a space, a space in bold, and a muted conversation were not seen yet.
+
+=== Slack
+
+A Slack service is one workspace, whose image is the service's icon.
+A direct message has its count, a channel counts only when the user is mentioned in it, and is a topic when it is only in bold; the replies in threads are one row, when Slack badges them.
+The sidebar shows no time and no preview: KaSH shows when it saw the message instead (Settings › Unread › Show approximate times).
+
+=== Google Messages
+
+The list shows no count: an unread conversation counts 1.
+Its time is to the minute today, to the day before.
+It has no "Mark as read": KaSH opens the conversation and goes back to the one before.
+
+*TODO*: a group was not seen yet.
+
+=== Telegram
+
+It reads Telegram Web K (`/k/`), not Web A.
+The rows do not tell a group from a channel.
+
+*TODO*: a group, a channel, a mention and a muted conversation were not seen yet.
+
+=== Discord
+
+A direct message has its count; a server with unread messages is a topic, mentioned or not.
+The column of servers shows no time and no preview: KaSH shows when it saw the message instead.
+Its search has every direct message once the list of direct messages was shown.
+
+*TODO*: a group direct message, a closed folder of servers, a muted server, and marking a direct message as read were not seen yet.
+
+=== Instagram
+
+Instagram does not count its messages: an unread conversation counts 1.
+It signs in with Facebook inside KaSH (`openInKash`).
+It has no "Mark as read": KaSH opens the conversation, which was seen read.
+
+*TODO*: going back to the conversation before was fixed but not tried; a group, a muted conversation, a message request and a long list were not seen yet.
+
+=== Messenger
+
+Facebook does not count the messages: an unread conversation counts 1.
+
+*TODO*: a muted conversation, a message request and the rows that the list loads as it is scrolled were not seen yet.
+
+=== LinkedIn
+
+A conversation has no id on the page: its participants' names are its id, and a conversation whose row is not loaded cannot be opened from KaSH.
+"Mark as read" is told by its text, in the languages of LinkedIn's interface.
+
+*TODO*: a muted conversation, a sponsored message and the rows that the list loads as it is scrolled were not seen yet.
+
+=== TikTok
+
+*TODO*: everything.
+Its messages are on the web at https://www.tiktok.com/messages[tiktok.com/messages].
+
+=== Snapchat
+
+*TODO*: everything.
+Its messages are on the web at https://web.snapchat.com[web.snapchat.com].
+
+=== Teams
+
+*TODO*: everything.
+Its web application is https://teams.microsoft.com[teams.microsoft.com] for work and school accounts, https://teams.live.com[teams.live.com] for personal ones: whether a Teams service is one account, as a Slack service is one workspace, is to be decided.

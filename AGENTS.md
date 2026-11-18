@@ -14,6 +14,7 @@ Chromium is JetBrains' fork of JCEF, built from the `jcef` submodule. It only ru
 
 **State of the services**: every service that KaSH knows is a **plugin** (see **Plugins** and `PLUGINS.adoc`): a manifest and a script, built in under `app/src/main/resources/app/kash/plugins/`. The built-in ones are WhatsApp, Google Chat, Slack, Google Messages, Telegram, Discord, Instagram, Messenger and LinkedIn. A web application that the user adds by its address is not a plugin: no option, no script, and it tells its total by its title (`(3) Name`). Adding a service to the catalog means inspecting its page once the user is logged in (see **Inspecting the services**) and writing its plugin. The user installs other plugins in Settings › Plugins (see **Installed plugins**).
 The automatic updates of the design (Settings › General › Updates) are not done.
+**`SERVICES.adoc` says what KaSH does for each service** (YES, NO, TODO), and for those to come (TikTok, Snapchat, Teams): a change to a plugin, or something that it was not seen doing and now is, changes it too.
 
 ## Modules
 
