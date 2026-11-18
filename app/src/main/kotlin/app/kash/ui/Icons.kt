@@ -75,6 +75,9 @@ object KashIcons {
     val Eraser = strokeIcon("eraser", "M8 16h8", "M11.5 4.5l4 4L9 15H6l-2-2 7.5-8.5z")
     val Code = strokeIcon("code", "M7 6l-4 4 4 4M13 6l4 4-4 4")
     val Close = strokeIcon("close", "M5.5 5.5l9 9M14.5 5.5l-9 9")
+    // A priority contact (PriorityContact): outlined to mark one, filled once it is.
+    val Star = strokeIcon("star", "M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z")
+    val StarFilled = fillIcon("star-filled", "M10 2.8l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L2.8 8.1l5-.7z")
     val Clock = strokeIcon("clock", circle(10f, 10f, 7f), "M10 6v4l2.6 1.8")
     val Info = strokeIcon("info", circle(10f, 10f, 7f), "M10 9.2v4.3", "M10 6.6h.01")
     val ArrowUp = strokeIcon("arrow-up", "M10 16V4.5", "M5 9.5l5-5 5 5", width = 2f)

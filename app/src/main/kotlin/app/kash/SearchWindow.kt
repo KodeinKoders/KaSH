@@ -3,6 +3,9 @@ package app.kash
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,6 +91,13 @@ import javax.swing.RootPaneContainer
 /** The shortcut of the search, as it is shown: `BrowserShortcut.Search` in a page, [isSearchShortcut] elsewhere. */
 const val SEARCH_SHORTCUT = "⌘⇧K"
 
+/** The search's shortcut that marks the selected line's contact as priority, or not any more ([isPriorityShortcut]). */
+const val PRIORITY_SHORTCUT = "⌘D"
+
+/** Whether [event] is ⌘D, which marks the selected line's contact as priority in the search, or not any more. */
+fun isPriorityShortcut(event: KeyEvent): Boolean =
+    event.type == KeyEventType.KeyDown && event.key == Key.D && event.isMetaPressed && !event.isShiftPressed && !event.isAltPressed && !event.isCtrlPressed
+
 /** Whether [event] is the search's shortcut, ⌘⇧K, in a window of KaSH (a page has its own: `BrowserShortcut.Search`). */
 fun isSearchShortcut(event: KeyEvent): Boolean =
     event.type == KeyEventType.KeyDown && event.key == Key.K && event.isMetaPressed && event.isShiftPressed && !event.isAltPressed && !event.isCtrlPressed
@@ -121,7 +131,10 @@ fun SearchField(onClick: () -> Unit, modifier: Modifier = Modifier) {
  * KaTTY's palette. It closes on a click on the veil, Escape, ⌘⇧K, when it loses the focus, and when a line is opened ([onOpen]).
  */
 @Composable
-fun SearchWindow(owner: java.awt.Window?, entries: List<SearchEntry>, icons: ServiceIcons, onOpen: (SearchEntry) -> Unit, onDismiss: () -> Unit) {
+fun SearchWindow(
+    owner: java.awt.Window?, entries: List<SearchEntry>, icons: ServiceIcons, onOpen: (SearchEntry) -> Unit, onDismiss: () -> Unit,
+    priority: PriorityActions = PriorityActions(),
+) {
     val latest by rememberUpdatedState(onDismiss)
     // Where the main window's content is on the screen, in AWT's points, which are dp.
     val bounds = remember(owner) {
@@ -158,13 +171,15 @@ fun SearchWindow(owner: java.awt.Window?, entries: List<SearchEntry>, icons: Ser
             window.addWindowFocusListener(listener)
             onDispose { window.removeWindowFocusListener(listener) }
         }
-        SearchContent(entries, icons, onOpen, onDismiss)
+        SearchContent(entries, icons, onOpen, onDismiss, priority)
     }
 }
 
 /** What the search shows, apart from its window: the field, the lines that match, and how to use them. */
 @Composable
-fun SearchContent(entries: List<SearchEntry>, icons: ServiceIcons, onOpen: (SearchEntry) -> Unit, onDismiss: () -> Unit) {
+fun SearchContent(
+    entries: List<SearchEntry>, icons: ServiceIcons, onOpen: (SearchEntry) -> Unit, onDismiss: () -> Unit, priority: PriorityActions = PriorityActions(),
+) {
     val colors = Kash.colors
     val s = strings
     val query = rememberTextFieldState()
@@ -197,6 +212,8 @@ fun SearchContent(entries: List<SearchEntry>, icons: ServiceIcons, onOpen: (Sear
                         Key.DirectionUp -> { select(stepped(selected, -1, matches.size)); true }
                         Key.Enter, Key.NumPadEnter -> { matches.getOrNull(selected)?.let { onOpen(it.entry) }; true }
                         Key.Escape -> { onDismiss(); true }
+                        // The selected line's contact marked as priority, or not any more, without opening it (as a browser's ⌘D bookmarks).
+                        Key.D -> if (isPriorityShortcut(event)) { matches.getOrNull(selected)?.let { priority.onToggle(it.entry) }; true } else false
                         else -> false
                     }
                 },
@@ -220,7 +237,7 @@ fun SearchContent(entries: List<SearchEntry>, icons: ServiceIcons, onOpen: (Sear
                         color = colors.muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                     )
                 }
-                SearchRow(match, selected == index, icons) { onOpen(match.entry) }
+                SearchRow(match, selected == index, icons, priority) { onOpen(match.entry) }
             }
         }
         Row(
@@ -230,6 +247,10 @@ fun SearchContent(entries: List<SearchEntry>, icons: ServiceIcons, onOpen: (Sear
         ) {
             FooterHint(listOf("↑", "↓"), s.searchNavigate)
             FooterHint(listOf("⏎"), s.searchOpen)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Shortcut(PRIORITY_SHORTCUT)
+                Text(s.searchPriority, color = colors.muted, fontSize = 12.sp, maxLines = 1)
+            }
             Box(Modifier.weight(1f))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Shortcut(SEARCH_SHORTCUT)
@@ -278,13 +299,15 @@ private fun FooterHint(keys: List<String>, label: String) {
 
 /** A line of the search: its service's tile, its name with the letters that matched, its service, and what is unread in it. */
 @Composable
-private fun SearchRow(match: SearchMatch, selected: Boolean, icons: ServiceIcons, onClick: () -> Unit) {
+private fun SearchRow(match: SearchMatch, selected: Boolean, icons: ServiceIcons, priority: PriorityActions, onClick: () -> Unit) {
     val colors = Kash.colors
     val entry = match.entry
     val shape = RoundedCornerShape(6.dp)
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
     Row(
         Modifier.fillMaxWidth().heightIn(min = 36.dp).clip(shape)
-            .then(if (selected) Modifier.background(colors.selection) else Modifier.hoverBackground(colors.hover, shape))
+            .then(if (selected) Modifier.background(colors.selection).hoverable(interaction) else Modifier.hoverBackground(colors.hover, shape, interaction))
             .semantics { contentDescription = "${entry.name} ${entry.service.title}"; this.selected = selected }
             .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -297,8 +320,22 @@ private fun SearchRow(match: SearchMatch, selected: Boolean, icons: ServiceIcons
             entry.count > 0 -> CountPill(UnreadCount.badge(entry.count))
             entry.topic -> Box(Modifier.padding(horizontal = 8.dp).size(8.dp).background(colors.muted, CircleShape))
         }
+        // Its star: filled for a priority contact, outlined while the line is pointed at or selected, which marks it; it does not open it.
+        val isPriority = priority.isPriority(entry)
+        if (isPriority || hovered || selected) {
+            val label = if (isPriority) strings.unmarkPriority else strings.markPriority
+            Box(
+                Modifier.size(22.dp).clip(RoundedCornerShape(4.dp)).hoverBackground(colors.hover, RoundedCornerShape(4.dp))
+                    .semantics { contentDescription = label }
+                    .clickable(role = Role.Button) { priority.onToggle(entry) },
+                contentAlignment = Alignment.Center,
+            ) { KashIcon(if (isPriority) KashIcons.StarFilled else KashIcons.Star, if (isPriority) colors.accent else colors.muted, size = 14.dp) }
+        }
     }
 }
+
+/** Whether a line of the search is a priority contact's ([isPriority]), and marking it as one or not any more ([onToggle]). */
+class PriorityActions(val isPriority: (SearchEntry) -> Boolean = { false }, val onToggle: (SearchEntry) -> Unit = {})
 
 /** [name] with the letters at [indices] in bold, in the accent's color: what the query matched. */
 internal fun highlighted(name: String, indices: List<Int>, accent: Color): AnnotatedString = buildAnnotatedString {

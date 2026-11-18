@@ -2,6 +2,7 @@
 
 package app.kash
 
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.withKeyDown
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.graphics.Color
@@ -83,6 +85,57 @@ class SearchWindowTest {
 
         onNodeWithContentDescription("Laura WhatsApp").performClick()
         assertEquals(listOf("laura"), opened)
+    }
+
+    @Test
+    fun theStarOfALineMarksItsContactAsPriorityWithoutOpeningIt() = runComposeUiTest {
+        val opened = mutableListOf<String>()
+        val priorities = mutableStateListOf("lucas")
+        setContent {
+            KashTheme(false) {
+                SearchContent(
+                    entries, icons, onOpen = { opened += it.conversation }, onDismiss = {},
+                    priority = PriorityActions(
+                        isPriority = { it.conversation in priorities },
+                        onToggle = { if (!priorities.remove(it.conversation)) priorities += it.conversation },
+                    ),
+                )
+            }
+        }
+        // Lucas is a priority contact: his star is there, and takes him out.
+        onNodeWithContentDescription("Remove from priority").performClick()
+        assertEquals(emptyList(), priorities)
+        assertEquals(emptyList(), opened)
+        // The selected line (the first one) has its star to mark it.
+        onNodeWithContentDescription("Mark as priority").performClick()
+        assertEquals(listOf("lucas"), priorities)
+        assertEquals(emptyList(), opened)
+    }
+
+    @Test
+    fun commandDMarksTheSelectedLinesContactAsPriorityWithoutOpeningIt() = runComposeUiTest {
+        val opened = mutableListOf<String>()
+        val priorities = mutableStateListOf("lucas")
+        setContent {
+            KashTheme(false) {
+                SearchContent(
+                    entries, icons, onOpen = { opened += it.conversation }, onDismiss = {},
+                    priority = PriorityActions(
+                        isPriority = { it.conversation in priorities },
+                        onToggle = { if (!priorities.remove(it.conversation)) priorities += it.conversation },
+                    ),
+                )
+            }
+        }
+        // The first line, Lucas (unread), then Laura once the arrow selects her.
+        val field = onNode(hasSetTextAction())
+        field.performKeyInput { withKeyDown(Key.MetaLeft) { pressKey(Key.D) } }
+        assertEquals(emptyList(), priorities)
+        field.performKeyInput { pressKey(Key.DirectionDown) }
+        field.performKeyInput { withKeyDown(Key.MetaLeft) { pressKey(Key.D) } }
+        assertEquals(listOf("laura"), priorities)
+        assertEquals(emptyList(), opened)
+        onNodeWithText("Priority").assertExists()
     }
 
     @Test

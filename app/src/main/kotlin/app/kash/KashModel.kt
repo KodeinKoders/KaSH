@@ -20,6 +20,8 @@ import app.kash.core.PageLanguages
 import app.kash.core.InstalledPlugin
 import app.kash.core.Plugin
 import app.kash.core.PluginIcon
+import app.kash.core.Priorities
+import app.kash.core.PriorityContact
 import app.kash.core.PluginManifest
 import app.kash.core.PluginPackage
 import app.kash.core.PluginPackageException
@@ -454,6 +456,16 @@ class KashModel(
 
     fun select(selection: Selection) = update { it.copy(selection = selection) }
 
+    /** The contacts that the user marked as priority ([PriorityContact]), kept in the state. */
+    val priorities: List<PriorityContact> get() = state.priorities
+
+    /** Whether the conversation [conversation] of [service] is a priority contact's. */
+    fun isPriority(service: ServiceId, conversation: String?): Boolean = Priorities.contains(state.priorities, service, conversation)
+
+    /** Marks the conversation [conversation] of [service], named [name], as a priority contact's, or not any more when it was. */
+    fun togglePriority(service: ServiceId, conversation: String, name: String) =
+        update { it.copy(priorities = Priorities.toggle(it.priorities, service, conversation, name)) }
+
     /** Does what KaSH's [shortcut] does: the search, the Unread tab, a service of the rail (an enabled one, in its order; none past the last). */
     fun shortcut(shortcut: BrowserShortcut) {
         when (shortcut) {
@@ -570,6 +582,7 @@ class KashModel(
         update { state ->
             state.copy(
                 services = state.services.filter { it.id != id },
+                priorities = state.priorities.filter { it.service != id },
                 selection = if (state.selection == Selection.OfService(id)) Selection.Inbox else state.selection,
                 deletedProfiles = state.deletedProfiles + service.profile,
             )

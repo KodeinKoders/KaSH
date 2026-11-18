@@ -92,7 +92,7 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
         selection = if (selected == null) Selection.Inbox else state.selection,
         badges = badges,
         // The topics are not counted (Inbox.sections).
-        inboxCount = Inbox.sections(rows).count,
+        inboxCount = Inbox.sections(rows, model.priorities).count,
         showBadges = settings.showBadges,
         showLabels = settings.showLabels,
         doNotDisturb = settings.doNotDisturb,
@@ -118,7 +118,10 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
                     actions = RowActions(
                         markReadOf = { row -> model.markReadOf(row.service.id) },
                         onMarkRead = { row -> row.conversation?.let { model.markRead(row.service.id, it) } },
+                        isPriority = { row -> model.isPriority(row.service.id, row.conversation) },
+                        onTogglePriority = { row -> row.conversation?.let { model.togglePriority(row.service.id, it, row.name) } },
                     ),
+                    priorities = model.priorities,
                 )
             }
         }

@@ -52,6 +52,7 @@ import app.kash.core.InboxSort
 import app.kash.core.Language
 import app.kash.core.NotificationDuration
 import app.kash.core.NotificationStyle
+import app.kash.core.Priorities
 import app.kash.core.RailSide
 import app.kash.core.Service
 import app.kash.core.ServiceId
@@ -65,6 +66,7 @@ import app.kash.macos.NotificationAlertStyle
 import app.kash.macos.NotificationAuthorization
 import app.kash.macos.inAppBundle
 import app.kash.ui.Hint
+import app.kash.ui.IconOnlyButton
 import app.kash.ui.Kash
 import app.kash.ui.LocalAwtWindow
 import app.kash.ui.KashIcon
@@ -101,7 +103,7 @@ private fun Strings.page(page: SettingsPage): Pair<String, List<String>> = when 
     SettingsPage.NOTIFICATIONS -> notifications to listOf(
         alerts, desktopNotifications, playSound, notificationStyle, kashNotifications, systemNotifications, sendTestNotification,
         notificationDuration, temporaryNotifications, permanentNotifications,
-        dockBadge, dockTotal, dockDot, dockNone, doNotDisturb,
+        priorityContacts, priorityContactsHint, dockBadge, dockTotal, dockDot, dockNone, doNotDisturb,
     )
     SettingsPage.INBOX -> inboxTab to listOf(display, defaultSort, openInboxOnLaunch, showApproximateTimes, content, skipMuted, directOnly)
     SettingsPage.SERVICES -> services to listOf(enabled, edit, resetCache, eraseData, delete, addService)
@@ -195,7 +197,7 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
                         when (page) {
                             SettingsPage.GENERAL -> GeneralPage(draft) { draft = it }
                             SettingsPage.APPEARANCE -> AppearancePage(draft, services, model, icons) { draft = it }
-                            SettingsPage.NOTIFICATIONS -> NotificationsPage(draft, notifier) { draft = it }
+                            SettingsPage.NOTIFICATIONS -> NotificationsPage(draft, notifier, model, icons) { draft = it }
                             SettingsPage.INBOX -> InboxPage(draft) { draft = it }
                             SettingsPage.PLUGINS -> PluginsPage(model, icons)
                             SettingsPage.SERVICES -> ServicesPage(
@@ -354,7 +356,7 @@ private fun openSystemNotificationSettings() {
 }
 
 @Composable
-private fun NotificationsPage(draft: Settings, notifier: Notifier, onChange: (Settings) -> Unit) {
+private fun NotificationsPage(draft: Settings, notifier: Notifier, model: KashModel, icons: ServiceIcons, onChange: (Settings) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(strings.alerts)
         CheckboxRow(strings.desktopNotifications, draft.notifications, { onChange(draft.copy(notifications = it)) })
@@ -412,6 +414,30 @@ private fun NotificationsPage(draft: Settings, notifier: Notifier, onChange: (Se
             Text(strings.systemDuration(alertStyle))
             Hint(strings.systemDurationHint)
             OutlinedButton(onClick = ::openSystemNotificationSettings, modifier = Modifier.padding(top = 4.dp)) { Text(strings.openSystemNotificationSettings) }
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionTitle(strings.priorityContacts)
+        Hint(strings.priorityContactsHint)
+        // Done at once, not at Apply: these are no settings, as the plugins of Settings › Plugins.
+        val priorities = Priorities.of(model.priorities, model.state.services)
+        if (priorities.isEmpty()) {
+            Text(strings.noPriorityContacts, color = Kash.colors.muted)
+        } else {
+            for (contact in priorities) {
+                val service = model.service(contact.service) ?: continue
+                Row(
+                    Modifier.fillMaxWidth().height(32.dp).padding(horizontal = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    KashIcon(KashIcons.StarFilled, Kash.colors.accent, size = 14.dp)
+                    ServiceTile(service, icons, 20.dp)
+                    Text(contact.name, Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(service.title, Modifier.weight(1f), color = Kash.colors.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    IconOnlyButton(KashIcons.Close, strings.removePriority(contact.name), { model.togglePriority(contact.service, contact.conversation, contact.name) }, size = 24.dp, iconSize = 14.dp)
+                }
+            }
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

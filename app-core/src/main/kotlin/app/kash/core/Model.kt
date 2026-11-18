@@ -184,6 +184,7 @@ public sealed interface Selection {
  * @property services The services, in the order of their tabs.
  * @property deletedProfiles The profiles of the services that were deleted or erased, which are deleted at the next launch, before the browser engine
  *   starts: while it runs, Chromium may still hold or write files of a profile that is closed.
+ * @property priorities The contacts that the user marked as priority ([Priorities]).
  */
 @Serializable
 public data class KashState(
@@ -191,4 +192,5 @@ public data class KashState(
     val selection: Selection = Selection.Inbox,
     val settings: Settings = Settings(),
     val deletedProfiles: List<ProfileId> = emptyList(),
+    val priorities: List<PriorityContact> = emptyList(),
 )

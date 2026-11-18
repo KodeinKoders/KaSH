@@ -256,7 +256,7 @@ fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: Se
 }
 
 /** Which text of [strings] a menu row shows: the items are built outside a composition, their text inside. */
-enum class StringsKey { UpdatePlugin, Back, Forward, Reload, Mute, Unmute, DevTools, Edit, ResetCache, Erase, Disable, Delete, OpenConversation, MarkRead, MarkReadByOpening }
+enum class StringsKey { UpdatePlugin, Back, Forward, Reload, Mute, Unmute, DevTools, Edit, ResetCache, Erase, Disable, Delete, OpenConversation, MarkRead, MarkReadByOpening, MarkPriority, UnmarkPriority }
 
 @Composable
 internal fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = false, argument: String = "", enabled: Boolean = true) {
@@ -276,6 +276,8 @@ internal fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = 
         StringsKey.OpenConversation -> strings.openConversation
         StringsKey.MarkRead -> strings.markRead
         StringsKey.MarkReadByOpening -> strings.markReadByOpening
+        StringsKey.MarkPriority -> strings.markPriority
+        StringsKey.UnmarkPriority -> strings.unmarkPriority
     }
     // Its own color, which Jewel's item does not gray out when it is disabled: KaSH does.
     val color: Color = when {

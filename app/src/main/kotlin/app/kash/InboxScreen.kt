@@ -39,6 +39,7 @@ import app.kash.core.ConversationKind
 import app.kash.core.Inbox
 import app.kash.core.InboxRow
 import app.kash.core.InboxSort
+import app.kash.core.PriorityContact
 import app.kash.core.UnreadCount
 import app.kash.ui.CountPill
 import app.kash.ui.IconOnlyButton
@@ -55,6 +56,7 @@ import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.SegmentedControl
 import org.jetbrains.jewel.ui.component.SegmentedControlButtonData
 import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.separator
 import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.Tooltip
 import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
@@ -70,11 +72,11 @@ import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 @Composable
 fun InboxScreen(
     rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Unit, icons: ServiceIcons, onRefresh: () -> Unit, onOpen: (InboxRow) -> Unit,
-    actions: RowActions = RowActions(),
+    actions: RowActions = RowActions(), priorities: List<PriorityContact> = emptyList(),
 ) {
     val query = rememberTextFieldState()
-    val all = Inbox.sections(rows)
-    val filtered = Inbox.sections(Inbox.filter(rows, query.text.toString()))
+    val all = Inbox.sections(rows, priorities)
+    val filtered = Inbox.sections(Inbox.filter(rows, query.text.toString()), priorities)
     VerticallyScrollableContainer(Modifier.fillMaxSize().background(Kash.colors.background), scrollState = rememberScrollState()) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
             Column(
@@ -84,8 +86,10 @@ fun InboxScreen(
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(strings.inbox, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                        val summary = strings.inboxSummary(all.count, all.messages.size)
-                        Text(if (all.topics.isEmpty()) summary else "$summary · ${strings.topicsSummary(all.topics.size)}", color = Kash.colors.muted)
+                        // The priority conversations are messages or topics as the others.
+                        val topics = all.topics.size + all.priority.count { it.topic }
+                        val summary = strings.inboxSummary(all.count, all.messages.size + all.priority.count { !it.topic })
+                        Text(if (topics == 0) summary else "$summary · ${strings.topicsSummary(topics)}", color = Kash.colors.muted)
                     }
                     OutlinedButton(onClick = onRefresh) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -116,6 +120,8 @@ fun InboxScreen(
                 if (filtered.isEmpty) {
                     NoResults(query.text.toString())
                 } else {
+                    // The priority contacts' first, only when there are some.
+                    if (filtered.priority.isNotEmpty()) InboxSection(strings.prioritySection, filtered.priority, "", sort, icons, onOpen, actions)
                     InboxSection(strings.messagesSection, filtered.messages, strings.noUnreadMessages, sort, icons, onOpen, actions)
                     InboxSection(strings.topicsSection, filtered.topics, strings.noUnreadTopics, sort, icons, onOpen, actions)
                 }
@@ -173,7 +179,12 @@ private fun RowsCard(rows: List<InboxRow>, row: @Composable (InboxRow) -> Unit) 
  * What can be done to a row of the Unread tab besides opening it: marking its conversation as read, when its service's plugin can
  * ([markReadOf]: how, null when it cannot).
  */
-class RowActions(val markReadOf: (InboxRow) -> MarkRead? = { null }, val onMarkRead: (InboxRow) -> Unit = {})
+class RowActions(
+    val markReadOf: (InboxRow) -> MarkRead? = { null },
+    val onMarkRead: (InboxRow) -> Unit = {},
+    val isPriority: (InboxRow) -> Boolean = { false },
+    val onTogglePriority: (InboxRow) -> Unit = {},
+)
 
 /**
  * A conversation: its service's tile (in the flat list), its name, its context and its service, its count. A row of a custom application is its
@@ -211,7 +222,11 @@ private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolea
     ) {
         if (withService) ServiceTile(row.service, icons, 32.dp)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // A priority contact's.
+                if (actions.isPriority(row)) KashIcon(KashIcons.StarFilled, Kash.colors.accent, size = 12.dp)
+                Text(name, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             // The start of the last message, as the service shows it; what the conversation is when there is none.
             Text(
                 row.preview.ifBlank { if (withService) "$context · ${row.service.title}" else context },
@@ -253,6 +268,11 @@ private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolea
             selectableItem(selected = false, onClick = { close(); onClick() }) { MenuRow(KashIcons.ChevronRight, StringsKey.OpenConversation) }
             // Only when its plugin can (the user's choice: not grayed out).
             if (markable) selectableItem(selected = false, onClick = { close(); actions.onMarkRead(row) }) { MenuRow(KashIcons.Check, markReadKey) }
+            separator()
+            val priority = actions.isPriority(row)
+            selectableItem(selected = false, onClick = { close(); actions.onTogglePriority(row) }) {
+                if (priority) MenuRow(KashIcons.StarFilled, StringsKey.UnmarkPriority) else MenuRow(KashIcons.Star, StringsKey.MarkPriority)
+            }
         }
     }
 }

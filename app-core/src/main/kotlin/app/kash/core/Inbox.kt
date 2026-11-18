@@ -34,17 +34,18 @@ public data class InboxGroup(
 }
 
 /**
- * The two sections of the Unread tab: the conversations whose unread messages their service counts, and the topics, which it shows without
- * counting them (a channel in bold, without a badge).
+ * The sections of the Unread tab: the conversations of the priority contacts ([PriorityContact]), the conversations whose unread messages their
+ * service counts, and the topics, which it shows without counting them (a channel in bold, without a badge).
  */
 public data class InboxSections(
     val messages: List<InboxRow>,
     val topics: List<InboxRow>,
+    val priority: List<InboxRow> = emptyList(),
 ) {
-    val isEmpty: Boolean get() = messages.isEmpty() && topics.isEmpty()
+    val isEmpty: Boolean get() = priority.isEmpty() && messages.isEmpty() && topics.isEmpty()
 
-    /** The number of unread messages, the topics' left out. */
-    val count: Int get() = messages.sumOf { it.count }
+    /** The number of unread messages, the topics' left out (a priority one's too). */
+    val count: Int get() = priority.filterNot { it.topic }.sumOf { it.count } + messages.sumOf { it.count }
 }
 
 /** What the Unread tab shows, made from the services and what is unread in each. */
@@ -72,10 +73,14 @@ public object Inbox {
             }
         }
 
-    /** The rows in their sections: the messages, then the topics, each in the order of [rows]. */
-    public fun sections(rows: List<InboxRow>): InboxSections {
-        val (topics, messages) = rows.partition { it.topic }
-        return InboxSections(messages, topics)
+    /**
+     * The rows in their sections, each in the order of [rows]: the conversations of the contacts marked as [priorities] (messages and topics),
+     * then the other messages, then the other topics.
+     */
+    public fun sections(rows: List<InboxRow>, priorities: List<PriorityContact> = emptyList()): InboxSections {
+        val (priority, others) = rows.partition { Priorities.contains(priorities, it.service.id, it.conversation) }
+        val (topics, messages) = others.partition { it.topic }
+        return InboxSections(messages, topics, priority)
     }
 
     /** The rows that [query] matches, by the conversation's name, or the service's name or label, ignoring case. */

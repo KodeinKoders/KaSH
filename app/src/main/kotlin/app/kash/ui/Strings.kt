@@ -36,6 +36,15 @@ interface Strings {
     fun open(name: String): String
     fun noResults(query: String): String
 
+    // Priority contacts
+    val prioritySection: String
+    val markPriority: String
+    val unmarkPriority: String
+    val priorityContacts: String
+    val priorityContactsHint: String
+    val noPriorityContacts: String
+    fun removePriority(name: String): String
+
     // Marking a conversation as read
     val markRead: String
     val markReadByOpening: String
@@ -52,6 +61,7 @@ interface Strings {
     val searchNavigate: String
     val searchOpen: String
     val searchClose: String
+    val searchPriority: String
     val emptyTitle: String
     val emptyHint: String
     fun unread(count: Int): String
@@ -265,6 +275,13 @@ object French : Strings {
     override val byService = "Par service"
     override fun open(name: String) = "Ouvrir $name"
     override fun noResults(query: String) = "Aucune conversation non lue ne correspond à « $query »."
+    override val prioritySection = "Prioritaires"
+    override val markPriority = "Marquer comme prioritaire"
+    override val unmarkPriority = "Retirer des prioritaires"
+    override val priorityContacts = "Contacts prioritaires"
+    override val priorityContactsHint = "Leurs conversations non lues sont en tête de l'onglet Non lus, et leurs notifications passent même en mode Ne pas déranger et quand leur service est en sourdine."
+    override val noPriorityContacts = "Aucun contact prioritaire. Marquez-en un depuis le menu d'une conversation de l'onglet Non lus, ou par son étoile dans la recherche."
+    override fun removePriority(name: String) = "Retirer $name des prioritaires"
     override val markRead = "Marquer comme lu"
     override val markReadByOpening = "Marquer comme lu (en l'ouvrant)"
     override val openConversation = "Ouvrir la conversation"
@@ -278,6 +295,7 @@ object French : Strings {
     override val searchNavigate = "Naviguer"
     override val searchOpen = "Ouvrir"
     override val searchClose = "Fermer"
+    override val searchPriority = "Prioritaire"
     override val emptyTitle = "Aucun message non lu"
     override val emptyHint = "Les conversations non lues de vos services apparaîtront ici."
     override fun unread(count: Int) = "$count non lu${s(count)}"
@@ -496,6 +514,13 @@ object English : Strings {
     override val byService = "By service"
     override fun open(name: String) = "Open $name"
     override fun noResults(query: String) = "No unread conversation matches “$query”."
+    override val prioritySection = "Priority"
+    override val markPriority = "Mark as priority"
+    override val unmarkPriority = "Remove from priority"
+    override val priorityContacts = "Priority contacts"
+    override val priorityContactsHint = "Their unread conversations are at the top of the Unread tab, and their notifications are shown even in Do Not Disturb and when their service is muted."
+    override val noPriorityContacts = "No priority contact. Mark one from the menu of a conversation of the Unread tab, or by its star in the search."
+    override fun removePriority(name: String) = "Remove $name from priority"
     override val markRead = "Mark as read"
     override val markReadByOpening = "Mark as read (by opening it)"
     override val openConversation = "Open the conversation"
@@ -509,6 +534,7 @@ object English : Strings {
     override val searchNavigate = "Navigate"
     override val searchOpen = "Open"
     override val searchClose = "Close"
+    override val searchPriority = "Priority"
     override val emptyTitle = "No unread messages"
     override val emptyHint = "The unread conversations of your services will show up here."
     override fun unread(count: Int) = "$count unread"

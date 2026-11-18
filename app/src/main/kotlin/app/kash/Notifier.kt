@@ -7,6 +7,7 @@ import androidx.compose.runtime.snapshotFlow
 import app.kash.core.NotificationDuration
 import app.kash.core.NotificationGroups
 import app.kash.core.NotificationPolicy
+import app.kash.core.Priorities
 import app.kash.core.NotificationStyle
 import app.kash.core.Service
 import app.kash.core.ServiceId
@@ -146,7 +147,10 @@ class Notifier(private val model: KashModel) {
     }
 
     private fun notify(service: Service, id: String, title: String, body: String, silent: Boolean) {
-        val decision = NotificationPolicy.decide(model.settings, service)
+        // A priority contact's goes through Do Not Disturb and the service's mute (the user's choice).
+        val conversation = NotificationGroups.conversationOf(model.unread[service.id]?.conversations.orEmpty(), title.ifBlank { service.title })
+        val priority = Priorities.isNotification(model.priorities, service.id, title.ifBlank { service.title }, conversation?.id)
+        val decision = NotificationPolicy.decide(model.settings, service, priority)
         // Never what the notification says: it is the user's messages.
         logger.debug("Notification of {}: {}", service.title, decision)
         if (!decision.show) return

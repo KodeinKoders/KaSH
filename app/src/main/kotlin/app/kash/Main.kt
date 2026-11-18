@@ -276,6 +276,10 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                             model.openConversation(entry.service, entry.conversation)
                         },
                         onDismiss = model::dismissSearch,
+                        priority = PriorityActions(
+                            isPriority = { entry -> model.isPriority(entry.service.id, entry.conversation) },
+                            onToggle = { entry -> model.togglePriority(entry.service.id, entry.conversation, entry.name) },
+                        ),
                     )
                 }
             }
