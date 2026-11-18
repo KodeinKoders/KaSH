@@ -54,13 +54,21 @@ declare namespace KashPlugin {
         complete?: boolean;
     }
 
+    interface MarkReadOptions {
+        /**
+         * The service has no "Mark as read", and the handler opens the conversation, waits for it to be read, and goes back to what was open
+         * before: KaSH says so in its item, "Mark as read (by opening it)".
+         */
+        byOpening?: boolean;
+    }
+
     interface WatchOptions {
         /** How often the page is read, in milliseconds; 2000 by default, 500 at least. */
         interval?: number;
     }
 
     interface Kash {
-        /** 2 since contacts; 1 before. */
+        /** 3 since onMarkRead, 2 since contacts; 1 before. */
         readonly apiVersion: number;
         readonly plugin: { readonly id: string; readonly version: string };
         /** The values of the service's options: strings for text and choice, booleans for boolean. */
@@ -111,6 +119,13 @@ declare namespace KashPlugin {
          * Returns a function that stops reading.
          */
         watch(read: () => readonly Conversation[] | null | undefined, options?: WatchOptions): () => void;
+
+        /**
+         * Called when the user marks the conversation id as read from KaSH (the Unread tab, a notification), without showing the service
+         * (since apiVersion 3). KaSH offers it only for a service whose plugin calls onMarkRead. The handler marks it as the user would (the
+         * service's model, the item of a row's menu); it may be async.
+         */
+        onMarkRead(handler: (id: string) => void | Promise<void>, options?: MarkReadOptions): void;
 
         /**
          * Called when the user opens the conversation id from the Unread tab or from the search (KaSH already shows the service): it may not be

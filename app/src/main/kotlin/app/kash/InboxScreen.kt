@@ -3,6 +3,8 @@ package app.kash
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +41,9 @@ import app.kash.core.InboxRow
 import app.kash.core.InboxSort
 import app.kash.core.UnreadCount
 import app.kash.ui.CountPill
+import app.kash.ui.IconOnlyButton
+import app.kash.ui.MenuAnchor
+import app.kash.ui.WindowMenu
 import app.kash.ui.Kash
 import app.kash.ui.KashIcon
 import app.kash.ui.KashIcons
@@ -63,7 +68,10 @@ import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
  * @param sort How the rows are sorted, which [onSort] changes: kept in the settings, so that it is the same at the next launch.
  */
 @Composable
-fun InboxScreen(rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Unit, icons: ServiceIcons, onRefresh: () -> Unit, onOpen: (InboxRow) -> Unit) {
+fun InboxScreen(
+    rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Unit, icons: ServiceIcons, onRefresh: () -> Unit, onOpen: (InboxRow) -> Unit,
+    actions: RowActions = RowActions(),
+) {
     val query = rememberTextFieldState()
     val all = Inbox.sections(rows)
     val filtered = Inbox.sections(Inbox.filter(rows, query.text.toString()))
@@ -108,8 +116,8 @@ fun InboxScreen(rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Un
                 if (filtered.isEmpty) {
                     NoResults(query.text.toString())
                 } else {
-                    InboxSection(strings.messagesSection, filtered.messages, strings.noUnreadMessages, sort, icons, onOpen)
-                    InboxSection(strings.topicsSection, filtered.topics, strings.noUnreadTopics, sort, icons, onOpen)
+                    InboxSection(strings.messagesSection, filtered.messages, strings.noUnreadMessages, sort, icons, onOpen, actions)
+                    InboxSection(strings.topicsSection, filtered.topics, strings.noUnreadTopics, sort, icons, onOpen, actions)
                 }
             }
         }
@@ -118,7 +126,7 @@ fun InboxScreen(rows: List<InboxRow>, sort: InboxSort, onSort: (InboxSort) -> Un
 
 /** A section of the Unread tab: its title and its number of conversations, then its rows as [sort] says, or [empty] when it has none. */
 @Composable
-private fun InboxSection(title: String, rows: List<InboxRow>, empty: String, sort: InboxSort, icons: ServiceIcons, onOpen: (InboxRow) -> Unit) {
+private fun InboxSection(title: String, rows: List<InboxRow>, empty: String, sort: InboxSort, icons: ServiceIcons, onOpen: (InboxRow) -> Unit, actions: RowActions) {
     Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -127,8 +135,8 @@ private fun InboxSection(title: String, rows: List<InboxRow>, empty: String, sor
         }
         when {
             rows.isEmpty() -> Text(empty, color = Kash.colors.muted, modifier = Modifier.padding(horizontal = 2.dp))
-            sort == InboxSort.BY_DATE -> RowsCard(Inbox.byDate(rows)) { row -> InboxRowView(row, icons, withService = true) { onOpen(row) } }
-            sort == InboxSort.BY_COUNT -> RowsCard(Inbox.byCount(rows)) { row -> InboxRowView(row, icons, withService = true) { onOpen(row) } }
+            sort == InboxSort.BY_DATE -> RowsCard(Inbox.byDate(rows)) { row -> InboxRowView(row, icons, withService = true, actions) { onOpen(row) } }
+            sort == InboxSort.BY_COUNT -> RowsCard(Inbox.byCount(rows)) { row -> InboxRowView(row, icons, withService = true, actions) { onOpen(row) } }
             else -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 for (group in Inbox.byService(rows)) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -141,7 +149,7 @@ private fun InboxSection(title: String, rows: List<InboxRow>, empty: String, sor
                             Box(Modifier.weight(1f))
                             Link(strings.open(group.service.name), onClick = { onOpen(group.rows.first().copy(conversation = null)) })
                         }
-                        RowsCard(group.rows) { row -> InboxRowView(row, icons, withService = false) { onOpen(row) } }
+                        RowsCard(group.rows) { row -> InboxRowView(row, icons, withService = false, actions) { onOpen(row) } }
                     }
                 }
             }
@@ -162,11 +170,26 @@ private fun RowsCard(rows: List<InboxRow>, row: @Composable (InboxRow) -> Unit) 
 }
 
 /**
+ * What can be done to a row of the Unread tab besides opening it: marking its conversation as read, when its service's plugin can
+ * ([markReadOf]: how, null when it cannot).
+ */
+class RowActions(val markReadOf: (InboxRow) -> MarkRead? = { null }, val onMarkRead: (InboxRow) -> Unit = {})
+
+/**
  * A conversation: its service's tile (in the flat list), its name, its context and its service, its count. A row of a custom application is its
- * total, which says so; a topic has a dot instead of a count.
+ * total, which says so; a topic has a dot instead of a count. A conversation has a context menu (a right click) that opens it, and marks it as
+ * read when its plugin can (the item is not there otherwise); one that can be has a button for it in place of its chevron while the pointer is
+ * over it.
  */
 @Composable
-private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolean, onClick: () -> Unit) {
+private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolean, actions: RowActions, onClick: () -> Unit) {
+    val markRead = if (row.isTotal) null else actions.markReadOf(row)
+    val markable = markRead != null
+    // What it says: the plugin's own "Mark as read", or by opening the conversation, which the service has instead.
+    val markReadKey = if (markRead == MarkRead.BY_OPENING) StringsKey.MarkReadByOpening else StringsKey.MarkRead
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    var menu by remember { mutableStateOf<MenuAnchor?>(null) }
     val context = when (row.kind) {
         null -> strings.unreadMessages
         ConversationKind.DIRECT -> strings.directConversation
@@ -177,7 +200,8 @@ private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolea
     Row(
         Modifier.fillMaxWidth().heightIn(min = if (withService) 56.dp else 48.dp)
             .background(Kash.colors.card)
-            .hoverBackground(Kash.colors.rowHover, RoundedCornerShape(0.dp))
+            .hoverBackground(Kash.colors.rowHover, RoundedCornerShape(0.dp), interaction)
+            .then(if (!row.isTotal) Modifier.onContextClick { menu = pointerAnchor() } else Modifier)
             .clickable(onClick = onClick)
             // The hand of a link: a click opens the conversation.
             .pointerHoverIcon(PointerIcon.Hand)
@@ -216,7 +240,20 @@ private fun InboxRowView(row: InboxRow, icons: ServiceIcons, withService: Boolea
             if (row.topic) Box(Modifier.padding(horizontal = 8.dp, vertical = 7.dp).size(8.dp).background(Kash.colors.muted, CircleShape))
             else CountPill(UnreadCount.badge(row.count))
         }
-        KashIcon(KashIcons.ChevronRight, Kash.colors.faint)
+        if (markable && hovered) {
+            val label = if (markRead == MarkRead.BY_OPENING) strings.markReadByOpening else strings.markRead
+            IconOnlyButton(KashIcons.Check, label, { actions.onMarkRead(row) }, size = 24.dp, iconSize = 14.dp)
+        } else {
+            KashIcon(KashIcons.ChevronRight, Kash.colors.faint)
+        }
+    }
+    menu?.let { anchor ->
+        val close = { menu = null }
+        WindowMenu(anchor, width = 240.dp, alignEnd = false, onDismiss = close) {
+            selectableItem(selected = false, onClick = { close(); onClick() }) { MenuRow(KashIcons.ChevronRight, StringsKey.OpenConversation) }
+            // Only when its plugin can (the user's choice: not grayed out).
+            if (markable) selectableItem(selected = false, onClick = { close(); actions.onMarkRead(row) }) { MenuRow(KashIcons.Check, markReadKey) }
+        }
     }
 }
 

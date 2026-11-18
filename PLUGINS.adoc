@@ -441,6 +441,23 @@ The handler opens it in the page: it clicks its row, calls the service's own fun
 A conversation of the search need not be unread, nor shown by the page (a row of a virtual list that is not rendered): its address opens it then.
 
 
+[#marking-as-read]
+=== Marking a conversation as read
+
+[source,typescript]
+----
+kash.onMarkRead(handler: (id: string) => void | Promise<void>, options?: { byOpening?: boolean }): void
+----
+
+KaSH offers to mark a conversation as read without showing its service (a button of a row of the Unread tab and its context menu, a button of a notification) only for a service whose plugin calls `onMarkRead`, since `kash.apiVersion` 3.
+The handler marks it as the user would: through the service's model (WhatsApp's), or the item "Mark as read" of its row's menu, told by what does not depend on the service's language (an attribute, an id, an icon), and only when the row is unread when the item toggles.
+It may be async; what it throws, or the promise that it rejects, is caught.
+KaSH takes the conversation out of the Unread tab at once, and the plugin's next report says whether it was read.
+A service that has no way to mark a conversation as read but opening it (Instagram, Google Messages) says so with `byOpening: true`, and KaSH says it in its item, "Mark as read (by opening it)".
+Its handler opens the conversation (clicks its row), waits for it to be read, then goes back to what was open before (`history.back()`), unless the user went elsewhere meanwhile, one at a time.
+Opening a conversation may load a document of its own (Instagram's does, from its list), where the script runs again: what is being marked as read is kept in the tab's `sessionStorage`, and the new document finishes it.
+
+
 [#the-services-icon]
 === The service's icon
 
@@ -473,7 +490,7 @@ The page cannot read the image of another site itself when that site does not al
 | Member | What it is
 
 | `kash.apiVersion`
-| `2` (`1` before `kash.contacts`).
+| `3` (`2` before `kash.onMarkRead`, `1` before `kash.contacts`).
 
 | `kash.plugin`
 | `{ id, version }`, from the manifest.

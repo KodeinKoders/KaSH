@@ -119,6 +119,29 @@ kash.contacts.watch(() => {
     return contacts;
 });
 
+// Marks a server or a direct message as read as the user would: its entry's context menu, and its item "Mark as read", told by its id (a
+// server's `guild-context-mark-guild-read`; any `…mark-…-read`), which does not depend on Discord's language. Escape closes the menu when it has
+// none.
+const MARK_READ_ITEM = /(^|-)mark-[a-z-]*read$/;
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+kash.onMarkRead(async (id) => {
+    const entryId = id.startsWith('@me/') ? id.slice(4) : id;
+    const item = column()?.querySelector(`[data-list-item-id="${ENTRY_PREFIX}${CSS.escape(entryId)}"]`);
+    if (!item) return;
+    const box = item.getBoundingClientRect();
+    item.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: box.x + 10, clientY: box.y + 10, button: 2 }));
+    for (let tries = 0; tries < 20; tries++) {
+        await wait(50);
+        const read = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].find((candidate) => MARK_READ_ITEM.test(candidate.id));
+        if (read) {
+            read.click();
+            return;
+        }
+    }
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+});
+
 kash.onOpenConversation((id) => {
     // Its entry of the column, clicked as the user would: Discord shows it without loading the page again.
     const entryId = id.startsWith('@me/') ? id.slice(4) : id;

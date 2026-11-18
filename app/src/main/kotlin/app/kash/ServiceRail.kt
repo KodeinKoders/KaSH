@@ -223,7 +223,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
 private val RAIL_SPACING = 2.dp
 
 /** Where the pointer is on the screen, for a context menu that opens there. */
-private fun pointerAnchor(): MenuAnchor {
+internal fun pointerAnchor(): MenuAnchor {
     val location = MouseInfo.getPointerInfo()?.location
     return MenuAnchor().apply {
         left = location?.x?.toFloat() ?: 0f
@@ -237,7 +237,7 @@ private fun pointerAnchor(): MenuAnchor {
  * the element.
  */
 @OptIn(ExperimentalComposeUiApi::class)
-private fun Modifier.onContextClick(onContextClick: () -> Unit): Modifier = onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) { event ->
+internal fun Modifier.onContextClick(onContextClick: () -> Unit): Modifier = onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) { event ->
     val buttons = event.buttons
     if (buttons.isSecondaryPressed || (buttons.isPrimaryPressed && event.keyboardModifiers.isCtrlPressed)) {
         event.changes.forEach { it.consume() }

@@ -47,22 +47,44 @@ internal fun editCommandOf(type: CefKeyEvent.EventType, modifiers: Int, characte
 }
 
 /** A shortcut of KaSH's that a page does not get: KaSH takes it whatever the page shows ([BrowserEngine.onShortcut]). */
-public enum class BrowserShortcut {
+public sealed interface BrowserShortcut {
     /** ⇧⌘K: the search of the contacts and topics. */
-    SEARCH,
+    public data object Search : BrowserShortcut
+
+    /** ⌘0: the Unread tab. */
+    public data object Inbox : BrowserShortcut
+
+    /** ⌘1 to ⌘9: the service at [index] (from 0) of the rail. */
+    public data class Service(val index: Int) : BrowserShortcut
 }
 
-/** KaSH's shortcut of a key press, or null: ⇧⌘K. [character] is read as [editCommandOf]'s. */
-internal fun browserShortcutOf(type: CefKeyEvent.EventType, modifiers: Int, character: Char): BrowserShortcut? {
+// The key codes of the digits, Windows' (which Chromium gives on every platform), of the key's place: the key of `1` on an AZERTY keyboard,
+// which types `&`, is 1, as Chrome reads its own ⌘1.
+private const val KEY_0 = 0x30
+private const val KEY_9 = 0x39
+
+/**
+ * KaSH's shortcut of a key press, or null: ⇧⌘K (the key that types `k`, [character] being read as [editCommandOf]'s), ⌘0 to ⌘9 (by
+ * [keyCode], the key's place: the digits are shifted on some layouts).
+ */
+internal fun browserShortcutOf(type: CefKeyEvent.EventType, modifiers: Int, character: Char, keyCode: Int = 0): BrowserShortcut? {
     if (type != CefKeyEvent.EventType.KEYEVENT_RAWKEYDOWN) return null
-    val shifted = EventFlags.EVENTFLAG_COMMAND_DOWN or EventFlags.EVENTFLAG_SHIFT_DOWN
-    return if (modifiers and MODIFIERS == shifted && character.lowercaseChar() == 'k') BrowserShortcut.SEARCH else null
+    val command = EventFlags.EVENTFLAG_COMMAND_DOWN
+    return when (modifiers and MODIFIERS) {
+        command or EventFlags.EVENTFLAG_SHIFT_DOWN -> if (character.lowercaseChar() == 'k') BrowserShortcut.Search else null
+        command -> when (keyCode) {
+            KEY_0 -> BrowserShortcut.Inbox
+            in KEY_0 + 1..KEY_9 -> BrowserShortcut.Service(keyCode - KEY_0 - 1)
+            else -> null
+        }
+        else -> null
+    }
 }
 
 /**
  * The shortcuts of the pages, the client's only keyboard handler (a `CefClient` keeps the first one that it is given, and ignores the others).
  *
- * - KaSH's own ([browserShortcutOf]), before the page sees them (`onPreKeyEvent`): they go to [onShortcut], on Swing's thread, whatever the
+ * - KaSH's own ([browserShortcutOf]: ⇧⌘K, ⌘0 to ⌘9), before the page sees them (`onPreKeyEvent`): they go to [onShortcut], on Swing's thread, whatever the
  *   service does with them.
  * - The editing shortcuts of macOS ([editCommandOf]: ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z, ⇧⌘Z), which do nothing in them otherwise. In Chrome, they are the Edit
  *   menu's: macOS gives a shortcut to the menu bar, whose item sends `copy:` to the focused view. KaSH's menu bar has no Edit menu, and Chromium's
@@ -71,7 +93,7 @@ internal fun browserShortcutOf(type: CefKeyEvent.EventType, modifiers: Int, char
  */
 internal class PageShortcuts(private val onShortcut: (BrowserShortcut) -> Unit) : CefKeyboardHandlerAdapter() {
     override fun onPreKeyEvent(browser: CefBrowser, event: CefKeyEvent, isKeyboardShortcut: BoolRef): Boolean {
-        val shortcut = browserShortcutOf(event.type, event.modifiers, event.unmodified_character) ?: return false
+        val shortcut = browserShortcutOf(event.type, event.modifiers, event.unmodified_character, event.windows_key_code) ?: return false
         // Chromium's thread: KaSH's state is Swing's.
         SwingUtilities.invokeLater { onShortcut(shortcut) }
         return true

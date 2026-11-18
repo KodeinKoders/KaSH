@@ -107,6 +107,27 @@ kash.contacts.watch(() => {
         .map((row) => ({ id: row.dataset.groupId, name: nameOf(row), kind: kindOf(row) }));
 });
 
+// Marks a conversation as read as the user would: its row's menu (its button `[aria-haspopup="menu"]`), whose first item is "Mark as read"
+// while it is unread ("Mark as unread" once it is read, in the language of the account): only an unread row's is clicked, any of its rows (a
+// starred one is in two sections).
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const unreadRow = (row) => !!row.querySelector(BADGE) || row.classList.contains(UNREAD) || homeRows().get(row.dataset.groupId)?.dataset.isUnread === 'true';
+
+kash.onMarkRead(async (id) => {
+    const row = panelRows().find((candidate) => idOf(candidate) === id && unreadRow(candidate));
+    const button = row && row.querySelector('button[aria-haspopup="menu"]');
+    if (!button) return;
+    button.click();
+    for (let tries = 0; tries < 20; tries++) {
+        await wait(100);
+        const item = [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].find((candidate) => candidate.getBoundingClientRect().width > 0);
+        if (item) {
+            item.click();
+            return;
+        }
+    }
+});
+
 kash.onOpenConversation((id) => {
     // Its row of the side panel, clicked as the user would: Google Chat opens it without loading the page again.
     const row = panelRows().find((candidate) => idOf(candidate) === id);

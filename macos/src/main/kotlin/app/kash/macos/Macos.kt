@@ -38,6 +38,9 @@ public enum class NotificationAlertStyle {
     UNAVAILABLE,
 }
 
+/** The button "Mark as read" of a notification ([MacosNotifications.post]): none, its plugin's own, or by opening the conversation. */
+public enum class MarkReadButton { NONE, DIRECT, BY_OPENING }
+
 /** The notifications of macOS's Notification Center. */
 public object MacosNotifications {
     private val authorization = MacosLibrary.function("kash_notifications_authorization", FunctionDescriptor.of(ValueLayout.JAVA_INT))
@@ -45,8 +48,15 @@ public object MacosNotifications {
     private val start = MacosLibrary.function("kash_notifications_start", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
     private val post = MacosLibrary.function(
         "kash_notifications_post",
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT),
     )
+    private val markReadTitles = MacosLibrary.function(
+        "kash_notifications_set_mark_read_titles",
+        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+    )
+
+    /** What [start]'s callback is given, before the identifier, when the button "Mark as read" of a notification was clicked. */
+    public const val MARK_READ_PREFIX: String = "mark-read:"
 
     @Volatile
     private var started = false
@@ -77,8 +87,21 @@ public object MacosNotifications {
         else -> NotificationAlertStyle.UNAVAILABLE
     }
 
-    /** Shows a notification, once [start] succeeded. [identifier] is what [start]'s callback is given when it is clicked. */
-    public fun post(identifier: String, title: String, subtitle: String, body: String, sound: Boolean) {
+    /**
+     * Titles the buttons of the notifications of a conversation ([post]'s `markRead`), in KaSH's language, once [start] succeeded: [direct] its
+     * plugin's own "Mark as read", [byOpening] by opening the conversation.
+     */
+    public fun setMarkReadTitles(direct: String, byOpening: String) {
+        val function = markReadTitles ?: return
+        if (!started) return
+        Arena.ofConfined().use { arena -> function.invoke(MacosLibrary.cString(arena, direct), MacosLibrary.cString(arena, byOpening)) }
+    }
+
+    /**
+     * Shows a notification, once [start] succeeded. [identifier] is what [start]'s callback is given when it is clicked, after [MARK_READ_PREFIX]
+     * when its button [markRead] is.
+     */
+    public fun post(identifier: String, title: String, subtitle: String, body: String, sound: Boolean, markRead: MarkReadButton = MarkReadButton.NONE) {
         val function = post ?: return
         if (!started) return
         Arena.ofConfined().use { arena ->
@@ -88,6 +111,7 @@ public object MacosNotifications {
                 MacosLibrary.cString(arena, subtitle),
                 MacosLibrary.cString(arena, body),
                 if (sound) 1 else 0,
+                markRead.ordinal,
             )
         }
     }

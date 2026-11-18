@@ -36,6 +36,11 @@ interface Strings {
     fun open(name: String): String
     fun noResults(query: String): String
 
+    // Marking a conversation as read
+    val markRead: String
+    val markReadByOpening: String
+    val openConversation: String
+
     // The search
     val searchField: String
     val searchPlaceholder: String
@@ -260,6 +265,9 @@ object French : Strings {
     override val byService = "Par service"
     override fun open(name: String) = "Ouvrir $name"
     override fun noResults(query: String) = "Aucune conversation non lue ne correspond à « $query »."
+    override val markRead = "Marquer comme lu"
+    override val markReadByOpening = "Marquer comme lu (en l'ouvrant)"
+    override val openConversation = "Ouvrir la conversation"
     override val searchField = "Rechercher…"
     override val searchPlaceholder = "Rechercher un contact ou un sujet…"
     override val searchLabel = "Rechercher un contact ou un sujet"
@@ -488,6 +496,9 @@ object English : Strings {
     override val byService = "By service"
     override fun open(name: String) = "Open $name"
     override fun noResults(query: String) = "No unread conversation matches “$query”."
+    override val markRead = "Mark as read"
+    override val markReadByOpening = "Mark as read (by opening it)"
+    override val openConversation = "Open the conversation"
     override val searchField = "Search…"
     override val searchPlaceholder = "Search a contact or a topic…"
     override val searchLabel = "Search a contact or a topic"

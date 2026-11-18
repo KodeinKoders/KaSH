@@ -187,6 +187,20 @@ const watchContacts = (read, options) => {
     };
 };
 
+// Marking a conversation as read, from KaSH (its Unread tab, a notification), when the plugin can: KaSH offers it only once the plugin said so.
+let markReadHandler = null;
+Object.defineProperty(window, '__kashMarkRead', {
+    value: (id) => {
+        if (typeof markReadHandler !== 'function') return;
+        try {
+            const done = markReadHandler(String(id));
+            if (done && typeof done.catch === 'function') done.catch((e) => console.error(`[KaSH] ${config.plugin.id}: marking a conversation as read failed`, e));
+        } catch (e) {
+            console.error(`[KaSH] ${config.plugin.id}: marking a conversation as read failed`, e);
+        }
+    },
+});
+
 let openHandler = null;
 Object.defineProperty(window, '__kashOpenConversation', {
     value: (id) => {
@@ -323,6 +337,14 @@ const kash = Object.freeze({
     onOpenConversation: (handler) => {
         if (typeof handler !== 'function') throw new TypeError('kash.onOpenConversation() takes a function');
         openHandler = handler;
+    },
+    // options.byOpening: the service has no other way than opening the conversation (KaSH says so in its item, "Mark as read (by opening
+    // it)"); the handler opens it, waits for it to be read, and goes back to what was open before.
+    onMarkRead: (handler, options) => {
+        if (typeof handler !== 'function') throw new TypeError('kash.onMarkRead() takes a function');
+        // KaSH offers to mark the service's conversations as read from then on, in this document.
+        if (markReadHandler === null) send({ type: 'capabilities', markRead: true, byOpening: !!(options && options.byOpening) });
+        markReadHandler = handler;
     },
     dom: Object.freeze({ text: (element) => (element ? clean(shown(element)) : '') }),
     time: Object.freeze({ parse: parseTime }),

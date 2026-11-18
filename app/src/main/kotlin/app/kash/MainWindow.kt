@@ -114,7 +114,12 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
             // Always there, without a size while the Unread tab is shown: a new panel for each page made it resized each time it was shown.
             ServicePage(selectedTab, if (selected == null) Modifier.size(0.dp) else Modifier.fillMaxSize())
             if (selected == null) {
-                InboxScreen(rows, settings.inboxSort, { sort -> model.updateSettings { it.copy(inboxSort = sort) } }, icons, onRefresh = { /* the counts are read as they change */ }, onOpen = { row -> model.openConversation(row.service, row.conversation) })
+                InboxScreen(rows, settings.inboxSort, { sort -> model.updateSettings { it.copy(inboxSort = sort) } }, icons, onRefresh = { /* the counts are read as they change */ }, onOpen = { row -> model.openConversation(row.service, row.conversation) },
+                    actions = RowActions(
+                        markReadOf = { row -> model.markReadOf(row.service.id) },
+                        onMarkRead = { row -> row.conversation?.let { model.markRead(row.service.id, it) } },
+                    ),
+                )
             }
         }
     }

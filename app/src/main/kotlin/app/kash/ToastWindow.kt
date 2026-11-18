@@ -86,13 +86,19 @@ fun ToastWindow(notifier: Notifier, icons: ServiceIcons) {
             })
         },
     ) {
-        ToastContent(toasts, icons, notifier::countOf, onClick = { notifier.clicked(it.key) }, onClose = { notifier.dismiss(it.key) })
+        ToastContent(
+            toasts, icons, notifier::countOf, onClick = { notifier.clicked(it.key) }, onClose = { notifier.dismiss(it.key) },
+            markReadOf = notifier::markReadOf, onMarkRead = { notifier.markRead(it.key) },
+        )
     }
 }
 
 /** The notifications of [ToastWindow], apart from its window: a click on one is [onClick], on its cross [onClose]. */
 @Composable
-internal fun ToastContent(toasts: List<Toast>, icons: ServiceIcons, countOf: (Toast) -> Int, onClick: (Toast) -> Unit, onClose: (Toast) -> Unit) {
+internal fun ToastContent(
+    toasts: List<Toast>, icons: ServiceIcons, countOf: (Toast) -> Int, onClick: (Toast) -> Unit, onClose: (Toast) -> Unit,
+    markReadOf: (Toast) -> MarkRead? = { null }, onMarkRead: (Toast) -> Unit = {},
+) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(TOAST_GAP)) {
         for (toast in toasts) {
             Row(
@@ -117,6 +123,12 @@ internal fun ToastContent(toasts: List<Toast>, icons: ServiceIcons, countOf: (To
                 // when there are several, a single message is the one shown.
                 val count = countOf(toast)
                 if (count > 1) CountPill(UnreadCount.badge(count))
+                // Its conversation marked as read without showing its service, when its plugin can.
+                val how = markReadOf(toast)
+                if (how != null) {
+                    val markRead = if (how == MarkRead.BY_OPENING) strings.markReadByOpening else strings.markRead
+                    Row(Modifier.semantics { contentDescription = markRead }.clickable { onMarkRead(toast) }) { KashIcon(KashIcons.Check, Kash.colors.faint) }
+                }
                 val close = strings.searchClose
                 Row(Modifier.semantics { contentDescription = close }.clickable { onClose(toast) }) { KashIcon(KashIcons.Close, Kash.colors.faint) }
             }

@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import app.kash.browser.BrowserEngine
 import app.kash.browser.BrowserProfile
+import app.kash.browser.BrowserShortcut
 import app.kash.browser.BrowserTab
 import app.kash.browser.ColorScheme
 import app.kash.core.Contact
@@ -63,6 +64,12 @@ import org.slf4j.LoggerFactory
 private val logger = LoggerFactory.getLogger(KashModel::class.java)
 
 /** A service whose page is loaded: its profile, its tab, and what watches them. */
+/**
+ * How a plugin marks a conversation as read (`kash.onMarkRead`): as the service's own "Mark as read" does, or by opening it in its page and
+ * going back to what was open before (Instagram, Google Messages: they have no other way), which KaSH says in its item.
+ */
+enum class MarkRead { DIRECT, BY_OPENING }
+
 class LoadedService(val profile: BrowserProfile, val tab: BrowserTab, val jobs: List<Job>)
 
 /** An update of the plugin named [name] that failed, and why. */
@@ -158,6 +165,9 @@ class KashModel(
 
     /** The unread conversations of each plugin's service, as its script last sent them (`kash.unread.set`). */
     private val conversations = mutableStateMapOf<ServiceId, List<Conversation>>()
+
+    // How the plugin of each service marks a conversation as read (`kash.onMarkRead`), as its page said.
+    private val markReadable = mutableStateMapOf<ServiceId, MarkRead>()
 
     /** The unread total of each plugin's service whose script only tells that (`kash.unread.setCount`). */
     private val totals = mutableStateMapOf<ServiceId, Int>()
@@ -282,6 +292,12 @@ class KashModel(
                 logger.debug("Icon of {}: {}", service.title, when (icon) { is PluginIcon.Remote -> icon.uri.host; is PluginIcon.Inline -> "inline"; PluginIcon.None -> "none" })
                 onIcon(id, icon)
             }
+            "capabilities" -> {
+                if (service.plugin == null) return
+                if (json["markRead"]?.jsonPrimitive?.booleanOrNull == true) {
+                    markReadable[id] = if (json["byOpening"]?.jsonPrimitive?.booleanOrNull == true) MarkRead.BY_OPENING else MarkRead.DIRECT
+                }
+            }
             "contacts" -> {
                 if (service.plugin == null) return
                 val received = try {
@@ -405,6 +421,7 @@ class KashModel(
         titles.remove(id)
         conversations.remove(id)
         totals.remove(id)
+        markReadable.remove(id)
         if (loadedService == null) {
             then()
             return
@@ -436,6 +453,15 @@ class KashModel(
     }
 
     fun select(selection: Selection) = update { it.copy(selection = selection) }
+
+    /** Does what KaSH's [shortcut] does: the search, the Unread tab, a service of the rail (an enabled one, in its order; none past the last). */
+    fun shortcut(shortcut: BrowserShortcut) {
+        when (shortcut) {
+            BrowserShortcut.Search -> toggleSearch()
+            BrowserShortcut.Inbox -> select(Selection.Inbox)
+            is BrowserShortcut.Service -> services.filter { it.enabled }.getOrNull(shortcut.index)?.let { select(Selection.OfService(it.id)) }
+        }
+    }
 
     fun updateSettings(change: (Settings) -> Settings) = update { state ->
         val settings = change(state.settings)
@@ -562,6 +588,22 @@ class KashModel(
         if (conversation == null) return
         val quoted = Json.encodeToString(kotlinx.serialization.json.JsonPrimitive(conversation))
         loaded[service.id]?.tab?.execute("window.__kashOpenConversation && window.__kashOpenConversation($quoted)")
+    }
+
+    /** How the conversations of [service] are marked as read from KaSH, as its plugin said in the page that is loaded; null: they are not. */
+    fun markReadOf(service: ServiceId): MarkRead? = markReadable[service]
+
+    /**
+     * Marks the conversation [conversation] of [service] as read, through its plugin (`kash.onMarkRead`), without showing the service: it leaves
+     * the Unread tab at once, and the plugin's next report says whether it was.
+     */
+    fun markRead(service: ServiceId, conversation: String) {
+        if (markReadOf(service) == null) return
+        val tab = loaded[service]?.tab ?: return
+        val quoted = Json.encodeToString(kotlinx.serialization.json.JsonPrimitive(conversation))
+        tab.execute("window.__kashMarkRead && window.__kashMarkRead($quoted)")
+        conversations[service]?.let { list -> conversations[service] = list.filter { it.id != conversation } }
+        logger.debug("Marked as read: a conversation of {}", service(service)?.title)
     }
 
     /** Opens Settings on [page]. */

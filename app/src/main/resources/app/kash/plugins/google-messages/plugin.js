@@ -56,6 +56,57 @@ kash.contacts.watch(() => {
     return all.map((row) => ({ id: idOf(row), name: kash.dom.text(row.querySelector('[data-e2e-conversation-name]')), kind: 'direct' }));
 });
 
+// Marks a conversation as read by opening it, which Messages has instead of a "Mark as read" (its menu only has "Mark as unread"): its row is
+// clicked, and once it is read, the page goes back to what was open before (history.back()), unless the user went elsewhere meanwhile. One at a time:
+// two that come together would cross. KaSH says it in its item, "Mark as read (by opening it)". Opening a conversation may load a document of its own
+// (Instagram's does, from its list): what is being marked as read is kept in the tab's sessionStorage, and the document that opening it loads
+// finishes it (this script runs again in it).
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const here = () => location.pathname + location.search;
+let markingRead = Promise.resolve();
+
+const PENDING = 'kash.markReadByOpening';
+
+const markReadByOpening = async (id) => {
+    const row = rows().find((candidate) => idOf(candidate) === id && candidate.dataset.e2eIsUnread === 'true');
+    if (!row) return;
+    sessionStorage.setItem(PENDING, JSON.stringify({ id, before: here(), at: Date.now() }));
+    row.click();
+    await finishMarkingRead();
+};
+
+// Waits for the conversation being marked as read to be read (6 s at most), then goes back to what was open before, unless the user went
+// elsewhere meanwhile; nothing when there is none, or it is old (a document loaded long after).
+const finishMarkingRead = async () => {
+    let pending = null;
+    try {
+        pending = JSON.parse(sessionStorage.getItem(PENDING) || 'null');
+    } catch (e) {
+        pending = null;
+    }
+    if (!pending || Date.now() - pending.at > 30000) {
+        sessionStorage.removeItem(PENDING);
+        return;
+    }
+    let opened = null;
+    for (let tries = 0; tries < 30; tries++) {
+        await wait(200);
+        if (opened === null && here() !== pending.before) opened = here();
+        const now = rows().find((candidate) => idOf(candidate) === pending.id);
+        if (opened !== null && now && !(now.dataset.e2eIsUnread === 'true')) break;
+    }
+    sessionStorage.removeItem(PENDING);
+    if (opened !== null && here() === opened) history.back();
+};
+
+// A document that opening a conversation loaded finishes marking it as read.
+finishMarkingRead();
+
+kash.onMarkRead((id) => {
+    markingRead = markingRead.then(() => markReadByOpening(id)).catch(() => {});
+    return markingRead;
+}, { byOpening: true });
+
 kash.onOpenConversation((id) => {
     // Its row, clicked as the user would: Messages opens it without loading the page again.
     const row = rows().find((candidate) => idOf(candidate) === id);

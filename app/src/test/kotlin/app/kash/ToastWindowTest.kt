@@ -40,6 +40,25 @@ class ToastWindowTest {
     }
 
     @Test
+    fun aNotificationWhosePluginCanMarksItsConversationAsRead() = runComposeUiTest {
+        val marked = mutableListOf<String>()
+        var markable by mutableStateOf<MarkRead?>(null)
+        setContent {
+            KashTheme(false) { ToastContent(listOf(toast), icons, { 1 }, onClick = {}, onClose = {}, markReadOf = { markable }, onMarkRead = { marked += it.key }) }
+        }
+        onNodeWithContentDescription("Mark as read").assertDoesNotExist()
+
+        markable = MarkRead.DIRECT
+        onNodeWithContentDescription("Mark as read").performClick()
+        assertEquals(listOf("w|laila"), marked)
+
+        // A service that only marks a conversation as read by opening it says so.
+        markable = MarkRead.BY_OPENING
+        onNodeWithContentDescription("Mark as read (by opening it)").performClick()
+        assertEquals(listOf("w|laila", "w|laila"), marked)
+    }
+
+    @Test
     fun aContactsNotificationShowsItsCountWhenThereAreSeveralMessages() = runComposeUiTest {
         var count by mutableStateOf(3)
         setContent { KashTheme(false) { ToastContent(listOf(toast), icons, { count }, onClick = {}, onClose = {}) } }

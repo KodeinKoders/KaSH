@@ -230,17 +230,23 @@ fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: Se
     // Read when the menu opens: what the page can do then.
     val canGoBack = tab?.canGoBack?.value == true
     val canGoForward = tab?.canGoForward?.value == true
-    selectableItem(selected = false, onClick = { close(); actions.onBack() }, enabled = canGoBack) { MenuRow(KashIcons.ChevronLeft, StringsKey.Back) }
-    selectableItem(selected = false, onClick = { close(); actions.onForward() }, enabled = canGoForward) {
-        MenuRow(KashIcons.ChevronRight, StringsKey.Forward)
+    selectableItem(selected = false, onClick = { close(); actions.onBack() }, enabled = canGoBack) {
+        MenuRow(KashIcons.ChevronLeft, StringsKey.Back, enabled = canGoBack)
     }
-    selectableItem(selected = false, onClick = { close(); actions.onReload() }, enabled = tab != null) { MenuRow(KashIcons.Refresh, StringsKey.Reload) }
+    selectableItem(selected = false, onClick = { close(); actions.onForward() }, enabled = canGoForward) {
+        MenuRow(KashIcons.ChevronRight, StringsKey.Forward, enabled = canGoForward)
+    }
+    selectableItem(selected = false, onClick = { close(); actions.onReload() }, enabled = tab != null) {
+        MenuRow(KashIcons.Refresh, StringsKey.Reload, enabled = tab != null)
+    }
     separator()
     selectableItem(selected = false, onClick = { close(); actions.onToggleMute() }) {
         if (service.muted) MenuRow(KashIcons.Bell, StringsKey.Unmute) else MenuRow(KashIcons.BellOff, StringsKey.Mute)
     }
     separator()
-    selectableItem(selected = false, onClick = { close(); actions.onDevTools() }, enabled = tab != null) { MenuRow(KashIcons.Code, StringsKey.DevTools) }
+    selectableItem(selected = false, onClick = { close(); actions.onDevTools() }, enabled = tab != null) {
+        MenuRow(KashIcons.Code, StringsKey.DevTools, enabled = tab != null)
+    }
     selectableItem(selected = false, onClick = { close(); actions.onEdit() }) { MenuRow(KashIcons.Pencil, StringsKey.Edit) }
     selectableItem(selected = false, onClick = { close(); actions.onResetCache() }) { MenuRow(KashIcons.Refresh, StringsKey.ResetCache) }
     selectableItem(selected = false, onClick = { close(); actions.onErase() }) { MenuRow(KashIcons.Eraser, StringsKey.Erase) }
@@ -250,10 +256,10 @@ fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: Se
 }
 
 /** Which text of [strings] a menu row shows: the items are built outside a composition, their text inside. */
-enum class StringsKey { UpdatePlugin, Back, Forward, Reload, Mute, Unmute, DevTools, Edit, ResetCache, Erase, Disable, Delete }
+enum class StringsKey { UpdatePlugin, Back, Forward, Reload, Mute, Unmute, DevTools, Edit, ResetCache, Erase, Disable, Delete, OpenConversation, MarkRead, MarkReadByOpening }
 
 @Composable
-private fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = false, argument: String = "") {
+internal fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = false, argument: String = "", enabled: Boolean = true) {
     val text = when (key) {
         StringsKey.UpdatePlugin -> strings.updatePlugin(argument)
         StringsKey.Back -> strings.back
@@ -267,10 +273,18 @@ private fun MenuRow(icon: ImageVector, key: StringsKey, destructive: Boolean = f
         StringsKey.ResetCache -> strings.resetCache
         StringsKey.Erase -> strings.eraseData
         StringsKey.Delete -> strings.delete
+        StringsKey.OpenConversation -> strings.openConversation
+        StringsKey.MarkRead -> strings.markRead
+        StringsKey.MarkReadByOpening -> strings.markReadByOpening
     }
-    val color: Color = if (destructive) Kash.colors.error else Kash.colors.text
+    // Its own color, which Jewel's item does not gray out when it is disabled: KaSH does.
+    val color: Color = when {
+        !enabled -> Kash.colors.faint
+        destructive -> Kash.colors.error
+        else -> Kash.colors.text
+    }
     Row(Modifier.height(22.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        KashIcon(icon, if (destructive) Kash.colors.error else Kash.colors.muted)
+        KashIcon(icon, if (!enabled) Kash.colors.faint else if (destructive) Kash.colors.error else Kash.colors.muted)
         // On one line: a row is one line high, and a second line was cut off ("Effacer toutes les").
         Text(text, color = color, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
     }

@@ -85,10 +85,10 @@ import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
 import javax.swing.RootPaneContainer
 
-/** The shortcut of the search, as it is shown: `BrowserShortcut.SEARCH` in a page, [isSearchShortcut] elsewhere. */
+/** The shortcut of the search, as it is shown: `BrowserShortcut.Search` in a page, [isSearchShortcut] elsewhere. */
 const val SEARCH_SHORTCUT = "⌘⇧K"
 
-/** Whether [event] is the search's shortcut, ⌘⇧K, in a window of KaSH (a page has its own: `BrowserShortcut.SEARCH`). */
+/** Whether [event] is the search's shortcut, ⌘⇧K, in a window of KaSH (a page has its own: `BrowserShortcut.Search`). */
 fun isSearchShortcut(event: KeyEvent): Boolean =
     event.type == KeyEventType.KeyDown && event.key == Key.K && event.isMetaPressed && event.isShiftPressed && !event.isAltPressed && !event.isCtrlPressed
 

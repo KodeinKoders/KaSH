@@ -11,6 +11,12 @@ typedef void (*kash_click_callback)(const char *identifier);
 
 static kash_click_callback clickCallback = NULL;
 
+// The categories of the notifications of a conversation that KaSH can mark as read (its plugin's own way, or by opening it), and their action:
+// a button of the notification, titled as it is done.
+static NSString *const KashConversationCategory = @"conversation";
+static NSString *const KashConversationOpeningCategory = @"conversation-opening";
+static NSString *const KashMarkReadAction = @"markRead";
+
 // The Notification Center calls its delegate on a thread of its own: the callback is an FFM upcall, which any thread can call.
 @interface KashNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
 @end
@@ -28,6 +34,9 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
          withCompletionHandler:(void (^)(void))completionHandler {
     if (clickCallback != NULL && [response.actionIdentifier isEqualToString:UNNotificationDefaultActionIdentifier]) {
         clickCallback(response.notification.request.identifier.UTF8String);
+    } else if (clickCallback != NULL && [response.actionIdentifier isEqualToString:KashMarkReadAction]) {
+        // Its button "Mark as read": the callback is given the identifier after `mark-read:`.
+        clickCallback([@"mark-read:" stringByAppendingString:response.notification.request.identifier].UTF8String);
     }
     completionHandler();
 }
@@ -118,8 +127,28 @@ void kash_panel_make_nonactivating(const char *title) {
     });
 }
 
-// Shows a notification, which the click callback is given [identifier] of when it is clicked.
-void kash_notifications_post(const char *identifier, const char *title, const char *subtitle, const char *body, int sound) {
+// A category of the notifications of a conversation, whose button "Mark as read" is titled [title].
+static UNNotificationCategory *kash_mark_read_category(NSString *identifier, const char *title) {
+    UNNotificationAction *action = [UNNotificationAction actionWithIdentifier:KashMarkReadAction
+                                                                        title:[NSString stringWithUTF8String:title]
+                                                                      options:UNNotificationActionOptionNone];
+    return [UNNotificationCategory categoryWithIdentifier:identifier actions:@[action] intentIdentifiers:@[] options:UNNotificationCategoryOptionNone];
+}
+
+// The buttons "Mark as read" of the notifications of a conversation, titled in KaSH's language: [direct] its plugin's own way, [byOpening] by
+// opening it. Their categories, which the Notification Center keeps; again when the language changes.
+void kash_notifications_set_mark_read_titles(const char *direct, const char *byOpening) {
+    if (delegate == nil) return;
+    @autoreleasepool {
+        NSSet *categories = [NSSet setWithObjects:kash_mark_read_category(KashConversationCategory, direct),
+                                                  kash_mark_read_category(KashConversationOpeningCategory, byOpening), nil];
+        [UNUserNotificationCenter.currentNotificationCenter setNotificationCategories:categories];
+    }
+}
+
+// Shows a notification, which the click callback is given [identifier] of when it is clicked; with the button "Mark as read" when [markRead] is
+// 1 (its plugin's own way) or 2 (by opening the conversation), none for 0.
+void kash_notifications_post(const char *identifier, const char *title, const char *subtitle, const char *body, int sound, int markRead) {
     if (delegate == nil) return;
     @autoreleasepool {
         UNMutableNotificationContent *content = [UNMutableNotificationContent new];
@@ -127,6 +156,8 @@ void kash_notifications_post(const char *identifier, const char *title, const ch
         if (subtitle != NULL && subtitle[0] != 0) content.subtitle = [NSString stringWithUTF8String:subtitle];
         if (body != NULL && body[0] != 0) content.body = [NSString stringWithUTF8String:body];
         if (sound) content.sound = UNNotificationSound.defaultSound;
+        if (markRead == 1) content.categoryIdentifier = KashConversationCategory;
+        if (markRead == 2) content.categoryIdentifier = KashConversationOpeningCategory;
         UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:[NSString stringWithUTF8String:identifier]
                                                                               content:content
                                                                               trigger:nil];

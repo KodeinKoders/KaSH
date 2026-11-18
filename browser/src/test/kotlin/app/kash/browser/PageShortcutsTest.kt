@@ -42,8 +42,8 @@ class PageShortcutsTest {
     @Test
     fun shiftCommandKIsTheSearchWhateverTheLayoutAndCapsLock() {
         val shifted = command or EventFlags.EVENTFLAG_SHIFT_DOWN
-        assertEquals(BrowserShortcut.SEARCH, browserShortcutOf(down, shifted, 'k'))
-        assertEquals(BrowserShortcut.SEARCH, browserShortcutOf(down, shifted or EventFlags.EVENTFLAG_CAPS_LOCK_ON, 'K'))
+        assertEquals(BrowserShortcut.Search, browserShortcutOf(down, shifted, 'k'))
+        assertEquals(BrowserShortcut.Search, browserShortcutOf(down, shifted or EventFlags.EVENTFLAG_CAPS_LOCK_ON, 'K'))
         // ⌘K is the page's own (Slack's quick switcher), ⌥⇧⌘K and ⌃⇧K are not KaSH's.
         assertNull(browserShortcutOf(down, command, 'k'))
         assertNull(browserShortcutOf(down, shifted or EventFlags.EVENTFLAG_ALT_DOWN, 'k'))
@@ -51,5 +51,19 @@ class PageShortcutsTest {
         assertNull(browserShortcutOf(down, shifted, 'f'))
         assertNull(browserShortcutOf(EventType.KEYEVENT_KEYUP, shifted, 'k'))
         assertNull(browserShortcutOf(EventType.KEYEVENT_CHAR, shifted, 'k'))
+    }
+
+    @Test
+    fun commandAndADigitAreTheUnreadTabAndTheServicesByTheKeysPlace() {
+        // The key of 1, whatever it types (`&` on an AZERTY keyboard).
+        assertEquals(BrowserShortcut.Service(0), browserShortcutOf(down, command, '&', 0x31))
+        assertEquals(BrowserShortcut.Service(8), browserShortcutOf(down, command, '9', 0x39))
+        assertEquals(BrowserShortcut.Inbox, browserShortcutOf(down, command, '0', 0x30))
+        // With another modifier, or without ⌘, they are the page's.
+        assertNull(browserShortcutOf(down, command or EventFlags.EVENTFLAG_SHIFT_DOWN, '1', 0x31))
+        assertNull(browserShortcutOf(down, command or EventFlags.EVENTFLAG_ALT_DOWN, '1', 0x31))
+        assertNull(browserShortcutOf(down, EventFlags.EVENTFLAG_NONE, '1', 0x31))
+        assertNull(browserShortcutOf(down, command, 'a', 0x41))
+        assertNull(browserShortcutOf(EventType.KEYEVENT_KEYUP, command, '1', 0x31))
     }
 }

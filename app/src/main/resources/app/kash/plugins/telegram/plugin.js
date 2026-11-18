@@ -7,7 +7,7 @@
 // (`.message-time`: "01:46" today, "Oct 28" this year, "09/19/2025" another one, in the language of Telegram's interface) and its unread badge
 // (`.dialog-subtitle-badge-unread`, with its count). The archive is a row of its own (`archive-dialog`), left out, as Telegram leaves its chats out
 // of its counts. The list is virtual: a conversation whose row is not rendered is not seen; it is the list of the folder that is shown. Its rows
-// are also the search's contacts and topics (`kash.contacts`).
+// are also the search's contacts and topics (`kash.contacts`), and one is marked as read through its context menu.
 //
 // Not seen yet when it was written: a group, a channel, a mention, a muted conversation (Telegram gives its badge a gray class).
 
@@ -60,6 +60,31 @@ kash.contacts.watch(() => {
         name: kash.dom.text(row.querySelector('.dialog-title .peer-title')),
         kind: row.dataset.peerId.startsWith('-') ? 'group' : 'direct',
     }));
+});
+
+// Marks a conversation as read as the user would: its row's context menu, and its item "Mark as read", told by its icon (`readchats`, the glyph
+// U+EA0A of Telegram's icon font) rather than by its text, which is in the language of Telegram's interface. Telegram builds the menu again for
+// each row: the item is looked for until it is there. A row that is not rendered (the list is virtual) cannot be.
+const MARK_AS_READ_ICON = String.fromCodePoint(0xea0a);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+kash.onMarkRead(async (id) => {
+    const row = rows().find((candidate) => candidate.dataset.peerId === id);
+    if (!row) return;
+    const box = row.getBoundingClientRect();
+    row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: box.x + 20, clientY: box.y + 20, button: 2 }));
+    for (let tries = 0; tries < 20; tries++) {
+        await wait(50);
+        const item = [...document.querySelectorAll('.btn-menu.contextmenu .btn-menu-item')]
+            .find((candidate) => candidate.querySelector('.btn-menu-item-icon')?.textContent === MARK_AS_READ_ICON);
+        if (item) {
+            item.click();
+            return;
+        }
+    }
+    // No such item (the conversation was read meanwhile): the menu is closed as a click elsewhere closes it.
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 });
 
 kash.onOpenConversation((id) => {

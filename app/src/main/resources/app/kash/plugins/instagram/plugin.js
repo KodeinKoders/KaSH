@@ -6,7 +6,8 @@
 // the conversation's id (`threadKeyForSelection`, the one of its address, `/direct/t/<id>/`) and, in its parent's `viewerThreadRef`, its kind
 // (`thread_subtype`: `IG_ONLY_ONE_TO_ONE`, `IG_BUSINESS_ACCOUNT_ONE_TO_ONE`…). Its texts are its name, the start of its last message, and the
 // time of it (`abbr`: "5 min", "2 h", "3 j", "32 sem.", in the page's language). An unread conversation is in bold, with a blue dot: Instagram
-// does not count its messages, so it counts 1. Its rows are also the search's contacts (`kash.contacts`).
+// does not count its messages, so it counts 1. Its rows are also the search's contacts (`kash.contacts`). It has no "Mark as read" (a
+// conversation's options are Pin, Mute, Delete): a conversation is marked as read by opening it, and going back.
 //
 // Not seen yet when it was written: a group (a `thread_subtype` with GROUP in it, a guess), a muted conversation, a message request, a long list
 // (whether it renders only the rows that fit).
@@ -90,6 +91,57 @@ kash.contacts.watch(() => {
     if (all.length === 0) return null;
     return all.map(({ element, id, kind }) => ({ id, name: kash.dom.text(textsOf(element)[0]), kind }));
 });
+
+// Marks a conversation as read by opening it, which Instagram has instead of a "Mark as read": its row is clicked, and once it is read, the page goes
+// back to what was open before (history.back()), unless the user went elsewhere meanwhile. One at a time: two that come together would cross. KaSH
+// says it in its item, "Mark as read (by opening it)". From the list (`/direct/inbox/`), opening a conversation loads a document of its own (from one
+// conversation to another, it does not): what is being marked as read is kept in the tab's sessionStorage, and the document that opening it loads
+// finishes it (this script runs again in it).
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const here = () => location.pathname + location.search;
+let markingRead = Promise.resolve();
+
+const PENDING = 'kash.markReadByOpening';
+
+const markReadByOpening = async (id) => {
+    const row = rows().find((candidate) => candidate.id === id && unread(textsOf(candidate.element)));
+    if (!row) return;
+    sessionStorage.setItem(PENDING, JSON.stringify({ id, before: here(), at: Date.now() }));
+    row.element.click();
+    await finishMarkingRead();
+};
+
+// Waits for the conversation being marked as read to be read (6 s at most), then goes back to what was open before, unless the user went
+// elsewhere meanwhile; nothing when there is none, or it is old (a document loaded long after).
+const finishMarkingRead = async () => {
+    let pending = null;
+    try {
+        pending = JSON.parse(sessionStorage.getItem(PENDING) || 'null');
+    } catch (e) {
+        pending = null;
+    }
+    if (!pending || Date.now() - pending.at > 30000) {
+        sessionStorage.removeItem(PENDING);
+        return;
+    }
+    let opened = null;
+    for (let tries = 0; tries < 30; tries++) {
+        await wait(200);
+        if (opened === null && here() !== pending.before) opened = here();
+        const now = rows().find((candidate) => candidate.id === pending.id);
+        if (opened !== null && now && !(unread(textsOf(now.element)))) break;
+    }
+    sessionStorage.removeItem(PENDING);
+    if (opened !== null && here() === opened) history.back();
+};
+
+// A document that opening a conversation loaded finishes marking it as read.
+finishMarkingRead();
+
+kash.onMarkRead((id) => {
+    markingRead = markingRead.then(() => markReadByOpening(id)).catch(() => {});
+    return markingRead;
+}, { byOpening: true });
 
 kash.onOpenConversation((id) => {
     // Its row, clicked as the user would: Instagram opens it without loading the page again.

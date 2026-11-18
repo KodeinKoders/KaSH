@@ -1,0 +1,13 @@
+{
+  "$schema": "../manifest.schema.json",
+  "manifestVersion": 1,
+  "id": "messenger",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "name": "Messenger",
+  "square": { "text": "Me", "color": "#0866FF" },
+  "icon": "icon.webp",
+  "url": "https://www.facebook.com/messages/",
+  "matches": ["https://www.facebook.com/*"],
+  "script": "plugin.js"
+}

@@ -13,6 +13,7 @@ import app.kash.core.ServiceId
 import app.kash.core.ServiceUnread
 import app.kash.core.Settings
 import app.kash.macos.MacosNotifications
+import app.kash.macos.MarkReadButton
 import app.kash.macos.inAppBundle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -162,17 +163,54 @@ class Notifier(private val model: KashModel) {
         )
         // The Notification Center's has no pill: its count is in its subtitle.
         val subtitle = if (system && count > 1) "${service.title} · ${stringsOf(model.settings.language).unread(count)}" else service.title
-        show(key, service, shownTitle, subtitle, body, decision.sound && !silent, system, model.settings.notificationDuration, group.received)
+        // Its button "Mark as read", when the plugin can: the conversation is found when it is clicked, the plugin may not list it yet.
+        val markable = if (system) model.markReadOf(service.id) else null
+        if (markable != null) titleMarkRead()
+        show(key, service, shownTitle, subtitle, body, decision.sound && !silent, system, model.settings.notificationDuration, group.received, markable)
+    }
+
+    // The language that the Notification Center's button "Mark as read" was last titled in.
+    private var markReadLanguage: String? = null
+
+    // Titles the Notification Center's button "Mark as read" in KaSH's language, when it changed.
+    private fun titleMarkRead() {
+        val strings = stringsOf(model.settings.language)
+        if (markReadLanguage == strings.code) return
+        MacosNotifications.setMarkReadTitles(strings.markRead, strings.markReadByOpening)
+        markReadLanguage = strings.code
+    }
+
+    // The unread conversation of the notification [key] (a contact's), as its plugin lists it now.
+    private fun conversationOf(key: String): Pair<Service, app.kash.core.Conversation>? {
+        val service = model.service(ServiceId(key.substringBefore('|'))) ?: return null
+        val title = toasts.firstOrNull { it.key == key }?.title ?: titles[key] ?: return null
+        val conversation = NotificationGroups.conversationOf(model.unread[service.id]?.conversations.orEmpty(), title) ?: return null
+        return service to conversation
+    }
+
+    /** How the conversation of [toast] is marked as read: its plugin can, and lists it as unread; null when it cannot. */
+    fun markReadOf(toast: Toast): MarkRead? = toast.service?.let(Service::id)?.let(model::markReadOf)?.takeIf { conversationOf(toast.key) != null }
+
+    /** Marks the conversation of the notification [key] as read, without showing its service, and the notification goes. */
+    fun markRead(key: String) {
+        val (service, conversation) = conversationOf(key) ?: return logger.debug("Mark as read: no unread conversation of the notification")
+        model.markRead(service.id, conversation.id)
+        end(key)
     }
 
     private fun show(
         key: String, service: Service?, title: String, subtitle: String, body: String, sound: Boolean, system: Boolean, duration: NotificationDuration,
-        received: Int = 0,
+        received: Int = 0, markable: MarkRead? = null,
     ) {
         if (system) {
             // How long it stays is macOS's to decide (KaSH's settings in its Notification settings: banners or alerts). The same identifier
             // replaces the contact's notification before.
-            MacosNotifications.post(key, title, subtitle, body, sound)
+            val button = when (markable) {
+                null -> MarkReadButton.NONE
+                MarkRead.DIRECT -> MarkReadButton.DIRECT
+                MarkRead.BY_OPENING -> MarkReadButton.BY_OPENING
+            }
+            MacosNotifications.post(key, title, subtitle, body, sound, button)
         } else {
             // A new notification of the same contact replaces the one before, as the Notification Center does.
             val toast = Toast(key, service, title, body, received)
@@ -192,6 +230,8 @@ class Notifier(private val model: KashModel) {
 
     /** The notification [key] was clicked: its service is shown, and its page given the click (a messaging service opens the conversation). */
     fun clicked(key: String) {
+        // The button "Mark as read" of the Notification Center's.
+        if (key.startsWith(MacosNotifications.MARK_READ_PREFIX)) return markRead(key.removePrefix(MacosNotifications.MARK_READ_PREFIX))
         toasts.removeAll { it.key == key }
         // A contact's: its page's last notification is the one clicked.
         val latest = groups[key]?.latest

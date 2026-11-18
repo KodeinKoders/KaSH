@@ -6,7 +6,7 @@
 // count. A conversation marked as unread by hand (its count is -1) counts as 1. A group that was never named is named by its members, without
 // the user, as WhatsApp shows it. The preview is the start of the last message as WhatsApp shows it in the row of the conversation (with the
 // sender in a group), read from the rows that are rendered and kept while the row is scrolled out; no other message is read. Every conversation
-// is a contact or a topic of the search (`kash.contacts`), from the same model.
+// is a contact or a topic of the search (`kash.contacts`), from the same model, and one is marked as read through it (`sendSeen`).
 
 // The modules exist once WhatsApp is loaded and logged in: before that, `require` throws, and there is nothing to read.
 const module = (name) => {
@@ -119,6 +119,27 @@ kash.contacts.watch(() => {
         // A conversation without a name cannot be searched for.
         .filter((contact) => contact.name);
 }, { complete: true });
+
+// Marks a conversation as read, as opening it would: its messages are seen (WhatsApp sends its read receipts, as its own "Mark as read" does).
+// One marked as unread by hand (its count is -1) has no message to see: its mark is taken off.
+kash.onMarkRead(async (id) => {
+    const collections = module('WAWebCollections');
+    const chat = collections && collections.Chat && collections.Chat.get(id);
+    if (!chat) return;
+    if (chat.unreadCount === -1) {
+        const commands = module('WAWebCmd');
+        if (commands && commands.Cmd) commands.Cmd.markChatUnread(chat, false);
+        return;
+    }
+    const seen = module('WAWebUpdateUnreadChatAction');
+    if (!seen) return;
+    // Its argument was the chat, and is now an object that holds it, as openChatBottom's.
+    try {
+        await seen.sendSeen({ chat });
+    } catch (e) {
+        await seen.sendSeen(chat);
+    }
+});
 
 kash.onOpenConversation((id) => {
     const collections = module('WAWebCollections');

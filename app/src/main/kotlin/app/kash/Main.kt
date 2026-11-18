@@ -106,7 +106,7 @@ fun main() {
         }
         // KaSH's shortcuts in a page, which the page does not get (PageShortcuts).
         DisposableEffect(Unit) {
-            engine.onShortcut = { shortcut -> if (shortcut == BrowserShortcut.SEARCH) model.toggleSearch() }
+            engine.onShortcut = model::shortcut
             onDispose { engine.onShortcut = {} }
         }
         Kash(engine, model, icons, windowFile, geometry, directories.hangs)
@@ -245,14 +245,11 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                 title = "KaSH",
                 icon = remember { AppIcon.painter() },
                 state = windowState,
-                // The search's shortcut while KaSH's own views have the focus (the Unread tab, the rail): a page's goes to engine.onShortcut.
+                // KaSH's shortcuts while its own views have the focus (the Unread tab, the rail): a page's go to engine.onShortcut.
                 onPreviewKeyEvent = { event ->
-                    if (isSearchShortcut(event)) {
-                        model.toggleSearch()
-                        true
-                    } else {
-                        false
-                    }
+                    val shortcut = windowShortcutOf(event)
+                    shortcut?.let(model::shortcut)
+                    shortcut != null
                 },
             ) {
                 DisposableEffect(window) {

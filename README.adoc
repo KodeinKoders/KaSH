@@ -17,7 +17,7 @@ toc::[]
 
 == Services
 
-WhatsApp, Google Chat, Slack, Google Messages, Telegram, Discord and Instagram are in the catalog, as plugins: each one is a manifest, which describes the service and its options, and a script, which reads its unread conversations (see link:PLUGINS.adoc[the plugins' guide]).
+WhatsApp, Google Chat, Slack, Google Messages, Telegram, Discord, Instagram and Messenger are in the catalog, as plugins: each one is a manifest, which describes the service and its options, and a script, which reads its unread conversations (see link:PLUGINS.adoc[the plugins' guide]).
 Other plugins are installed in Settings › Plugins, from a zip, a folder or an address, which KaSH can watch for a new version.
 Any web application can also be added as a custom service, by its address.
 A Slack service is one workspace, given by its name (`my-team` for `my-team.slack.com`).
@@ -32,7 +32,7 @@ Google Chat's spaces with new messages and no mention are topics too.
 And Google Messages' (the SMS and RCS of an Android phone): its unread conversations, without the muted ones, each counted as one message, since Google Messages shows no count.
 And Telegram's (Telegram Web K): its unread conversations, with their counts, without the muted ones and the archive.
 And Discord's: its unread direct messages, with their counts; its servers with new messages are topics.
-And Instagram's: its unread conversations, each counted as one message, since Instagram shows no count.
+And Instagram's and Messenger's (Facebook's messages): their unread conversations, each counted as one message, since they show no count.
 
 The search, the field in the middle of the title bar or ⌘⇧K, finds any contact or topic of every service by its name (its letters in order, whatever their accents), read or unread, and opens it in its service.
 A service's page often shows only part of them (the rows of a list that fit, those it loaded): KaSH keeps those it saw, from a launch to the next.
@@ -46,6 +46,8 @@ A right click on a service's tile in the rail opens a menu with all of it: back,
 A link to another site opens in the system's browser; the service's own pages and the sign-in pages (Google, Microsoft, Apple, Facebook, GitHub) stay in KaSH.
 
 A contact's notifications are one: the last message, and how many are unread.
+A conversation is marked as read without showing its service, from the Unread tab (a button over its row, or its context menu) or its notification, in WhatsApp, Telegram, Discord, Slack, Messenger and Google Chat; in Instagram and Google Messages, which have no such action, by opening it in the background and going back to what was open.
+⌘1 to ⌘9 show the services of the rail, ⌘0 the Unread tab, ⇧⌘K the search.
 KaSH's own notifications go away after a few seconds, or stay until they are closed (Settings › Notifications); how long macOS's stay is its own setting (banners or alerts), which Settings shows and opens.
 
 The window opens again where it was, as big and in the mode it was in (floating, maximized, full screen) when KaSH was closed.

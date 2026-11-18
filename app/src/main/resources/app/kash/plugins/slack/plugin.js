@@ -96,6 +96,28 @@ kash.contacts.watch(() => {
         });
 });
 
+// Marks a conversation as read as the user would: its row's context menu, and its item `channel_ctx_menu_mark_as_read` (an attribute that
+// Slack keeps for its tests, whatever its language). Escape on the menu closes it when it has none. Not the replies in threads: their entry has
+// no such item.
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+kash.onMarkRead(async (id) => {
+    const row = rows().find((candidate) => candidate.dataset.qaChannelSidebarChannelId === id);
+    if (!row) return;
+    const target = row.querySelector('[data-qa^="channel_sidebar_name_"]') || row;
+    const box = target.getBoundingClientRect();
+    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: box.x + 5, clientY: box.y + 5, button: 2 }));
+    for (let tries = 0; tries < 20; tries++) {
+        await wait(50);
+        const item = document.querySelector('[role="menu"] [data-qa="channel_ctx_menu_mark_as_read"]');
+        if (item) {
+            item.click();
+            return;
+        }
+    }
+    document.querySelector('[role="menu"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+});
+
 kash.onOpenConversation((id) => {
     if (id === THREADS_ID) {
         const threads = threadsEntry();
