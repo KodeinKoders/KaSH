@@ -93,4 +93,38 @@ class ShortcutsTest {
         }
         assertEquals(emptyList(), found)
     }
+
+    @Test
+    fun aShortcutFromTheWindowAndThePageIsDoneOnce() {
+        var now = 0L
+        val twins = ShortcutTwins { now }
+        assertEquals(true, twins.admit(BrowserShortcut.Search, ShortcutSource.WINDOW))
+        now += 5_000_000
+        assertEquals(false, twins.admit(BrowserShortcut.Search, ShortcutSource.PAGE))
+        // The next press: once again, whichever source comes first.
+        now += 400_000_000
+        assertEquals(true, twins.admit(BrowserShortcut.Search, ShortcutSource.PAGE))
+        now += 2_000_000
+        assertEquals(false, twins.admit(BrowserShortcut.Search, ShortcutSource.WINDOW))
+    }
+
+    @Test
+    fun aKeyHeldDownRepeatsItsShortcut() {
+        var now = 0L
+        val twins = ShortcutTwins { now }
+        // ⌘+ held: each repeat from both sources, every 30 ms.
+        val done = (0 until 4).count { repeat ->
+            now = repeat * 30_000_000L
+            val window = twins.admit(BrowserShortcut.ZoomIn, ShortcutSource.WINDOW)
+            now += 1_000_000
+            val page = twins.admit(BrowserShortcut.ZoomIn, ShortcutSource.PAGE)
+            window && !page
+        }
+        assertEquals(4, done)
+        // From one source only (a key that the other does not read), each press is done.
+        assertEquals(true, twins.admit(BrowserShortcut.Back, ShortcutSource.PAGE))
+        assertEquals(true, twins.admit(BrowserShortcut.Back, ShortcutSource.PAGE))
+        // Another shortcut right after is not a twin.
+        assertEquals(true, twins.admit(BrowserShortcut.Forward, ShortcutSource.WINDOW))
+    }
 }

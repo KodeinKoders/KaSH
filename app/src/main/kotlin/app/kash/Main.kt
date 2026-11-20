@@ -109,7 +109,7 @@ fun main() {
         }
         // KaSH's shortcuts in a page, which the page does not get (PageShortcuts).
         DisposableEffect(Unit) {
-            engine.onShortcut = model::shortcut
+            engine.onShortcut = { model.shortcut(it, ShortcutSource.PAGE) }
             onDispose { engine.onShortcut = {} }
         }
         Kash(engine, model, icons, windowFile, geometry, directories.hangs)

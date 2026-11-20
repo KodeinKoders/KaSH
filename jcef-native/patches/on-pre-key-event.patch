@@ -1,0 +1,14 @@
+diff --git a/native/keyboard_handler.cpp b/native/keyboard_handler.cpp
+index 88bb640..df78ae6 100644
+--- a/native/keyboard_handler.cpp
++++ b/native/keyboard_handler.cpp
+@@ -51,7 +51,8 @@ bool KeyboardHandler::OnPreKeyEvent(CefRefPtr<CefBrowser> browser,
+     return false;
+ 
+   ScopedJNIBoolRef jboolRef(env, *is_keyboard_shortcut);
+-  if (!jboolRef)
++  // Whether the BoolRef could be made: `!jboolRef` is its value (operator bool), false for every key event, which never reached Java.
++  if (!jboolRef.get())
+     return false;
+ 
+   jboolean jresult = JNI_FALSE;

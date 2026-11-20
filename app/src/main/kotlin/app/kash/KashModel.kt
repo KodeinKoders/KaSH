@@ -512,8 +512,15 @@ class KashModel(
     fun togglePriority(service: ServiceId, conversation: String, name: String) =
         update { it.copy(priorities = Priorities.toggle(it.priorities, service, conversation, name)) }
 
-    /** Does what KaSH's [shortcut] does: the search, the Unread tab, a service of the rail (an enabled one, in its order; none past the last). */
-    fun shortcut(shortcut: BrowserShortcut) {
+    // A key pressed in a page brings its shortcut from the window and from the page: done once.
+    private val shortcutTwins = ShortcutTwins()
+
+    /**
+     * Does what KaSH's [shortcut], from [source], does: the search, the Unread tab, a service of the rail (an enabled one, in its order; none past
+     * the last), the zoom and Chrome's of the page shown.
+     */
+    fun shortcut(shortcut: BrowserShortcut, source: ShortcutSource = ShortcutSource.WINDOW) {
+        if (!shortcutTwins.admit(shortcut, source)) return
         when (shortcut) {
             BrowserShortcut.Search -> toggleSearch()
             BrowserShortcut.Inbox -> select(Selection.Inbox)

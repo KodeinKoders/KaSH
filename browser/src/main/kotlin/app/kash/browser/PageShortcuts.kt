@@ -122,7 +122,10 @@ internal fun browserShortcutOf(type: CefKeyEvent.EventType, modifiers: Int, char
  * The shortcuts of the pages, the client's only keyboard handler (a `CefClient` keeps the first one that it is given, and ignores the others).
  *
  * - KaSH's own ([browserShortcutOf]: ⇧⌘K, ⌘0 to ⌘9, ⌘+ and ⌘−, ⌘R, ⌘[ and ⌘], ⌥⌘I), before the page sees them (`onPreKeyEvent`): they go to [onShortcut], on Swing's thread, whatever the
- *   service does with them.
+ *   service does with them, and the page never gets them (Chromium drops the key's release too). JetBrains' JCEF never called `onPreKeyEvent`
+ *   (its native code read the value of the `BoolRef` that it made for checking that it was made): `jcef-native/patches/on-pre-key-event.patch`
+ *   fixes it. AppKit gives a key with ⌘ to KaSH's window too (AWT's view, which Chromium's is inside): KaSH lets the twin through once
+ *   (`ShortcutTwins`).
  * - The editing shortcuts of macOS ([editCommandOf]: ⌘C, ⌘V, ⌘X, ⌘A, ⌘Z, ⇧⌘Z), which do nothing in them otherwise. In Chrome, they are the Edit
  *   menu's: macOS gives a shortcut to the menu bar, whose item sends `copy:` to the focused view. KaSH's menu bar has no Edit menu, and Chromium's
  *   view only gets the key press, which the page does not handle: once the page had its chance (a page that handles the shortcut itself keeps

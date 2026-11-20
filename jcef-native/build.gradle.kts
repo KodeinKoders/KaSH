@@ -1,3 +1,4 @@
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
@@ -61,6 +62,48 @@ val downloadAnt = tasks.register<DownloadAnt>("downloadAnt") {
     version = libs.versions.ant
     sha512 = "d78427aff207592c024ff1552dc04f7b57065a195c42d398fcffe7a0145e8d00cd46786f5aa52e77ab0fdf81334f065eb8011eecd2b48f7228e97ff4cb20d16c"
     outputDirectory = layout.buildDirectory.dir("tools/ant")
+}
+
+// KaSH's fixes to JetBrains' JCEF: the files of `patches/` (made with `git -C jcef diff`), applied to the submodule's checkout before it is built,
+// in the order of their names. One that is already applied (`git apply --reverse --check`) is left as it is; one that does not apply any more
+// (after the submodule moved) fails the build, and has to be made again or dropped when JetBrains fixed it.
+abstract class PatchJcef @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val patches: ConfigurableFileCollection
+
+    /** The submodule's checkout, which the patches change. */
+    @get:Internal
+    abstract val sourceDirectory: DirectoryProperty
+
+    @TaskAction
+    fun patch() {
+        val checkout = sourceDirectory.get().asFile.absolutePath
+        for (patch in patches.files.sortedBy { it.name }) {
+            val apply = { arguments: List<String> ->
+                val errors = ByteArrayOutputStream()
+                val result = exec.exec {
+                    commandLine(listOf("git", "-C", checkout, "apply") + arguments + patch.absolutePath)
+                    errorOutput = errors
+                    isIgnoreExitValue = true
+                }
+                result.exitValue to errors.toString()
+            }
+            if (apply(listOf("--reverse", "--check")).first == 0) continue
+            val (exit, errors) = apply(emptyList())
+            check(exit == 0) { "${patch.name} does not apply to the jcef submodule:\n$errors" }
+            logger.lifecycle("Applied ${patch.name} to the jcef submodule")
+        }
+    }
+}
+
+val patchJcef = tasks.register<PatchJcef>("patchJcef") {
+    group = "build"
+    description = "Applies KaSH's fixes (jcef-native/patches) to the jcef submodule."
+    patches.from(layout.projectDirectory.dir("patches").asFileTree.matching { include("*.patch") })
+    sourceDirectory = jcefDirectory
+    // Nothing to compare: whether a patch is applied is read from the checkout each time.
+    outputs.upToDateWhen { false }
 }
 
 // Configures and builds JCEF with CMake and Ninja, as JetBrains' `jb/tools/mac/build.sh` does with Xcode: Ninja only needs the Command Line Tools,
@@ -146,6 +189,8 @@ val buildJcef = tasks.register<BuildJcef>("buildJcef") {
     group = "build"
     description = "Builds JetBrains' JCEF (libjcef, its helpers, jcef.jar) from the jcef submodule, with CMake and Ninja."
     sourceDirectory = jcefDirectory
+    // Its sources with KaSH's fixes.
+    dependsOn(patchJcef)
     sources.from(jcefDirectory.asFileTree.matching {
         // What the build downloads and generates in the submodule, which would make the task run again each time.
         exclude("third_party/cef/cef_binary_*", "third_party/cef/cef_binary_*/**", "third_party/vcpkg/**", "third_party/thrift_compiler/**")
