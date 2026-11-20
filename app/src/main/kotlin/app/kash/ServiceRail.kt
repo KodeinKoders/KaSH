@@ -106,6 +106,8 @@ class RailModel(
     val settingsDot: Boolean = false,
     /** The services whose plugin has a new version: an arrow at the bottom left of their tiles. */
     val updates: Set<ServiceId> = emptySet(),
+    /** The services whose notifications are off (muted, in one of their ranges of Do Not Disturb, or turned off): their badges gray. */
+    val quiet: Set<ServiceId> = emptySet(),
     /** Moves a service past its neighbor in the rail (a tile dragged over it): see [KashModel.moveNextTo]. */
     val onMove: (ServiceId, ServiceId) -> Unit,
     /** The items of a service's context menu (a right click on its tile), which the function given closes. */
@@ -154,6 +156,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
                     label = service.label,
                     badge = if (count > 0) UnreadCount.badge(count) else null,
                     update = service.id in model.updates,
+                    quietBadge = service.id in model.quiet,
                     description = strings.serviceTileLabel(service.title, count),
                     tooltip = service.title,
                     // ⌘1 to ⌘9, the first nine of the rail (KashModel.shortcut).
@@ -270,7 +273,7 @@ internal fun Modifier.onContextClick(onContextClick: () -> Unit): Modifier = onP
 
 /**
  * A tile of the rail: the selection's indicator on the edge next to the content, and its ring around the tile; the label under it; the unread
- * badge over its top right corner, and an arrow over its bottom left one when its plugin has a new version ([update]).
+ * badge over its top right corner (gray when [quietBadge]: its notifications are off), and an arrow over its bottom left one when its plugin has a new version ([update]).
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -280,6 +283,7 @@ private fun RailItem(
     label: String,
     badge: String?,
     update: Boolean = false,
+    quietBadge: Boolean = false,
     description: String,
     tooltip: String,
     shortcut: String?,
@@ -332,7 +336,7 @@ private fun RailItem(
                 ) { tile() }
                 if (badge != null) {
                     // Over the tile's top right corner, as in the design: 14 dp inside its right edge, 4 dp above its top.
-                    UnreadBadge(badge, Kash.colors.panel, Modifier.offset(x = 4.dp + metrics.tile - 14.dp, y = 0.dp))
+                    UnreadBadge(badge, Kash.colors.panel, Modifier.offset(x = 4.dp + metrics.tile - 14.dp, y = 0.dp), quiet = quietBadge)
                 }
                 if (update) {
                     // Over the tile's bottom left corner, as the badge over its top right one: 4 dp out of the tile.

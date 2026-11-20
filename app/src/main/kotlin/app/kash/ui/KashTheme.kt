@@ -43,6 +43,8 @@ class KashColors(
     val field: Color,
     val neutral: Color,
     val error: Color,
+    /** The gray of the unread badge of a service whose notifications are off, in place of the red: dark, and lighter on the dark theme's tiles. */
+    val quietBadge: Color,
 ) {
     /** The red of the unread badges. */
     val badge: Color = Color(0xFFD9363E)
@@ -59,6 +61,7 @@ class KashColors(
             line = Color(0xFF393B40), hover = Color(0xFF393B40), rowHover = Color(0xFF34363B), chip = Color(0xFF43454A), divider = Color(0xFF43454A),
             control = Color(0xFF4E5157), dashed = Color(0xFF5A5D63), text = Color(0xFFDFE1E5), muted = Color(0xFF9DA0A8), faint = Color(0xFF868A91),
             selection = Color(0xFF2E436E), link = Color(0xFF548AF7), field = Color(0xFF2B2D30), neutral = Color(0xFF393B40), error = Color(0xFFF2777E),
+            quietBadge = Color(0xFF6F737A),
         )
 
         val Light = KashColors(
@@ -66,6 +69,7 @@ class KashColors(
             line = Color(0xFFEBECF0), hover = Color(0xFFDFE1E5), rowHover = Color(0xFFF5F6F8), chip = Color(0xFFEBECF0), divider = Color(0xFFDFE1E5),
             control = Color(0xFFC9CCD6), dashed = Color(0xFFA8ADBD), text = Color(0xFF1E1F22), muted = Color(0xFF6C707E), faint = Color(0xFF6C707E),
             selection = Color(0xFFD4E2FF), link = Color(0xFF2F64D6), field = Color(0xFFFFFFFF), neutral = Color(0xFFDFE1E5), error = Color(0xFFC42B33),
+            quietBadge = Color(0xFF6C707E),
         )
     }
 }

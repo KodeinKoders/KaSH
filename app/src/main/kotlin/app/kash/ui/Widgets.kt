@@ -87,12 +87,15 @@ fun IconOnlyButton(
     }
 }
 
-/** The red badge of an unread count, with a ring of [ring] (the rail's color) that separates it from the tile it overlaps. */
+/**
+ * The red badge of an unread count, with a ring of [ring] (the rail's color) that separates it from the tile it overlaps; gray when [quiet] (a
+ * service whose notifications are off, the user's choice).
+ */
 @Composable
-fun UnreadBadge(text: String, ring: Color, modifier: Modifier = Modifier) {
+fun UnreadBadge(text: String, ring: Color, modifier: Modifier = Modifier, quiet: Boolean = false) {
     Box(
         modifier.defaultMinSize(minWidth = 20.dp).height(20.dp)
-            .background(Kash.colors.badge, RoundedCornerShape(10.dp))
+            .background(if (quiet) Kash.colors.quietBadge else Kash.colors.badge, RoundedCornerShape(10.dp))
             .border(2.dp, ring, RoundedCornerShape(10.dp))
             .padding(horizontal = 5.dp),
         contentAlignment = Alignment.Center,
