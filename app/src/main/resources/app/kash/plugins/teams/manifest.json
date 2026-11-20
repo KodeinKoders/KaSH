@@ -1,0 +1,13 @@
+{
+  "$schema": "../manifest.schema.json",
+  "manifestVersion": 1,
+  "id": "teams",
+  "version": "1.0.0",
+  "versionCode": 1,
+  "name": "Teams",
+  "square": { "text": "T", "color": "#5B5FC7" },
+  "icon": "icon.webp",
+  "url": "https://teams.cloud.microsoft/",
+  "matches": ["https://teams.cloud.microsoft/*"],
+  "script": "plugin.js"
+}

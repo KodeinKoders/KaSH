@@ -20,35 +20,35 @@ A web application added by its address tells only its total, by its title (`(3) 
 
 [cols="4,1,1,1,1,1,1,1,1,1,1,1,1",options="header"]
 |===
-| | WhatsApp | Google Chat | Slack | Google Messages | Telegram | Discord | Instagram | Messenger | LinkedIn | TikTok | Snapchat | Teams
+| | WhatsApp | Google Chat | Slack | Google Messages | Telegram | Discord | Instagram | Messenger | LinkedIn | Teams | TikTok | Snapchat
 
 13+h| The plugin
 
 | Built-in plugin
-| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO
 
 | Page inspected while signed in
-| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO
 
 | Logo as the service's icon
-| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO
 
 | Image of the workspace as the service's icon
-| NO | NO | YES | NO | NO | NO | NO | NO | NO | TODO | TODO | TODO
+| NO | NO | YES | NO | NO | NO | NO | NO | NO | NO | TODO | TODO
 
 13+h| The unread conversations (the Unread tab, the badges)
 
 | Unread conversations
-| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO
 
 | Their number of unread messages (otherwise 1 each)
-| YES | YES | YES | NO | YES | YES | NO | NO | YES | TODO | TODO | TODO
+| YES | YES | YES | NO | YES | YES | NO | NO | YES | NO | TODO | TODO
 
 | Topics: what is new without being counted (a channel in bold)
-| NO | TODO | YES | NO | NO | YES | NO | NO | NO | TODO | TODO | TODO
+| NO | TODO | YES | NO | NO | YES | NO | NO | NO | YES | TODO | TODO
 
 | Groups told from people
-| YES | YES | YES | TODO | TODO | TODO | TODO | YES | YES | TODO | TODO | TODO
+| YES | YES | YES | TODO | TODO | TODO | TODO | YES | YES | YES | TODO | TODO
 
 | Muted conversations left out
 | YES | TODO | YES | YES | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO
@@ -65,10 +65,10 @@ A web application added by its address tells only its total, by its title (`(3) 
 13+h| The search
 
 | Contacts and topics in the search
-| YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
+| YES | YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO
 
 | Every conversation, not only those that the page showed
-| YES | NO | NO | NO | NO | NO | NO | NO | NO | TODO | TODO | TODO
+| YES | NO | NO | NO | NO | NO | NO | NO | NO | NO | TODO | TODO
 
 | Opening a conversation from KaSH
 | YES | YES | YES | YES | YES | YES | YES | YES | YES | TODO | TODO | TODO
@@ -79,7 +79,7 @@ A web application added by its address tells only its total, by its title (`(3) 
 | YES | YES | YES | NO | YES | YES | NO | YES | YES | TODO | TODO | TODO
 
 | By opening it in the background, then going back
-| NO | NO | NO | YES | NO | NO | TODO | NO | NO | TODO | TODO | TODO
+| NO | NO | NO | YES | NO | NO | TODO | NO | NO | NO | TODO | TODO
 |===
 
 
@@ -150,6 +150,15 @@ A conversation has no id on the page: its participants' names are its id, and a 
 
 *TODO*: a muted conversation, a sponsored message and the rows that the list loads as it is scrolled were not seen yet.
 
+=== Teams
+
+It reads Microsoft Teams at https://teams.cloud.microsoft[teams.cloud.microsoft]: its chat list, whose rows give the conversations' ids.
+Its list shows no count: an unread conversation counts 1, as Teams' title counts it.
+A Viva Engage community with new posts, only in bold, is a topic.
+Its sign-in, Microsoft's, stays in KaSH.
+
+*TODO*: a channel of a team, a mention, a muted conversation, the time and the start of the last message (the list was compact), opening a conversation from KaSH, marking one as read, and the rows that the list loads as it is scrolled were not seen yet.
+
 === TikTok
 
 *TODO*: everything.
@@ -159,8 +168,3 @@ Its messages are on the web at https://www.tiktok.com/messages[tiktok.com/messag
 
 *TODO*: everything.
 Its messages are on the web at https://web.snapchat.com[web.snapchat.com].
-
-=== Teams
-
-*TODO*: everything.
-Its web application is https://teams.microsoft.com[teams.microsoft.com] for work and school accounts, https://teams.live.com[teams.live.com] for personal ones: whether a Teams service is one account, as a Slack service is one workspace, is to be decided.
