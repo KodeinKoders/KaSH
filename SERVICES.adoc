@@ -103,6 +103,7 @@ The preview is the Home list's, only while Home is shown.
 
 A Slack service is one workspace, whose image is the service's icon.
 A direct message has its count, a channel counts only when the user is mentioned in it, and is a topic when it is only in bold; the replies in threads are one row, when Slack badges them.
+Its option *Only starred channels in the topics* (off by default) leaves out of the topics the channels that are not starred; a mention counts all the same.
 The sidebar shows no time and no preview: KaSH shows when it saw the message instead (Settings › Unread › Show approximate times).
 
 === Google Messages

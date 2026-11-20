@@ -4,7 +4,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,9 +18,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
@@ -37,6 +46,7 @@ import app.kash.ui.uiScaleFactor
 import app.kash.ui.Kash
 import app.kash.ui.KashIcon
 import app.kash.ui.KashIcons
+import app.kash.ui.hoverBackground
 import app.kash.ui.strings
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -101,6 +111,30 @@ fun ToastWindow(notifier: Notifier, icons: ServiceIcons) {
     }
 }
 
+/**
+ * A button of a notification, which shows only [icon]: a background and a brighter icon while the pointer is over it, so that a click on it is
+ * told from a click on the notification next to it. No tooltip: Jewel's is a popup, which the notifications' window, as big as they are, would cut.
+ */
+@Composable
+private fun ToastButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(4.dp)
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    Box(
+        Modifier.size(24.dp)
+            .hoverBackground(Kash.colors.hover, shape, interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .semantics {
+                contentDescription = label
+                role = Role.Button
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        KashIcon(icon, if (hovered) Kash.colors.text else Kash.colors.faint)
+    }
+}
+
 /** The notifications of [ToastWindow], apart from its window: a click on one is [onClick], on its cross [onClose]. */
 @Composable
 internal fun ToastContent(
@@ -135,10 +169,9 @@ internal fun ToastContent(
                 val how = markReadOf(toast)
                 if (how != null) {
                     val markRead = if (how == MarkRead.BY_OPENING) strings.markReadByOpening else strings.markRead
-                    Row(Modifier.semantics { contentDescription = markRead }.clickable { onMarkRead(toast) }) { KashIcon(KashIcons.Check, Kash.colors.faint) }
+                    ToastButton(KashIcons.Check, markRead) { onMarkRead(toast) }
                 }
-                val close = strings.searchClose
-                Row(Modifier.semantics { contentDescription = close }.clickable { onClose(toast) }) { KashIcon(KashIcons.Close, Kash.colors.faint) }
+                ToastButton(KashIcons.Close, strings.searchClose) { onClose(toast) }
             }
         }
     }

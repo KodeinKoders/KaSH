@@ -2,8 +2,8 @@
   "$schema": "../manifest.schema.json",
   "manifestVersion": 1,
   "id": "slack",
-  "version": "1.0.0",
-  "versionCode": 1,
+  "version": "1.1.0",
+  "versionCode": 2,
   "name": "Slack",
   "square": { "text": "Sl", "color": "#5B2C6F" },
   "icon": "icon.webp",
@@ -22,6 +22,15 @@
       "lowercase": true,
       "pattern": "[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*",
       "patternError": { "en": "Letters, digits and hyphens", "fr": "Des lettres, des chiffres et des tirets" }
+    },
+    {
+      "id": "starredTopicsOnly",
+      "type": "boolean",
+      "label": { "en": "Only starred channels in the topics", "fr": "Seulement les canaux favoris dans les sujets" },
+      "hint": {
+        "en": "A channel with new messages and no mention is in the Unread tab's topics only when it is starred. A mention always counts.",
+        "fr": "Un canal avec de nouveaux messages, sans mention, n'est dans les sujets de l'onglet Non lus que s'il est en favori. Une mention compte toujours."
+      }
     }
   ]
 }
