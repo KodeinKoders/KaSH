@@ -76,7 +76,7 @@ A web application added by its address tells only its total, by its title (`(3) 
 13+h| Marking a conversation as read
 
 | By the service's own action
-| YES | YES | YES | NO | YES | YES | NO | YES | YES | TODO | TODO | TODO
+| YES | YES | YES | NO | YES | YES | NO | YES | YES | YES | TODO | TODO
 
 | By opening it in the background, then going back
 | NO | NO | NO | YES | NO | NO | TODO | NO | NO | NO | TODO | TODO
@@ -157,7 +157,9 @@ Its list shows no count: an unread conversation counts 1, as Teams' title counts
 A Viva Engage community with new posts, only in bold, is a topic.
 Its sign-in, Microsoft's, stays in KaSH.
 
-*TODO*: a channel of a team, a mention, a muted conversation, the time and the start of the last message (the list was compact), opening a conversation from KaSH, marking one as read, and the rows that the list loads as it is scrolled were not seen yet.
+It marks a conversation as read through its row's menu, as Teams' own "Mark as read".
+
+*TODO*: a channel of a team, a mention, a muted conversation, the time and the start of the last message (the list was compact), opening a conversation from KaSH, marking a community as read, and the rows that the list loads as it is scrolled were not seen yet.
 
 === TikTok
 

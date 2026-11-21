@@ -12,7 +12,7 @@
 //
 // An unread conversation has a dot (`[data-testid="dot-badge-container"]`), no count: it counts 1 (the page's title, `(1) …`, counts those). Its
 // row is labelled by `chat_list_unread_text` too, and its name is in bold. A community only in bold is a topic: Teams' title does not count it.
-// A conversation appears in Favorites and in RecentChats: once.
+// A conversation appears in Favorites and in RecentChats: once. The row's "…" menu, which Teams adds while the row is pointed at, marks it as read.
 //
 // Not seen yet when it was written: a channel of a team (the TeamsAndChannels folder was empty), a mention, a muted conversation, the time and the
 // preview (the list was compact), the rows that the list loads as it is scrolled.
@@ -95,6 +95,47 @@ kash.contacts.watch(() => {
         const id = idOf(row);
         return { id, name: nameOf(row), kind: kindOf(id) };
     }).filter((contact) => contact.name);
+});
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The pointer over the row (or out of it), as React reads it: Teams adds the row's "…" button only while it is pointed at.
+const point = (target, over) => {
+    const box = target.getBoundingClientRect();
+    const at = { bubbles: true, view: window, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 };
+    for (const type of over ? ['pointerover', 'mouseover', 'pointermove', 'mousemove'] : ['pointerout', 'mouseout']) {
+        target.dispatchEvent(new (type.startsWith('pointer') ? PointerEvent : MouseEvent)(type, at));
+    }
+};
+
+// Marked as read through the row's "…" menu (`more-menu-trigger`), whose first item is "Mark as read" for an unread conversation
+// (`change-read-status-menu-item`; "Mark as unread", `change-unread-status-menu-item`, for a read one) and for a community
+// (`mark-as-read-engage-community-menu-item`). The menu is a layer of its own, out of the row.
+const MARK_AS_READ = '[data-tid="change-read-status-menu-item"], [data-testid="mark-as-read-engage-community-menu-item"]';
+
+kash.onMarkRead(async (id) => {
+    const row = rows().find((candidate) => idOf(candidate) === id && (isUnread(candidate) || (kindOf(id) === 'channel' && isBold(candidate))));
+    if (!row) return;
+    const target = row.querySelector('[data-inp]') || row;
+    point(target, true);
+    let trigger = null;
+    for (let tries = 0; tries < 20 && !trigger; tries++) {
+        await wait(50);
+        trigger = row.querySelector('[data-testid="more-menu-trigger"]');
+    }
+    if (!trigger) return point(target, false);
+    trigger.click();
+    for (let tries = 0; tries < 20; tries++) {
+        await wait(100);
+        const menu = document.querySelector('[role="menu"]');
+        if (!menu) continue;
+        const item = menu.querySelector(MARK_AS_READ);
+        // No such item (the row was read meanwhile, a kind of conversation whose menu has none): the menu is closed again.
+        if (item) item.click();
+        else menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        break;
+    }
+    point(target, false);
 });
 
 kash.onOpenConversation((id) => {
