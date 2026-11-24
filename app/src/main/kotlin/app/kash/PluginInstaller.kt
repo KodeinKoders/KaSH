@@ -34,7 +34,12 @@ private val logger = LoggerFactory.getLogger(PluginInstaller::class.java)
  *
  * Everything here reads or writes files, or downloads: **never on Swing's thread**.
  */
-class PluginInstaller(private val directories: KashDirectories, private val builtInIds: Set<String>) {
+class PluginInstaller(
+    private val directories: KashDirectories,
+    private val builtInIds: Set<String>,
+    // How long a download may take, its body included.
+    private val downloadTimeout: Duration = Duration.ofSeconds(30),
+) {
     private val file = InstalledPluginsFile(directories.pluginsFile)
 
     /** The installed plugins, in the order they were installed. */
@@ -193,16 +198,16 @@ class PluginInstaller(private val directories: KashDirectories, private val buil
         return mapOf(PluginPackage.MANIFEST to manifest) + names.associateWith { download(webAddress(uri.resolve(it).toString())) }
     }
 
-    // Without cookies, of at most PluginPackage.MAX_BYTES.
+    // Without cookies, of at most PluginPackage.MAX_BYTES, in downloadTimeout at most (its body too).
     private fun download(uri: URI): ByteArray {
-        val request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(30)).header("User-Agent", "KaSH").GET().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofInputStream())
-        response.body().use { body ->
-            if (response.statusCode() !in 200..299) throw IOException("${uri.host} answered ${response.statusCode()} for ${uri.path}")
-            val bytes = body.readNBytes(PluginPackage.MAX_BYTES + 1)
-            if (bytes.size > PluginPackage.MAX_BYTES) throw PluginPackageException("${uri.path} is bigger than ${PluginPackage.MAX_BYTES / 1024 / 1024} MB")
-            return bytes
+        val request = HttpRequest.newBuilder(uri).timeout(downloadTimeout).header("User-Agent", "KaSH").GET().build()
+        val response = try {
+            client.download(request, PluginPackage.MAX_BYTES.toLong(), downloadTimeout)
+        } catch (e: TooBigException) {
+            throw PluginPackageException("${uri.path} is bigger than ${PluginPackage.MAX_BYTES / 1024 / 1024} MB")
         }
+        if (response.statusCode() !in 200..299) throw IOException("${uri.host} answered ${response.statusCode()} for ${uri.path}")
+        return response.body()
     }
 
     private fun isZip(bytes: ByteArray): Boolean = bytes.size >= 4 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte() && bytes[2] == 3.toByte() && bytes[3] == 4.toByte()

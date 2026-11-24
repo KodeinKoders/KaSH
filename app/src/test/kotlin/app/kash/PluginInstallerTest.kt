@@ -96,6 +96,30 @@ class PluginInstallerTest {
     }
 
     @Test
+    fun anAddressThatStallsInItsBodyFailsInTime() {
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        val release = java.util.concurrent.CountDownLatch(1)
+        // Its headers, a byte of its body, then nothing.
+        server.createContext("/") { exchange ->
+            exchange.sendResponseHeaders(200, 1000)
+            exchange.responseBody.write(byteArrayOf('P'.code.toByte()))
+            exchange.responseBody.flush()
+            release.await(10, java.util.concurrent.TimeUnit.SECONDS)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val stalling = PluginInstaller(directories, emptySet(), downloadTimeout = java.time.Duration.ofMillis(300))
+            val started = System.nanoTime()
+            assertFailsWith<java.io.IOException> { stalling.read(PluginSource.Url("http://127.0.0.1:${server.address.port}/plugin.zip")) }
+            assertTrue((System.nanoTime() - started) / 1_000_000 < 5_000)
+        } finally {
+            release.countDown()
+            server.stop(0)
+        }
+    }
+
+    @Test
     fun aZipIsCopiedAndNotWatched() {
         val path = root.resolve("my-chat.zip")
         path.writeBytes(zip(files().mapKeys { "my-chat/${it.key}" }))

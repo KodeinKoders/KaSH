@@ -193,19 +193,16 @@ class ServiceIcons(private val directories: KashDirectories, private val registr
 
     /** The image at [uri], without the service's cookies, of at most [PluginIcon.MAX_BYTES]; null when it cannot be had. */
     private fun download(uri: URI): ByteArray? = try {
-        val request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(10)).header("User-Agent", USER_AGENT).GET().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofInputStream())
-        response.body().use { body ->
-            if (response.statusCode() !in 200..299) null
-            else body.readNBytes(PluginIcon.MAX_BYTES + 1).takeIf { it.isNotEmpty() && it.size <= PluginIcon.MAX_BYTES }
-        }
+        val request = HttpRequest.newBuilder(uri).timeout(TIMEOUT).header("User-Agent", USER_AGENT).GET().build()
+        client.download(request, PluginIcon.MAX_BYTES.toLong(), TIMEOUT).takeIf { it.statusCode() in 200..299 }?.body()?.takeIf { it.isNotEmpty() }
     } catch (e: Exception) {
         null
     }
 
+    // A site's page, where its icons are named: 2 MB at most, in 10 s at most.
     private fun get(url: String): ByteArray? = try {
-        val request = HttpRequest.newBuilder(URI(url)).timeout(Duration.ofSeconds(10)).header("User-Agent", USER_AGENT).GET().build()
-        client.send(request, HttpResponse.BodyHandlers.ofByteArray()).takeIf { it.statusCode() in 200..299 }?.body()
+        val request = HttpRequest.newBuilder(URI(url)).timeout(TIMEOUT).header("User-Agent", USER_AGENT).GET().build()
+        client.download(request, PAGE_MAX_BYTES, TIMEOUT).takeIf { it.statusCode() in 200..299 }?.body()
     } catch (e: Exception) {
         null
     }
@@ -219,6 +216,9 @@ class ServiceIcons(private val directories: KashDirectories, private val registr
         val LINK = Regex("<link\\b[^>]*>", RegexOption.IGNORE_CASE)
         val REL = Regex("rel\\s*=\\s*[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
         val HREF = Regex("href\\s*=\\s*[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
+        // How long a download may take, its body included (see download).
+        val TIMEOUT: Duration = Duration.ofSeconds(10)
+        const val PAGE_MAX_BYTES = 2L * 1024 * 1024
         const val USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
     }
 }
