@@ -654,6 +654,11 @@ class KashModel(
     /** Deletes the service: its page is closed now, its profile deleted at the next launch. */
     fun delete(id: ServiceId) {
         val service = service(id) ?: return
+        // Its Edit window goes with it: it would become Add with the deleted service's draft, and Save would bring it back.
+        if (editing == id) {
+            addServiceOpen = false
+            editing = null
+        }
         unload(id)
         seen.remove(id)
         saveUnreadTimesLater()

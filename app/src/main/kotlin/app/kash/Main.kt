@@ -5,6 +5,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.window.ApplicationScope
@@ -291,17 +292,21 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
             }
             ToastWindow(notifier, icons)
             if (model.addServiceOpen) {
-                val editing = model.editing?.let(model::service)
-                AddServiceWindow(
-                    editing = editing,
-                    icons = icons,
-                    onClose = { model.addServiceOpen = false; model.editing = null },
-                    onDone = { service ->
-                        if (editing == null) model.add(service) else model.replace(service)
-                        model.addServiceOpen = false
-                        model.editing = null
-                    },
-                )
+                // A window per service edited (or added): its draft is that service's. Edit on another service, or Add, while it is open, makes
+                // the window again; the same window kept the first one's draft, and Save turned the second into the first one's plugin.
+                key(model.editing) {
+                    val editing = model.editing?.let(model::service)
+                    AddServiceWindow(
+                        editing = editing,
+                        icons = icons,
+                        onClose = { model.addServiceOpen = false; model.editing = null },
+                        onDone = { service ->
+                            if (editing == null) model.add(service) else model.replace(service)
+                            model.addServiceOpen = false
+                            model.editing = null
+                        },
+                    )
+                }
             }
             if (model.aboutOpen) AboutWindow(onClose = { model.aboutOpen = false })
             if (model.settingsOpen) {
