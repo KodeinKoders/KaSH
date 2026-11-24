@@ -186,6 +186,12 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                                     if (picked?.icon != null && iconMode == IconMode.FAVICON) iconMode = IconMode.PLUGIN
                                     if (picked?.icon == null && iconMode == IconMode.PLUGIN) iconMode = IconMode.FAVICON
                                     pluginId = tilePlugin; squareColor = null; hex.edit { replace(0, length, "") }; squareText.edit { replace(0, length, "") }
+                                    // A web application has none of these settings: what a plugin's had is not kept for it, hidden.
+                                    if (tilePlugin == null) {
+                                        includeInInbox = true
+                                        notifications = true
+                                        quietHours = emptyList()
+                                    }
                                 }
                             }
                             repeat(3 - row.size) { Box(Modifier.weight(1f)) }
@@ -290,9 +296,11 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                         url = serviceUrl!!,
                         label = label.text.toString().trim(),
                         showBadge = showBadge,
-                        includeInInbox = includeInInbox,
-                        desktopNotifications = notifications,
-                        quietHours = quietHours,
+                        // A web application's window does not show these: their defaults, never what a plugin picked before had (its
+                        // notifications turned off, hidden, with no box to turn them on again).
+                        includeInInbox = plugin == null || includeInInbox,
+                        desktopNotifications = plugin == null || notifications,
+                        quietHours = if (plugin == null) emptyList() else quietHours,
                         icon = draftIcon,
                     )
                     onDone(service)
