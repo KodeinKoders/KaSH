@@ -94,9 +94,10 @@ fun IconOnlyButton(
 @Composable
 fun UnreadBadge(text: String, ring: Color, modifier: Modifier = Modifier, quiet: Boolean = false) {
     Box(
-        modifier.defaultMinSize(minWidth = 20.dp).height(20.dp)
-            .background(if (quiet) Kash.colors.quietBadge else Kash.colors.badge, RoundedCornerShape(10.dp))
-            .border(2.dp, ring, RoundedCornerShape(10.dp))
+        // A minimum size, not a fixed one: its text grows with Settings › Appearance › Text size.
+        modifier.defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
+            .background(if (quiet) Kash.colors.quietBadge else Kash.colors.badge, RoundedCornerShape(50))
+            .border(2.dp, ring, RoundedCornerShape(50))
             .padding(horizontal = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -118,7 +119,8 @@ fun CountPill(text: String) {
 /** A grey chip: the title bar's "Do not disturb", a service's unread count in its header. */
 @Composable
 fun Chip(text: String, height: Dp = 20.dp) {
-    Box(Modifier.height(height).background(Kash.colors.chip, RoundedCornerShape(height / 2)).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+    // A minimum height, not a fixed one: its text grows with Settings › Appearance › Text size.
+    Box(Modifier.heightIn(min = height).background(Kash.colors.chip, RoundedCornerShape(50)).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
         Text(text, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }

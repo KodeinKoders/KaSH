@@ -56,6 +56,12 @@ class UiScaleRenderTest {
                                     Box(Modifier.height(320.dp)) {
                                         SearchContent(listOf(SearchEntry(whatsApp, "laila", "Laila", ConversationKind.DIRECT, 2)), icons, {}, {})
                                     }
+                                    // A chip, a badge and the quiet hours' time fields, which hold text in a size of their own.
+                                    androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                                        app.kash.ui.Chip("Ne pas déranger")
+                                        app.kash.ui.UnreadBadge("12", Kash.colors.background)
+                                    }
+                                    app.kash.ui.QuietHoursEditor(listOf(app.kash.core.QuietRange(days = setOf(1, 2, 3, 4, 5), start = 19 * 60, end = 8 * 60))) {}
                                     // The service's menu, its shortcuts at the right of their rows.
                                     CompositionLocalProvider(LocalMenuController provides DefaultMenuController(onDismissRequest = { true })) {
                                         MenuFrame(260.dp * (scale / 100f)) { serviceMenu(whatsApp, ServiceActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}), devToolsEnabled = true) {} }

@@ -138,7 +138,8 @@ private fun TimeField(minutes: Int, label: String, onTime: (Int) -> Unit) {
     }
     TextField(
         state = state,
-        modifier = Modifier.width(64.dp).semantics { contentDescription = label },
+        // As wide as its text is big (Settings › Appearance › Text size): a text field clips what does not fit.
+        modifier = Modifier.width(64.dp * uiScaleFactor()).semantics { contentDescription = label },
         textStyle = JewelTheme.defaultTextStyle.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp),
         inputTransformation = { if (length > 5) revertAllChanges() },
         outline = if (invalid) Outline.Error else Outline.None,

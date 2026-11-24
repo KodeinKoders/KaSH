@@ -128,7 +128,8 @@ private fun UpdateButton(description: String, updating: Boolean, onClick: () -> 
     val shape = RoundedCornerShape(4.dp)
     Tooltip({ Text(description) }) {
         Row(
-            Modifier.height(24.dp)
+            // A minimum height, not a fixed one: its text grows with Settings › Appearance › Text size.
+            Modifier.heightIn(min = 24.dp)
                 .background(Kash.colors.accent.copy(alpha = if (updating) 0.5f else 1f), shape)
                 .clickable(enabled = !updating, onClick = onClick)
                 .semantics {
