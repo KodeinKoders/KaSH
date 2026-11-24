@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -128,6 +129,12 @@ private fun TimeField(minutes: Int, label: String, onTime: (Int) -> Unit) {
             invalid = parsed == null
             if (parsed != null) give(parsed)
         }
+    }
+    // A time that changes from outside (the range of this line removed, the next one in its place; Settings' draft following a change): the
+    // field shows it. Not while it is written: a text that is this time already, or not a time yet, is the user's.
+    LaunchedEffect(minutes) {
+        val written = parseTime(state.text.toString())
+        if (written != null && written != minutes) state.setTextAndPlaceCursorAtEnd(timeText(minutes))
     }
     TextField(
         state = state,

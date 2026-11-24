@@ -12,6 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -64,6 +66,22 @@ class QuietHoursEditorTest {
 
         onNodeWithContentDescription("Remove the range").performClick()
         assertEquals(emptyList(), ranges)
+    }
+
+    @Test
+    fun removingARangeShowsTheTimesOfTheOneInItsPlace() = runComposeUiTest {
+        val evenings = QuietRange(days = setOf(1, 2, 3, 4, 5), start = 19 * 60, end = 8 * 60)
+        val weekend = QuietRange(days = setOf(6, 7), start = 0, end = 0)
+        var ranges by mutableStateOf(listOf(evenings, weekend))
+        setContent { KashTheme(false) { QuietHoursEditor(ranges) { ranges = it } } }
+
+        onAllNodesWithContentDescription("Remove the range")[0].performClick()
+        waitForIdle()
+        assertEquals(listOf(weekend), ranges)
+        // The line in its place shows the weekend's times, which are the ones kept.
+        onNodeWithContentDescription("from").assert(hasText("00:00"))
+        onNodeWithContentDescription("to").assert(hasText("00:00"))
+        assertEquals(listOf(weekend), ranges)
     }
 
     @Test
