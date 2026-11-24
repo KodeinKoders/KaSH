@@ -33,6 +33,12 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# A relative folder is the one where the script is started from, before it goes to the project: `--dest Apps` installed into the project.
+case "$dest" in
+    /*) ;;
+    *) dest="$PWD/$dest" ;;
+esac
+
 # Gradle's tasks are those of the project, whatever the folder that the script is started from.
 cd "$(dirname "$0")/.."
 
@@ -47,13 +53,18 @@ mkdir -p "$dest"
 dest="$(cd "$dest" && pwd -P)"
 installed="$dest/KaSH.app"
 staging="$dest/.KaSH.app.new"
+previous="$dest/.KaSH.app.old"
 
 # Replacing the bundle under a program that runs from it would break it (KaSH, and Chromium's helpers, which are in it too). Nothing is stopped
-# for the user: other instances may be theirs, and KaSH has to quit by itself to keep what its services write.
+# for the user: other instances may be theirs, and KaSH has to quit by itself to keep what its services write. Checked before the build, and
+# again before the bundle is replaced: KaSH may have been opened while it built.
 # The command line of a process of the bundle starts with its path (and awk's own does not, which `pgrep -f` would match).
-if ps -axo command= | awk -v path="$installed/Contents/" 'index($0, path) == 1 { found = 1 } END { exit !found }'; then
-    fail "KaSH is running from $installed: quit it and run this again"
-fi
+refuse_if_running() {
+    if ps -axo command= | awk -v path="$installed/Contents/" 'index($0, path) == 1 { found = 1 } END { exit !found }'; then
+        fail "KaSH is running from $installed: quit it and run this again"
+    fi
+}
+refuse_if_running
 
 # The bundle, with the executable bits of Chromium's helpers given back (restoreExecutableBits, which follows it).
 ./gradlew :app:createDistributable
@@ -61,13 +72,23 @@ fi
 bundle="app/build/compose/binaries/main/app/KaSH.app"
 [ -d "$bundle" ] || fail "the build did not make $bundle"
 
-# The new bundle is complete before the old one goes, so a copy that fails leaves the installed application as it was.
-# The staging folder does not end with .app, so that Launch Services never takes it for an application.
+# The new bundle is complete before the old one goes, so a copy that fails leaves the installed application as it was. The old one is moved
+# aside, the new one takes its place, and the old one is deleted only then: it comes back when the new one cannot take its place.
+# The folders aside do not end with .app, so that Launch Services never takes them for applications.
 trap 'rm -rf "$staging"' EXIT
-rm -rf "$staging"
+rm -rf "$staging" "$previous"
 ditto "$bundle" "$staging"
-rm -rf "$installed"
-mv "$staging" "$installed"
+refuse_if_running
+if [ -e "$installed" ]; then
+    mv "$installed" "$previous"
+fi
+if ! mv "$staging" "$installed"; then
+    if [ -e "$previous" ]; then
+        mv "$previous" "$installed"
+    fi
+    fail "the new bundle could not take the place of $installed, which is as it was"
+fi
+rm -rf "$previous"
 
 # jpackage signs the bundle ad hoc: a copy that lost that would not open.
 codesign --verify --deep --strict "$installed" || fail "the signature of the installed $installed is not valid"

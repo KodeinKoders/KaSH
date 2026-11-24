@@ -91,7 +91,7 @@ To launch KaSH from Spotlight or Raycast, build it and install it in `~/Applicat
 scripts/install.sh                      # or `--dest /Applications`
 ----
 
-It replaces the application that is there, and refuses to while that one is running.
+It replaces the application that is there (which comes back if the new one cannot take its place), and refuses to while that one is running.
 A bundle that you built yourself is not quarantined, so macOS does not ask anything when it opens.
 
 [IMPORTANT]
