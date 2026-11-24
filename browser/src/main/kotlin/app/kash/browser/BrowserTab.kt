@@ -154,7 +154,12 @@ public class BrowserTab internal constructor(
      *
      * Only once: removing the emulated size makes Chromium lay the page out again and wait for a new frame of it, even at the same size, and the
      * page was empty for half a second whenever it was shown.
+     *
+     * Called on Chromium's thread (the end of the first load) and on Swing's (the page shown): what it reads and decides, and the command that it
+     * sends, are one under the tab's lock, so the commands go in the order of the decisions. Without it, Swing's thread could see the size not
+     * emulated yet and leave it, then Chromium's emulate it on a page that was shown: fixed, it did not follow the window any more.
      */
+    @Synchronized
     private fun applyHiddenSize(): CompletableFuture<*> {
         val devTools = browser.devToolsClient ?: return CompletableFuture.completedFuture(Unit)
         val future = if (browser.uiComponent.isShowing) {
