@@ -1,14 +1,7 @@
 package app.kash.core
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import org.slf4j.LoggerFactory
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
-
-private val logger = LoggerFactory.getLogger(UnreadTimesFile::class.java)
 
 /**
  * A conversation that came while KaSH was not watching its service (KaSH closed, the service disabled): its time is when KaSH saw it once its
@@ -63,8 +56,7 @@ public object UnreadTimes {
      * The key of a conversation [id] in [SeenService.conversations]: a hash, since some ids say who the conversation is with (WhatsApp's are
      * phone numbers).
      */
-    public fun key(id: String): String =
-        MessageDigest.getInstance("SHA-256").digest(id.encodeToByteArray()).take(16).joinToString("") { "%02x".format(it) }
+    public fun key(id: String): String = shortHash(id)
 
     /**
      * What KaSH saw of a service ([previous]) once its page shows [conversations], at [now]. Its page was loaded at [loadedAt]; KaSH had last
@@ -108,31 +100,14 @@ internal data class UnreadTimesContent(
 )
 
 /** `unread-times.json`: what KaSH saw of each service's unread conversations ([UnreadTimes]), by service id. */
-public class UnreadTimesFile(private val path: Path) {
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+public class UnreadTimesFile(path: Path) {
+    private val file = JsonFile(path, UnreadTimesContent.serializer(), ::UnreadTimesContent, "the unread conversations' times start again")
 
-    /** What KaSH saw of each service, or nothing when there is no file or it cannot be read (which is logged). */
-    public fun load(): Map<ServiceId, SeenService> {
-        if (!Files.exists(path)) return emptyMap()
-        return try {
-            json.decodeFromString(UnreadTimesContent.serializer(), Files.readString(path)).services.mapKeys { ServiceId(it.key) }
-        } catch (e: Exception) {
-            logger.error("Cannot read {}: the unread conversations' times start again", path, e)
-            emptyMap()
-        }
-    }
+    /** What KaSH saw of each service, or nothing when there is no file or it cannot be read ([JsonFile]). */
+    public fun load(): Map<ServiceId, SeenService> = file.load().services.mapKeys { ServiceId(it.key) }
 
-    /** Writes [services] to a temporary file next to the file, then moves it in place: a crash while writing leaves the file before. */
-    @Synchronized
+    /** Writes [services] durably: a crash while writing leaves the file before. */
     public fun save(services: Map<ServiceId, SeenService>) {
-        Files.createDirectories(path.toAbsolutePath().parent)
-        val temporary = path.resolveSibling("${path.fileName}.tmp")
-        val content = UnreadTimesContent(services = services.mapKeys { it.key.value })
-        Files.writeString(temporary, json.encodeToString(UnreadTimesContent.serializer(), content))
-        Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        file.save(UnreadTimesContent(services = services.mapKeys { it.key.value }))
     }
 }

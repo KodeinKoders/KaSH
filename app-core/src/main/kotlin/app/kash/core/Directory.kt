@@ -1,13 +1,7 @@
 package app.kash.core
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import org.slf4j.LoggerFactory
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-
-private val logger = LoggerFactory.getLogger(DirectoryFile::class.java)
 
 /**
  * A contact or a topic that a service gives access to (a person, a group, a channel, a space, a server), as its plugin showed it: what the search
@@ -47,31 +41,14 @@ internal data class DirectoryContent(
  * `contacts.json`: the contacts and topics of each service ([Directory]), by service id. Their ids and names are in it as they are, since the
  * search shows the names and opens the conversations by their ids.
  */
-public class DirectoryFile(private val path: Path) {
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+public class DirectoryFile(path: Path) {
+    private val file = JsonFile(path, DirectoryContent.serializer(), ::DirectoryContent, "the search starts again from what the services show")
 
-    /** The contacts of each service, or none when there is no file or it cannot be read (which is logged). */
-    public fun load(): Map<ServiceId, List<Contact>> {
-        if (!Files.exists(path)) return emptyMap()
-        return try {
-            json.decodeFromString(DirectoryContent.serializer(), Files.readString(path)).services.mapKeys { ServiceId(it.key) }
-        } catch (e: Exception) {
-            logger.error("Cannot read {}: the search starts again from what the services show", path, e)
-            emptyMap()
-        }
-    }
+    /** The contacts of each service, or none when there is no file or it cannot be read ([JsonFile]). */
+    public fun load(): Map<ServiceId, List<Contact>> = file.load().services.mapKeys { ServiceId(it.key) }
 
-    /** Writes [services] to a temporary file next to the file, then moves it in place: a crash while writing leaves the file before. */
-    @Synchronized
+    /** Writes [services] durably: a crash while writing leaves the file before. */
     public fun save(services: Map<ServiceId, List<Contact>>) {
-        Files.createDirectories(path.toAbsolutePath().parent)
-        val temporary = path.resolveSibling("${path.fileName}.tmp")
-        val content = DirectoryContent(services = services.mapKeys { it.key.value })
-        Files.writeString(temporary, json.encodeToString(DirectoryContent.serializer(), content))
-        Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        file.save(DirectoryContent(services = services.mapKeys { it.key.value }))
     }
 }

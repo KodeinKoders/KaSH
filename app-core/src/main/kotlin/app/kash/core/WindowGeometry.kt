@@ -1,13 +1,8 @@
 package app.kash.core
 
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import java.io.IOException
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
 private val logger = LoggerFactory.getLogger(WindowFile::class.java)
 
@@ -70,39 +65,16 @@ public data class ScreenBounds(val x: Float, val y: Float, val width: Float, val
  * The file that keeps the window's geometry, apart from the state of KaSH ([StateFile]): it changes whenever the window is moved, and what is lost
  * with it is nothing worth keeping aside. A file that is missing, unreadable or of a later version means the default window.
  */
-public class WindowFile(private val path: Path) {
+public class WindowFile(path: Path) {
+    // Its version is checked here (a later one is the default window), and an unreadable one is not kept aside.
+    private val file = JsonFile(path, WindowGeometry.serializer(), ::WindowGeometry, "the window opens at the default place", version = null, keepUnreadable = false)
+
     /** What is in the file, or the default geometry. */
-    public fun load(): WindowGeometry {
-        if (!Files.exists(path)) return WindowGeometry()
-        return try {
-            JSON.decodeFromString(WindowGeometry.serializer(), Files.readString(path)).takeIf { it.version <= WindowGeometry.VERSION }
-                ?: WindowGeometry().also { logger.warn("{} is of a later version", path) }
-        } catch (e: SerializationException) {
-            logger.warn("{} cannot be read", path, e)
-            WindowGeometry()
-        } catch (e: IllegalArgumentException) {
-            logger.warn("{} cannot be read", path, e)
-            WindowGeometry()
-        } catch (e: IOException) {
-            logger.warn("{} cannot be read", path, e)
-            WindowGeometry()
-        }
-    }
+    public fun load(): WindowGeometry =
+        file.load().takeIf { it.version <= WindowGeometry.VERSION } ?: WindowGeometry().also { logger.warn("The window's file is of a later version") }
 
-    /** Writes [geometry] to a temporary file next to the file, then moves it in place, so that a crash does not leave half of it; one write at a time. */
-    @Synchronized
+    /** Writes [geometry] durably, so that a crash does not leave half of it; one write at a time. */
     public fun save(geometry: WindowGeometry) {
-        Files.createDirectories(path.toAbsolutePath().parent)
-        val temporary = path.resolveSibling("${path.fileName}.tmp")
-        Files.writeString(temporary, JSON.encodeToString(WindowGeometry.serializer(), geometry))
-        Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-    }
-
-    private companion object {
-        val JSON = Json {
-            prettyPrint = true
-            ignoreUnknownKeys = true
-            encodeDefaults = true
-        }
+        file.save(geometry)
     }
 }

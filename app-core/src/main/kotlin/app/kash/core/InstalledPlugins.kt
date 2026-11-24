@@ -2,12 +2,7 @@ package app.kash.core
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import org.slf4j.LoggerFactory
-import java.nio.file.Files
 import java.nio.file.Path
-
-private val logger = LoggerFactory.getLogger(InstalledPluginsFile::class.java)
 
 /** Where a plugin that the user installed comes from: what it is installed from again when it is updated. */
 @Serializable
@@ -57,35 +52,18 @@ public data class InstalledPlugin(
 internal data class InstalledPluginsContent(val version: Int = 1, val plugins: List<InstalledPlugin> = emptyList())
 
 /** The file that the installed plugins are kept in ([KashDirectories.pluginsFile]), as JSON. */
-public class InstalledPluginsFile(private val path: Path) {
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-        // A value that this version does not know, which has a default, is the default rather than a file that cannot be read.
-        coerceInputValues = true
-    }
+public class InstalledPluginsFile(path: Path) {
+    private val file = JsonFile(path, InstalledPluginsContent.serializer(), ::InstalledPluginsContent, "no installed plugin is loaded")
 
     /**
      * The installed plugins, or none when there is no file or it cannot be read. One that cannot be read (a kind of source that this version does
-     * not know) is set aside ([setAside], which is logged) before the next installation saves over it: the other plugins are still in it.
+     * not know) is set aside ([JsonFile]) before the next installation saves over it: the other plugins are still in it.
      */
-    @Synchronized
-    public fun load(): List<InstalledPlugin> {
-        if (!Files.exists(path)) return emptyList()
-        return try {
-            json.decodeFromString(InstalledPluginsContent.serializer(), Files.readString(path)).plugins
-        } catch (e: Exception) {
-            val aside = setAside(path)
-            logger.error("Cannot read {}: no installed plugin is loaded, the file is kept as {}", path, aside.fileName, e)
-            emptyList()
-        }
-    }
+    public fun load(): List<InstalledPlugin> = file.load().plugins
 
-    /** Writes [plugins] durably ([writeDurably]): a crash while writing leaves the list before. */
-    @Synchronized
+    /** Writes [plugins] durably: a crash while writing leaves the list before. */
     public fun save(plugins: List<InstalledPlugin>) {
-        writeDurably(path, json.encodeToString(InstalledPluginsContent.serializer(), InstalledPluginsContent(plugins = plugins)))
+        file.save(InstalledPluginsContent(plugins = plugins))
     }
 }
 

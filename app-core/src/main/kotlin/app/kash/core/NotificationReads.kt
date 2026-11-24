@@ -1,14 +1,7 @@
 package app.kash.core
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import org.slf4j.LoggerFactory
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import java.security.MessageDigest
-
-private val logger = LoggerFactory.getLogger(NotificationReads::class.java)
 
 /**
  * When the notifications of a group ([NotificationGroups.key]: a service and a title) are over because what they say was read, in KaSH or
@@ -109,8 +102,7 @@ public class NotificationReads(seenBefore: Set<String> = emptySet()) {
         public fun titleOf(key: String): String = key.substringAfter('|')
 
         /** The hash of the group [key], which [NotificationReadsFile] keeps: a group's title is a contact's name. */
-        public fun hash(key: String): String =
-            MessageDigest.getInstance("SHA-256").digest(key.encodeToByteArray()).take(16).joinToString("") { "%02x".format(it) }
+        public fun hash(key: String): String = shortHash(key)
     }
 }
 
@@ -121,30 +113,17 @@ internal data class NotificationReadsContent(
 )
 
 /** `notification-reads.json`: the groups whose conversation was listed ([NotificationReads.seen], hashed), for the next launch. */
-public class NotificationReadsFile(private val path: Path) {
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+public class NotificationReadsFile(path: Path) {
+    private val file = JsonFile(
+        path, NotificationReadsContent.serializer(), ::NotificationReadsContent,
+        "the notifications of the last launch are kept until their services have nothing unread",
+    )
 
-    /** The hashes of the groups, or none when there is no file or it cannot be read (which is logged). */
-    public fun load(): Set<String> {
-        if (!Files.exists(path)) return emptySet()
-        return try {
-            json.decodeFromString(NotificationReadsContent.serializer(), Files.readString(path)).seen
-        } catch (e: Exception) {
-            logger.error("Cannot read {}: the notifications of the last launch are kept until their services have nothing unread", path, e)
-            emptySet()
-        }
-    }
+    /** The hashes of the groups, or none when there is no file or it cannot be read ([JsonFile]). */
+    public fun load(): Set<String> = file.load().seen
 
-    /** Writes [seen] to a temporary file next to the file, then moves it in place: a crash while writing leaves the file before. */
-    @Synchronized
+    /** Writes [seen] durably: a crash while writing leaves the file before. */
     public fun save(seen: Set<String>) {
-        Files.createDirectories(path.toAbsolutePath().parent)
-        val temporary = path.resolveSibling("${path.fileName}.tmp")
-        Files.writeString(temporary, json.encodeToString(NotificationReadsContent.serializer(), NotificationReadsContent(seen = seen)))
-        Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        file.save(NotificationReadsContent(seen = seen))
     }
 }
