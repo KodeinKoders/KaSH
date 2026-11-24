@@ -346,7 +346,7 @@ compose {
             targetFormats(TargetFormat.Dmg)
             packageName = "KaSH"
             packageVersion = project.version.toString()
-            description = "Isolated, persistent Chromium environments, one per tab"
+            description = "Your messaging services in one window, each in its own isolated browser"
             vendor = "Kodein Koders"
             jvmArgs += jcefJvmArgs
 

@@ -1,4 +1,5 @@
-// What KaSH asks of macOS that Java has no API for: the notifications of the Notification Center, and the login item of the application.
+// What KaSH asks of macOS that Java has no API for: the notifications of the Notification Center, the login item of the application, and the
+// panels that do not activate KaSH when they are clicked (its own notifications' window).
 // Called from Kotlin through the FFM API (app.kash.macos): plain C functions, strings in UTF-8.
 
 #import <AppKit/AppKit.h>

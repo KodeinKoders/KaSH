@@ -46,7 +46,7 @@ public class BrowserEngine private constructor(
     private val tabs = ConcurrentHashMap<CefBrowser, BrowserTab>()
     private val profiles = CopyOnWriteArrayList<BrowserProfile>()
 
-    // The size of the pages that are not shown (see BrowserTab.created): the last size a page was shown at, the main window's size until then.
+    // The size of the pages that are not shown (see BrowserTab.applyHiddenSize): the last size a page was shown at, the main window's size until then.
     private val hiddenSize = AtomicReference(Dimension(1280, 800))
 
     // The tabs whose browser is to be created, one after the other (see create), and the one being created.

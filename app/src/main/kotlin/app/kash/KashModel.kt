@@ -70,13 +70,13 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger(KashModel::class.java)
 
-/** A service whose page is loaded: its profile, its tab, and what watches them. */
 /**
  * How a plugin marks a conversation as read (`kash.onMarkRead`): as the service's own "Mark as read" does, or by opening it in its page and
  * going back to what was open before (Instagram, Google Messages: they have no other way), which KaSH says in its item.
  */
 enum class MarkRead { DIRECT, BY_OPENING }
 
+/** A service whose page is loaded: its profile, its tab, and what watches them. */
 class LoadedService(val profile: BrowserProfile, val tab: BrowserTab, val jobs: List<Job>)
 
 /** An update of the plugin named [name] that failed, and why. */

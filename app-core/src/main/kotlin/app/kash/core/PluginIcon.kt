@@ -4,11 +4,11 @@ import java.net.URI
 import java.util.Base64
 
 /**
- * The image that a plugin's script gives as its service's icon (`kash.setIcon`), which the service's tile shows when its icon is the automatic one
- * ([ServiceIcon.Favicon]), in place of its site's icon.
+ * The image that a plugin's script gives as its service's icon (`kash.setIcon`), which the service's tile shows when its icon is an automatic
+ * one ([ServiceIcon.Plugin] or [ServiceIcon.Favicon]), in place of its plugin's icon or its site's.
  */
 public sealed interface PluginIcon {
-    /** The service has none: its tile shows its site's icon. */
+    /** The service has none: its tile shows its plugin's icon or its site's, as its icon says. */
     public data object None : PluginIcon
 
     /** An image that KaSH downloads, without the service's cookies. */

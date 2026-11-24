@@ -45,7 +45,10 @@ public sealed interface ServiceIcon {
     @SerialName("plugin")
     public data object Plugin : ServiceIcon
 
-    /** The site's own icon, fetched from its address; the service's colored square while there is none. */
+    /**
+     * The automatic icon: the image that the plugin's script gives (`kash.setIcon`), else the site's own icon, fetched from its address, else the
+     * plugin's square, else a globe (`tileContent`).
+     */
     @Serializable
     @SerialName("favicon")
     public data object Favicon : ServiceIcon
@@ -141,7 +144,7 @@ public enum class InboxSort { BY_DATE, BY_COUNT, BY_SERVICE }
  * The settings of the application.
  *
  * @property launchAtLogin Off by default: registering a login item is the user's decision.
- * @property directOnly Only direct messages and mentions in the Unread tab: kept, but without effect until the services are instrumented.
+ * @property directOnly Only the direct messages and the mentions in the Unread tab (`Inbox.rows`): no group, channel nor topic without a mention.
  * @property showApproximateTimes Whether the Unread tab shows the times of the conversations that came while KaSH was not watching their services
  * ([WhileClosed], with a clock). Without, they have no time (last when sorted by date); KaSH still keeps them ([UnreadTimes]), for when it is on
  * again.
