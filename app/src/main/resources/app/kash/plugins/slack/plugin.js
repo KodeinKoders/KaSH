@@ -13,10 +13,12 @@
 // The conversations of the sidebar, rendered: its sections (starred, channels, direct messages, apps) are one list.
 const rows = () => [...document.querySelectorAll('[data-qa-channel-sidebar-channel-id]')];
 
-// Slack's types: a channel (public or private), a direct message, a group direct message.
+// Slack's types: a channel (public or private) is a `channel`, a group direct message a `group`, a direct message `direct`: the same in the
+// unread conversations and in the contacts.
 const kindOf = (row) => {
     const type = row.dataset.qaChannelSidebarChannelType;
-    return type === 'channel' || type === 'mpim' ? 'group' : 'direct';
+    if (type === 'channel') return 'channel';
+    return type === 'mpim' ? 'group' : 'direct';
 };
 
 const nameOf = (row) => kash.dom.text(row.querySelector('[data-qa^="channel_sidebar_name_"]'));
@@ -96,10 +98,7 @@ kash.contacts.watch(() => {
     if (all.length === 0) return null;
     return all
         .filter((row) => row.dataset.qaChannelSidebarIsYou !== 'true')
-        .map((row) => {
-            const type = row.dataset.qaChannelSidebarChannelType;
-            return { id: row.dataset.qaChannelSidebarChannelId, name: nameOf(row), kind: type === 'channel' ? 'channel' : type === 'mpim' ? 'group' : 'direct' };
-        });
+        .map((row) => ({ id: row.dataset.qaChannelSidebarChannelId, name: nameOf(row), kind: kindOf(row) }));
 });
 
 // Marks a conversation as read as the user would: its row's context menu, and its item `channel_ctx_menu_mark_as_read` (an attribute that
