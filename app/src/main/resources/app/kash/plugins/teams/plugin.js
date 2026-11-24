@@ -124,10 +124,14 @@ kash.onMarkRead(async (id) => {
         trigger = row.querySelector('[data-testid="more-menu-trigger"]');
     }
     if (!trigger) return point(target, false);
+    // The menu that the click shows, not another one that the document still has (an earlier one, a hidden one): a menu that was not shown
+    // before the click (a new one, or one that the page shows again).
+    const shown = (menu) => menu.getBoundingClientRect().width > 0;
+    const before = new Set([...document.querySelectorAll('[role="menu"]')].filter(shown));
     trigger.click();
     for (let tries = 0; tries < 20; tries++) {
         await wait(100);
-        const menu = document.querySelector('[role="menu"]');
+        const menu = [...document.querySelectorAll('[role="menu"]')].find((candidate) => !before.has(candidate) && shown(candidate));
         if (!menu) continue;
         const item = menu.querySelector(MARK_AS_READ);
         // No such item (the row was read meanwhile, a kind of conversation whose menu has none): the menu is closed again.

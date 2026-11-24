@@ -87,10 +87,15 @@ kash.onMarkRead(async (id) => {
     if (!found || !unread(textsOf(found.link))) return;
     const button = found.row.querySelector('[role="button"][aria-haspopup="menu"]');
     if (!button) return;
+    // The menu that the click shows, not another one that the document still has (an earlier one, a hidden one): a menu that was not shown
+    // before the click (a new one, or one that the page shows again).
+    const shown = (menu) => menu.getBoundingClientRect().width > 0;
+    const before = new Set([...document.querySelectorAll('[role="menu"]')].filter(shown));
     button.click();
     for (let tries = 0; tries < 20; tries++) {
         await wait(100);
-        const item = document.querySelector('[role="menu"] [role="menuitem"]');
+        const menu = [...document.querySelectorAll('[role="menu"]')].find((candidate) => !before.has(candidate) && shown(candidate));
+        const item = menu && menu.querySelector('[role="menuitem"]');
         if (item) {
             item.click();
             return;
