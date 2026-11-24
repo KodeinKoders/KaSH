@@ -163,8 +163,12 @@ internal fun PluginsPage(model: KashModel, icons: ServiceIcons) {
                                             CheckboxRow(strings.watch, installed.watch, { model.setPluginWatch(plugin.id, it) })
                                         }
                                     }
+                                    // As the rail's arrow and the title bar's button do (startPluginUpdate): once at a time, its failure in a dialog.
                                     model.pluginUpdates[plugin.id]?.let { update ->
-                                        DefaultButton(onClick = { run { model.updatePlugin(plugin.id) } }) { Text(strings.updateTo(update.version)) }
+                                        val updating = plugin.id in model.updatingPlugins
+                                        DefaultButton(onClick = { model.startPluginUpdate(plugin.id) }, enabled = !updating) {
+                                            Text(if (updating) strings.updating else strings.updateTo(update.version))
+                                        }
                                     }
                                     Box(Modifier.weight(1f))
                                     Link(strings.uninstall, onClick = { flow = PluginFlow.Uninstall(plugin) })
