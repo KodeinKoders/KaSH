@@ -41,6 +41,7 @@ import app.kash.core.PluginSource
 import app.kash.ui.Hint
 import app.kash.ui.UiScaled
 import app.kash.ui.Kash
+import app.kash.ui.LocalUiScale
 import app.kash.ui.LocalAwtWindow
 import app.kash.ui.strings
 import kotlinx.coroutines.CancellationException
@@ -278,7 +279,9 @@ private fun PluginDialog(
     actions: @Composable () -> Unit = {},
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
-    DialogWindow(onCloseRequest = onDismiss, state = rememberDialogState(size = DpSize(480.dp, height.dp)), title = title, resizable = false) {
+    // As big as the text is (LocalUiScale, outside the window's UiScaled): its content and its buttons stay in it.
+    val scale = LocalUiScale.current
+    DialogWindow(onCloseRequest = onDismiss, state = rememberDialogState(size = DpSize(480.dp * scale, height.dp * scale)), title = title, resizable = false) {
         // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
         UiScaled {
             Box(Modifier.fillMaxSize().background(Kash.colors.panel).padding(20.dp)) {

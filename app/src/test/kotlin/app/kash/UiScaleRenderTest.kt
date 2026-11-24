@@ -12,6 +12,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -69,6 +70,30 @@ class UiScaleRenderTest {
                 File("build/renders").mkdirs()
                 ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File("build/renders/ui-scale-$scale.png"))
             }
+        }
+    }
+
+    @Test
+    fun aDialogKeepsItsButtonsAtABiggerTextWithALongMessage() {
+        val scale = 1.75f
+        runComposeUiTest {
+            setContent {
+                CompositionLocalProvider(LocalUiScale provides scale) {
+                    KashTheme(false) {
+                        UiScaled {
+                            Box(Modifier.width(MESSAGE_DIALOG_SIZE.width * scale).height(MESSAGE_DIALOG_SIZE.height * scale)) {
+                                MessageContent("Effacer les données de WhatsApp · Travail ?", "Une très longue raison. ".repeat(40)) {
+                                    org.jetbrains.jewel.ui.component.DefaultButton(onClick = {}) { org.jetbrains.jewel.ui.component.Text("OK") }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            onNodeWithText("OK").assertIsDisplayed()
+            // To look at: build/renders/ui-scale-dialog-175.png.
+            File("build/renders").mkdirs()
+            ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File("build/renders/ui-scale-dialog-175.png"))
         }
     }
 }

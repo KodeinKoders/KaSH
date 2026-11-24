@@ -17,12 +17,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
+import androidx.compose.foundation.rememberScrollState
 import app.kash.ui.Kash
+import app.kash.ui.LocalUiScale
 import app.kash.ui.UiScaled
 import app.kash.ui.strings
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 
 /**
  * The confirmation of what cannot be undone (deleting a service, erasing its data), in a dialog of its own: a page of a service is a native view,
@@ -56,20 +59,33 @@ fun PluginUpdateFailureDialog(failure: PluginUpdateFailure, onDismiss: () -> Uni
     }
 }
 
+/** The size of a message's dialog, at the usual size of the text: as big as the text is ([LocalUiScale], outside the window's [UiScaled]). */
+internal val MESSAGE_DIALOG_SIZE = DpSize(440.dp, 200.dp)
+
 // A dialog of its own (not drawn over the page): its title, its text, and its buttons at the bottom right.
 @Composable
 private fun MessageDialog(title: String, body: String, onDismiss: () -> Unit, buttons: @Composable () -> Unit) {
-    DialogWindow(onCloseRequest = onDismiss, state = rememberDialogState(size = DpSize(440.dp, 200.dp)), title = title, resizable = false) {
+    val scale = LocalUiScale.current
+    val size = DpSize(MESSAGE_DIALOG_SIZE.width * scale, MESSAGE_DIALOG_SIZE.height * scale)
+    DialogWindow(onCloseRequest = onDismiss, state = rememberDialogState(size = size), title = title, resizable = false) {
         // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
-        UiScaled {
-            Box(Modifier.fillMaxSize().background(Kash.colors.panel).padding(20.dp)) {
-                Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text(body, color = Kash.colors.muted)
-                    Box(Modifier.weight(1f))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) { buttons() }
-                }
+        UiScaled { MessageContent(title, body, buttons) }
+    }
+}
+
+/**
+ * What a message's dialog shows: its title, its text, which scrolls when it is longer than the window (an exception's message, a long title at a
+ * bigger text), and its buttons, always at the bottom: the text pushed them out of the window.
+ */
+@Composable
+internal fun MessageContent(title: String, body: String, buttons: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Kash.colors.panel).padding(20.dp)) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            VerticallyScrollableContainer(Modifier.weight(1f).fillMaxWidth(), scrollState = rememberScrollState()) {
+                Text(body, color = Kash.colors.muted)
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) { buttons() }
         }
     }
 }
