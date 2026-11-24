@@ -28,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -104,9 +106,10 @@ fun InboxScreen(
                     return@Column
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val filterLabel = strings.filterLabel
                     TextField(
                         state = query,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).semantics { contentDescription = filterLabel },
                         placeholder = { Text(strings.filterPlaceholder, color = Kash.colors.faint) },
                         leadingIcon = { KashIcon(KashIcons.Search, Kash.colors.muted, Modifier.padding(end = 8.dp)) },
                     )

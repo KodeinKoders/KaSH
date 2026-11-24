@@ -203,7 +203,8 @@ private fun AddServiceContent(editing: Service?, icons: ServiceIcons, onClose: (
                     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text(strings.customApplication, fontWeight = FontWeight.SemiBold)
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            LabeledField(strings.name, name, strings.namePlaceholder, Modifier.weight(1f))
+                            // Add is disabled without a name: the field says why, once the address is written.
+                            LabeledField(strings.name, name, strings.namePlaceholder, Modifier.weight(1f), error = strings.nameRequired.takeIf { customName.isEmpty() && customUrl.isNotEmpty() })
                             LabeledField(strings.url, url, strings.urlPlaceholder, Modifier.weight(2f), monospace = true, error = strings.urlInvalid.takeIf { customUrl.isNotEmpty() && !urlValid })
                         }
                         LabeledField(strings.labelOptional, label, strings.labelPlaceholder, Modifier.widthIn(max = 320.dp))

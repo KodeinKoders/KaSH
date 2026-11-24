@@ -202,7 +202,8 @@ fun ServiceMenuButton(service: Service, actions: ServiceActions, devToolsEnabled
     val menu = remember { MenuState() }
     val anchor = remember { MenuAnchor() }
     Box(Modifier.menuAnchor(anchor)) {
-        IconOnlyButton(KashIcons.More, strings.moreOptions, menu::toggle, size = buttonSize, active = menu.open)
+        // Its tooltip says "More options"; a screen reader says whose they are, since every service has one.
+        IconOnlyButton(KashIcons.More, strings.moreOptions, menu::toggle, size = buttonSize, active = menu.open, description = strings.actionsFor(service.title))
     }
     if (menu.open) {
         // Wide enough for the longest item in French ("Effacer toutes les données…").

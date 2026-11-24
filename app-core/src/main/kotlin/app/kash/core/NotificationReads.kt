@@ -24,8 +24,8 @@ public class NotificationReads(seenBefore: Set<String> = emptySet()) {
 
     private val followed = LinkedHashMap<String, Followed>()
 
-    /** The groups followed now. */
-    public val keys: Set<String> get() = followed.keys
+    /** The groups followed now (for the tests). */
+    internal val keys: Set<String> get() = followed.keys
 
     /** The hashes ([hash]) of the groups followed whose conversation was listed: what [NotificationReadsFile] keeps for the next launch. */
     public val seen: Set<String> get() = followed.filterValues { it.listed }.keys.mapTo(HashSet(), ::hash)

@@ -56,7 +56,10 @@ fun Modifier.dashedBorder(color: Color, width: Dp, radius: Dp): Modifier = drawB
     )
 }
 
-/** A square button that shows only [icon], with [label] for accessibility and as a tooltip: the design's `.ib` buttons. */
+/**
+ * A square button that shows only [icon], with [label] as a tooltip and for accessibility ([description], when what a screen reader says needs
+ * more than the tooltip: whose button it is): the design's `.ib` buttons.
+ */
 @Composable
 fun IconOnlyButton(
     icon: ImageVector,
@@ -68,6 +71,7 @@ fun IconOnlyButton(
     tint: Color = Kash.colors.muted,
     active: Boolean = false,
     enabled: Boolean = true,
+    description: String = label,
 ) {
     val shape = RoundedCornerShape(if (size >= 44.dp) 6.dp else 4.dp)
     Tooltip({ Text(label) }) {
@@ -77,7 +81,7 @@ fun IconOnlyButton(
                 .hoverBackground(Kash.colors.hover, shape)
                 .clickable(enabled = enabled, onClick = onClick)
                 .semantics {
-                    contentDescription = label
+                    contentDescription = description
                     role = Role.Button
                 },
             contentAlignment = Alignment.Center,
