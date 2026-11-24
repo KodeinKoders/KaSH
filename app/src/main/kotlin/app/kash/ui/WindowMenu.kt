@@ -140,17 +140,58 @@ fun WindowMenu(anchor: MenuAnchor, width: Dp, alignEnd: Boolean, onDismiss: () -
                 window.addWindowFocusListener(listener)
                 onDispose { window.removeWindowFocusListener(listener) }
             }
-            // Under its button, starting where the button starts, or ending where it ends; again when the button moves. The window is larger than the
-            // menu by its margin, where the shadow is drawn.
-            LaunchedEffect(anchor.left, anchor.right, anchor.bottom, alignEnd) {
+            // Under its button, starting where the button starts, or ending where it ends; again when the button moves, and once the window has
+            // its size. The window is larger than the menu by its margin, where the shadow is drawn. Kept on the screen (menuLocation): a menu
+            // at the pointer near the screen's right edge or bottom was mostly off it.
+            val place = {
                 val x = if (alignEnd) anchor.right - menuWidth.value else anchor.left
-                window.setLocation((x - MARGIN.value).toInt(), (anchor.bottom + GAP - MARGIN.value).toInt())
+                val screen = screenAt(anchor.left.toInt(), anchor.bottom.toInt())
+                val location = if (screen == null || window.width == 0) {
+                    java.awt.Point((x - MARGIN.value).toInt(), (anchor.bottom + GAP - MARGIN.value).toInt())
+                } else {
+                    menuLocation(
+                        (x - MARGIN.value).toInt(), (anchor.bottom + GAP - MARGIN.value).toInt(), window.width, window.height,
+                        anchor.top.toInt(), MARGIN.value.toInt(), GAP.toInt(), screen,
+                    )
+                }
+                window.setLocation(location)
+            }
+            LaunchedEffect(anchor.left, anchor.right, anchor.top, anchor.bottom, alignEnd) { place() }
+            DisposableEffect(window) {
+                val listener = object : java.awt.event.ComponentAdapter() {
+                    override fun componentResized(e: java.awt.event.ComponentEvent) = place()
+                }
+                window.addComponentListener(listener)
+                onDispose { window.removeComponentListener(listener) }
             }
             CompositionLocalProvider(LocalMenuController provides controller) {
                 MenuFrame(menuWidth, content)
             }
         }
     }
+}
+
+/**
+ * Where a menu's window goes, its top left at ([x], [y]) under its button, [width] by [height] (its shadow's [margin] around the menu), kept on
+ * [screen] (without the menu bar and the Dock): moved left when it would go past the screen's right edge (never past its left one), and above its
+ * button ([anchorTop], [gap] from it) when it would go past its bottom, or against the screen's bottom when it does not fit above either.
+ */
+internal fun menuLocation(x: Int, y: Int, width: Int, height: Int, anchorTop: Int, margin: Int, gap: Int, screen: java.awt.Rectangle): java.awt.Point {
+    val left = x.coerceAtMost(screen.x + screen.width - width).coerceAtLeast(screen.x)
+    if (y + height <= screen.y + screen.height) return java.awt.Point(left, y)
+    val above = anchorTop - gap - height + margin
+    val top = if (above >= screen.y) above else (screen.y + screen.height - height).coerceAtLeast(screen.y)
+    return java.awt.Point(left, top)
+}
+
+// The usable part (without the menu bar and the Dock) of the screen that the point ([x], [y]) is on; null when it is on none.
+private fun screenAt(x: Int, y: Int): java.awt.Rectangle? {
+    val configuration = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().screenDevices
+        .map { it.defaultConfiguration }
+        .firstOrNull { it.bounds.contains(x, y) } ?: return null
+    val bounds = configuration.bounds
+    val insets = java.awt.Toolkit.getDefaultToolkit().getScreenInsets(configuration)
+    return java.awt.Rectangle(bounds.x + insets.left, bounds.y + insets.top, bounds.width - insets.left - insets.right, bounds.height - insets.top - insets.bottom)
 }
 
 /**
