@@ -796,7 +796,8 @@ class KashModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (e !is PluginPackageException) logger.warn("The plugin {} could not be updated", id, e)
+                // Its kind only: its message says the source's path or address, which may say who the user is. The dialog says it.
+                if (e !is PluginPackageException) logger.warn("The plugin {} could not be updated: {}", id, e.javaClass.simpleName)
                 pluginUpdateFailure = PluginUpdateFailure(name, e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName)
             } finally {
                 updatingPlugins = updatingPlugins - id
@@ -857,7 +858,8 @@ class KashModel(
                 throw e
             } catch (e: Exception) {
                 // A folder being written, an address that does not answer: the next check may read it.
-                if (watchErrors.add("${entry.id}|${e.message}")) logger.warn("The source of the plugin {} cannot be read: {}", entry.id, e.message)
+                // Once per error (its message is the key, in memory only); its kind in the log, not its message, which says the source's path or address.
+                if (watchErrors.add("${entry.id}|${e.message}")) logger.warn("The source of the plugin {} cannot be read: {}", entry.id, e.javaClass.simpleName)
                 continue
             }
             // Read again: it may have been uninstalled, updated or no longer watched meanwhile.

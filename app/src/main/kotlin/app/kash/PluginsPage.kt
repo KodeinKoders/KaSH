@@ -230,7 +230,8 @@ private fun sourceLabel(source: PluginSource): String = when (source) {
 
 /** What the user is told when a plugin cannot be read or installed: the first field that is wrong, or why it could not be read. */
 private fun messageOf(error: Exception): String {
-    if (error !is PluginPackageException) logger.warn("A plugin could not be installed", error)
+    // Its kind only: its message (and its stack's) says the source's path or address, which may say who the user is. The user is told the message.
+    if (error !is PluginPackageException) logger.warn("A plugin could not be installed: {}", error.javaClass.simpleName)
     return error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
 }
 
