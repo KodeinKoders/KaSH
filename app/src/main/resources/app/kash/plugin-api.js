@@ -112,10 +112,13 @@ const setIcon = (source) => {
     send({ type: 'icon', source });
 };
 
+// The reads of the watches, which KaSH's Refresh (the Unread tab's) runs at once.
+const readers = new Set();
+
 const watch = (read, options) => {
     if (typeof read !== 'function') throw new TypeError('kash.watch() takes a function');
     const interval = Math.max(500, Number(options && options.interval) || 2000);
-    const timer = setInterval(() => {
+    const tick = () => {
         let conversations;
         try {
             conversations = read();
@@ -124,8 +127,13 @@ const watch = (read, options) => {
             return;
         }
         if (conversations !== null && conversations !== undefined) set(conversations);
-    }, interval);
-    return () => clearInterval(timer);
+    };
+    const timer = setInterval(tick, interval);
+    readers.add(tick);
+    return () => {
+        clearInterval(timer);
+        readers.delete(tick);
+    };
 };
 
 // A contact or a topic that the service gives access to (a person, a group, a channel, a space, a server), as KaSH reads it, or null when it is
@@ -182,7 +190,9 @@ const watchContacts = (read, options) => {
     // Once the page had time to show its lists, then every interval.
     const first = setTimeout(tick, Math.min(interval, 3000));
     const timer = setInterval(tick, interval);
+    readers.add(tick);
     return () => {
+        readers.delete(tick);
         clearTimeout(first);
         clearInterval(timer);
     };
@@ -265,6 +275,16 @@ const markReadByOpening = (handlers) => {
         return markingByOpening;
     }, { byOpening: true });
 };
+
+// KaSH's Refresh (the Unread tab's): every watch reads its page at once, and what it reads is sent even when it did not change (a conversation
+// that KaSH took out by mistake comes back).
+Object.defineProperty(window, '__kashRefresh', {
+    value: () => {
+        last = null;
+        lastContacts = null;
+        for (const read of readers) read();
+    },
+});
 
 let openHandler = null;
 Object.defineProperty(window, '__kashOpenConversation', {

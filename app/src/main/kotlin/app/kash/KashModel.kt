@@ -756,6 +756,17 @@ class KashModel(
         activateWindow()
     }
 
+    /**
+     * The Unread tab's Refresh: every plugin's page reads itself at once, and sends what it reads even when it did not change. A web application
+     * has nothing to read again: its title is followed as it changes.
+     */
+    fun refresh() {
+        for ((id, loadedService) in loaded) {
+            if (service(id)?.plugin == null) continue
+            loadedService.tab.execute("window.__kashRefresh && window.__kashRefresh()")
+        }
+    }
+
     /** Shows [service], and opens [conversation] in its page when there is one (a row of the Unread tab). */
     fun openConversation(service: Service, conversation: String?) {
         show(service)

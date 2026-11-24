@@ -387,6 +387,7 @@ kash.watch(read: () => Conversation[] | null | undefined, options?: { interval?:
 
 `watch` calls `read` every `interval` milliseconds (2000 by default, 500 at least) and sends what it returns with `unread.set`.
 `read` returns `null` or `undefined` while the page is not ready (the service is loading, or the user is not logged in): nothing is sent.
+The Unread tab's Refresh calls every `read` (the contacts' too) at once, and what it returns is sent even when it did not change.
 An exception of `read` is caught: the page changed its structure, nothing is sent, and reading goes on.
 `watch` returns a function that stops it.
 
