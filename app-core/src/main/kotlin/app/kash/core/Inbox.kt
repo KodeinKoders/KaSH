@@ -83,12 +83,12 @@ public object Inbox {
         return InboxSections(messages, topics, priority)
     }
 
-    /** The rows that [query] matches, by the conversation's name, or the service's name or label, ignoring case. */
+    /** The rows that [query] matches, by the conversation's name, or the service's name or label, ignoring case and accents ([foldText]). */
     public fun filter(rows: List<InboxRow>, query: String): List<InboxRow> {
-        val q = query.trim().lowercase()
+        val q = foldText(query.trim())
         if (q.isEmpty()) return rows
         return rows.filter {
-            it.name.lowercase().contains(q) || it.service.name.lowercase().contains(q) || it.service.label.lowercase().contains(q)
+            foldText(it.name).contains(q) || foldText(it.service.name).contains(q) || foldText(it.service.label).contains(q)
         }
     }
 

@@ -77,6 +77,9 @@ class InboxTest {
         assertEquals(listOf("Laila"), Inbox.filter(rows, " lai ").map { it.name })
         assertEquals(listOf("Laila", "Escalade"), Inbox.filter(rows, "whatsapp").map { it.name })
         assertEquals(listOf("Le Cerf Ludique"), Inbox.filter(rows, "JEUX").map { it.name })
+        // Without the accents, as the search.
+        val accented = rows.map { if (it.name == "Laila") it.copy(name = "Hélène") else it }
+        assertEquals(listOf("Hélène"), Inbox.filter(accented, "helene").map { it.name })
     }
 
     @Test

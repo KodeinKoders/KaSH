@@ -18,6 +18,17 @@ class SearchTest {
         assertEquals(listOf(0, 1, 2), fuzzyMatch("HEL", "hélène")!!.second)
         assertEquals(listOf(0, 1, 2), fuzzyMatch("hél", "HELENE")!!.second)
         assertEquals(listOf(0, 1), fuzzyMatch("ca", "Ça va")!!.second)
+        // The letters that no decomposition takes their accent from.
+        assertEquals(listOf(0, 1, 2, 3), fuzzyMatch("lodz", "Łódź")!!.second)
+        assertEquals(listOf(0, 1, 2, 3, 4, 5), fuzzyMatch("strase", "Straße")!!.second)
+        // A query typed decomposed: e, then its accent.
+        assertEquals(listOf(0, 1), fuzzyMatch("he\u0301", "hélène")!!.second)
+    }
+
+    @Test
+    fun aKoreanSyllableIsNotTheFirstOfItsLetters() {
+        assertNull(fuzzyMatch("김", "강민"))
+        assertEquals(listOf(0), fuzzyMatch("김", "김민")!!.second)
     }
 
     @Test

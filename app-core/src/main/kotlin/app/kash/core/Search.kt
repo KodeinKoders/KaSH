@@ -47,7 +47,8 @@ public data class SearchMatch(val entry: SearchEntry, val indices: List<Int>, va
  * short text, are better. KaTTY's palette's, with the accents.
  */
 public fun fuzzyMatch(query: String, text: String): Pair<Int, List<Int>>? {
-    val needle = query.filterNot { it.isWhitespace() }.map(::fold)
+    // Nor its combining marks: a query typed decomposed (e, then its accent) looks for its letters.
+    val needle = query.filterNot { it.isWhitespace() || isMark(it) }.map(::fold)
     if (needle.isEmpty()) return 0 to emptyList()
     // One character for each of the text's, so that the indices are the text's.
     val hay = text.map(::fold)
@@ -80,8 +81,25 @@ public fun fuzzyMatch(query: String, text: String): Pair<Int, List<Int>>? {
     return best
 }
 
-// A character without its case and its accents: the first of its decomposition (é is e and an accent), in lower case.
-private fun fold(c: Char): Char = Normalizer.normalize(c.toString(), Normalizer.Form.NFD).first().lowercaseChar()
+// The letters that no decomposition takes their accent from, as one letter each (the indices stay the text's).
+private val FOLDED = mapOf('ł' to 'l', 'ø' to 'o', 'đ' to 'd', 'ß' to 's', 'æ' to 'a', 'œ' to 'o', 'ı' to 'i')
+
+// A Korean syllable, which decomposes into its letters (김 into ㄱ, ㅣ, ㅁ): kept whole, or every syllable that starts with ㄱ would be 김.
+private val HANGUL_SYLLABLES = '\uAC00'..'\uD7A3'
+
+// A character without its case and its accents: the first of its decomposition (é is e and an accent), in lower case; a Korean syllable whole,
+// ł, ø, ß and the like as their letter.
+private fun fold(c: Char): Char {
+    val lower = c.lowercaseChar()
+    if (lower in HANGUL_SYLLABLES) return lower
+    FOLDED[lower]?.let { return it }
+    return Normalizer.normalize(lower.toString(), Normalizer.Form.NFD).first()
+}
+
+private fun isMark(c: Char): Boolean = Character.getType(c) == Character.NON_SPACING_MARK.toInt()
+
+/** [text] without its case, its accents ([fuzzyMatch]'s folding) and its combining marks: what a filter compares. */
+public fun foldText(text: String): String = text.filterNot(::isMark).map(::fold).joinToString("")
 
 private fun List<Char>.indexOf(c: Char, from: Int): Int {
     for (i in from until size) if (this[i] == c) return i
