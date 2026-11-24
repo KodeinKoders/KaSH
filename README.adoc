@@ -49,6 +49,7 @@ A right click on a service's tile in the rail opens a menu with all of it: back,
 A link to another site opens in the system's browser; the service's own pages and the sign-in pages (Google, Microsoft, Apple, Facebook, GitHub) stay in KaSH.
 
 A contact's notifications are one: the last message, and how many are unread.
+A notification goes away once its conversation is read, in KaSH or elsewhere (on the phone, in another browser), the Notification Center's too, and those of the last launch whose conversations were read meanwhile.
 A conversation is marked as read without showing its service, from the Unread tab (a button over its row, or its context menu) or its notification, in WhatsApp, Telegram, Discord, Slack, Messenger, Google Chat, LinkedIn and Teams; in Instagram and Google Messages, which have no such action, by opening it in the background and going back to what was open.
 A contact marked as priority (from the Unread tab, the search or Settings) has its unread conversations at the top of the Unread tab, and its notifications even in Do Not Disturb and when its service is muted.
 Do Not Disturb turns on at the hours of its ranges (each with its days, and which may go past midnight), for all of KaSH (Settings › Notifications) or a service alone (its Edit window); during a range, the rail's bell lifts it until the range ends.

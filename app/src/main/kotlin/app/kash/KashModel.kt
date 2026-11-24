@@ -16,6 +16,7 @@ import app.kash.core.Directory
 import app.kash.core.DoNotDisturb
 import app.kash.core.DirectoryFile
 import app.kash.core.KashDirectories
+import app.kash.core.NotificationReadsFile
 import app.kash.core.KashState
 import app.kash.core.PageLanguages
 import app.kash.core.InstalledPlugin
@@ -189,6 +190,9 @@ class KashModel(
     // The contacts and topics that each plugin's service showed (Directory), which the search lists, kept across launches; the services that no
     // longer exist are forgotten. A disabled service keeps them.
     private val directoryFile = DirectoryFile(directories.directoryFile)
+
+    /** The notifications whose conversation was listed as unread, for the next launch (the Notifier's). */
+    val notificationReadsFile = NotificationReadsFile(directories.notificationReadsFile)
     private val directory = mutableStateMapOf<ServiceId, List<Contact>>().apply {
         putAll(directoryFile.load().filterKeys { id -> initial.services.any { it.id == id } })
     }
@@ -303,7 +307,7 @@ class KashModel(
             return
         }
         when (json["type"]?.jsonPrimitive?.contentOrNull) {
-            "notification" -> onPageNotification(service, json)
+            "notification", "notification-close" -> onPageNotification(service, json)
             "icon" -> {
                 // Only a plugin's script has the API: a web application's page has nothing to say about its tile.
                 if (service.plugin == null) return

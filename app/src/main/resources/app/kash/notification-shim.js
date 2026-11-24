@@ -4,6 +4,7 @@
 // the service worker's `showNotification`) by an implementation that sends them to KaSH through `window.cefQuery`, which shows them on the
 // desktop. The permission is always granted: KaSH decides whether a notification is shown. When the user clicks it, KaSH calls
 // `__kashNotificationClick(id)`, which fires the notification's `click` event, as a browser does (a messaging service opens the conversation).
+// When the page closes a notification (`close()`), KaSH is told (`notification-close`), with how long after it was shown.
 // It is the same for every service: it does not read anything of the page.
 (() => {
     if (window.__kashNotificationClick) return;
@@ -42,13 +43,17 @@
             this.onerror = null;
             this.onshow = null;
             this.__kashId = 'n' + (++next);
+            this.__kashShownAt = Date.now();
             shown.set(this.__kashId, this);
             send({ type: 'notification', id: this.__kashId, title: this.title, body: this.body, tag: this.tag, silent: this.silent });
             setTimeout(() => fire(this, 'show'), 0);
         }
 
+        // The page closes it (what it says was read, here or elsewhere; or its time is up): KaSH is told, as Chrome would take it away.
         close() {
-            if (shown.delete(this.__kashId)) fire(this, 'close');
+            if (!shown.delete(this.__kashId)) return;
+            send({ type: 'notification-close', id: this.__kashId, after: Date.now() - this.__kashShownAt });
+            fire(this, 'close');
         }
 
         static get permission() {

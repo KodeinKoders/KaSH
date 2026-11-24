@@ -7,6 +7,8 @@ import androidx.compose.runtime.snapshotFlow
 import app.kash.core.NotificationDuration
 import app.kash.core.NotificationGroups
 import app.kash.core.NotificationPolicy
+import app.kash.core.NotificationReads
+import app.kash.core.UnreadTimes
 import app.kash.core.Priorities
 import app.kash.core.NotificationStyle
 import app.kash.core.Service
@@ -21,10 +23,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import org.slf4j.LoggerFactory
 import java.awt.Toolkit
 import javax.swing.SwingUtilities
@@ -71,8 +75,12 @@ class Notifier(private val model: KashModel) {
     // The titles of the groups, which the Notification Center's notifications do not keep.
     private val titles = HashMap<String, String>()
 
-    // The groups whose conversation the plugin listed as unread: once it is not any more (read, here or elsewhere), the group is over.
-    private val seenUnread = HashSet<String>()
+    // When a group is over because what it says was read (in KaSH, on the phone…): its notification goes, KaSH's own and the Notification
+    // Center's. What it knew of the groups of the last launch, whose notifications the Notification Center may still show, is in its file.
+    private val reads = NotificationReads(model.notificationReadsFile.load())
+
+    // The groups whose conversation was listed, as last written to the file.
+    private var savedReads = emptySet<String>()
 
     init {
         val system = usesSystem(model.settings)
@@ -81,6 +89,33 @@ class Notifier(private val model: KashModel) {
         model.onPluginUpdate = ::pluginUpdate
         // A contact's notification goes away once its conversation is read.
         scope.launch { snapshotFlow { model.unread }.collect(::unreadChanged) }
+        // Those of the last launch that the Notification Center still shows, once the services had the time to say what they have unread.
+        if (system) scope.launch { delay(UnreadTimes.SETTLE_MS); restoreDelivered() }
+    }
+
+    // The notifications of the last launches that the Notification Center still shows: those whose conversation was read meanwhile go, the others
+    // are followed as this launch's.
+    private suspend fun restoreDelivered() {
+        val delivered = withContext(Dispatchers.IO) { MacosNotifications.delivered() } ?: return logger.debug("The Notification Center did not say what it shows")
+        val restored = delivered.filter { key -> key !in groups && !key.startsWith("$TEST_KEY|") && !key.startsWith("$PLUGIN_KEY|") }
+        val over = restored.filter { key -> reads.restored(key, model.unread[NotificationReads.serviceOf(key)]) }
+        over.forEach(MacosNotifications::remove)
+        logger.debug("Notifications of the last launch: {} shown, {} read meanwhile", restored.size, over.size)
+        saveReads()
+    }
+
+    // Writes the groups whose conversation was listed, when they changed, off Swing's thread.
+    private fun saveReads() {
+        val seen = reads.seen
+        if (seen == savedReads) return
+        savedReads = seen
+        scope.launch(Dispatchers.IO) {
+            try {
+                model.notificationReadsFile.save(seen)
+            } catch (e: Exception) {
+                logger.error("Cannot save the notifications whose conversation was listed", e)
+            }
+        }
     }
 
     /**
@@ -93,20 +128,22 @@ class Notifier(private val model: KashModel) {
     }
 
     private fun unreadChanged(unread: Map<ServiceId, ServiceUnread>) {
-        for (key in groups.keys.toList() + toasts.mapNotNull { toast -> toast.key.takeIf { toast.service != null } }) {
-            val service = model.service(ServiceId(key.substringBefore('|'))) ?: continue
-            val title = toasts.firstOrNull { it.key == key }?.title ?: titles[key] ?: continue
-            val conversation = NotificationGroups.conversationOf(unread[service.id]?.conversations.orEmpty(), title)
-            if (conversation != null) seenUnread += key else if (key in seenUnread) end(key)
-        }
+        val over = reads.update(unread)
+        // Never which ones: their titles are the user's contacts.
+        if (over.isNotEmpty()) logger.debug("Notifications read: {}", over.size)
+        over.forEach(::end)
+        saveReads()
     }
 
-    // The notifications of the group [key] are over: its notification goes, and the next one starts a new count.
+    // The notifications of the group [key] are over: its notification goes (KaSH's own, and the Notification Center's), and the next one starts
+    // a new count.
     private fun end(key: String) {
         groups.remove(key)
         titles.remove(key)
-        seenUnread.remove(key)
+        reads.forget(key)
         toasts.removeAll { it.key == key }
+        // Also when the notifications are KaSH's own now: the Notification Center may show one from before.
+        if (systemStarted) MacosNotifications.remove(key)
     }
 
     /**
@@ -140,10 +177,24 @@ class Notifier(private val model: KashModel) {
 
     private fun received(service: Service, json: JsonObject) {
         val id = json["id"]?.jsonPrimitive?.content ?: return
+        if (json["type"]?.jsonPrimitive?.content == "notification-close") return closed(service, id, json["after"]?.jsonPrimitive?.longOrNull)
         val title = json["title"]?.jsonPrimitive?.content.orEmpty()
         val body = json["body"]?.jsonPrimitive?.content.orEmpty()
         val silent = json["silent"]?.jsonPrimitive?.booleanOrNull ?: false
         notify(service, id, title, body, silent)
+    }
+
+    /**
+     * The page of [service] closed its notification [id], [after] milliseconds after it showed it: Chrome would take it away. KaSH does for a web
+     * application, whose page is all it knows of what was read, when it is the last one of its group; a plugin's service says what was read
+     * itself (some pages close their notifications after a while, read or not).
+     */
+    private fun closed(service: Service, id: String, after: Long?) {
+        // The ids are the page's own (`n1`, `n2`…): another service's page has the same.
+        val key = groups.entries.firstOrNull { (key, group) -> group.latest == id && NotificationReads.serviceOf(key) == service.id }?.key
+        // How the pages close their notifications, to see which ones say what was read: never which notification.
+        logger.debug("Notification of {} closed by its page after {} ms: {}", service.title, after, if (key == null) "not the last of its group" else "the last of its group")
+        if (key != null && service.plugin == null) end(key)
     }
 
     private fun notify(service: Service, id: String, title: String, body: String, silent: Boolean) {
@@ -161,6 +212,11 @@ class Notifier(private val model: KashModel) {
         group.latest = id
         group.received++
         titles[key] = shownTitle
+        reads.shown(key, model.unread[service.id])
+        saveReads()
+        // Whether the services' notifications are titled as their conversations, to see which ones are followed by their conversation and which
+        // by their service's total: never the title.
+        logger.debug("Notification of {}: {}", service.title, if (NotificationGroups.listedOf(model.unread[service.id]?.conversations.orEmpty(), shownTitle) != null) "its conversation is listed" else "no conversation listed of its title")
         val system = usesSystem(model.settings)
         val count = NotificationGroups.count(
             group.received, NotificationGroups.conversationOf(model.unread[service.id]?.conversations.orEmpty(), shownTitle),
@@ -226,7 +282,10 @@ class Notifier(private val model: KashModel) {
                 scope.launch {
                     delay(TOAST_DURATION_MS)
                     // Gone: the next notification of the contact counts from its unread messages again.
-                    if (toasts.removeAll { it === toast }) groups.remove(key)
+                    if (toasts.removeAll { it === toast }) {
+                        groups.remove(key)
+                        reads.forget(key)
+                    }
                 }
             }
         }
@@ -237,6 +296,7 @@ class Notifier(private val model: KashModel) {
         // The button "Mark as read" of the Notification Center's.
         if (key.startsWith(MacosNotifications.MARK_READ_PREFIX)) return markRead(key.removePrefix(MacosNotifications.MARK_READ_PREFIX))
         toasts.removeAll { it.key == key }
+        reads.forget(key)
         // A contact's: its page's last notification is the one clicked.
         val latest = groups[key]?.latest
         if (latest != null) end(key)
@@ -254,6 +314,7 @@ class Notifier(private val model: KashModel) {
 
     fun dismiss(key: String) {
         groups.remove(key)
+        reads.forget(key)
         toasts.removeAll { it.key == key }
     }
 }

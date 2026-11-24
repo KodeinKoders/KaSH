@@ -16,6 +16,16 @@ public object NotificationGroups {
     }
 
     /**
+     * The unread conversation or topic of the group titled [title] among [conversations], by its name; null when none is: whether what the group
+     * says is still unread ([NotificationReads]).
+     */
+    public fun listedOf(conversations: List<Conversation>, title: String): Conversation? {
+        val name = title.trim()
+        if (name.isEmpty()) return null
+        return conversations.firstOrNull { it.name.trim().equals(name, ignoreCase = true) }
+    }
+
+    /**
      * The count that the group shows: the notifications that it [received] since it was last shown, or its conversation's unread messages
      * when the plugin counts more (a message that came without a notification, or before KaSH saw it).
      */
