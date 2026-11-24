@@ -96,6 +96,11 @@ class PluginManifestTest {
         refused("square.text", slackWith("\"text\": \"Sl\"", "\"text\": \"Slac\""))
         refused("square.color", slackWith("\"#5B2C6F\"", "\"purple\""))
         refused("matches", slackWith("[\"https://app.slack.com/*\"]", "[]"))
+        // A page of the web with a host of its own: not every page, nor any host.
+        for (any in listOf("*", "https://*", "https://*.example.com/*", "app.example.com/*", "https://app.example.com")) {
+            refused("matches[0]", slackWith("[\"https://app.slack.com/*\"]", "[\"$any\"]"))
+        }
+        assertEquals(listOf("https://app.example.com/*"), PluginManifests.parse(slackWith("[\"https://app.slack.com/*\"]", "[\"https://app.example.com/*\"]")).matches)
         refused("script", slackWith("\"plugin.js\"", "\"../plugin.js\""))
         refused("icon", slackWith("\"script\": \"plugin.js\",", "\"script\": \"plugin.js\", \"icon\": \"../icon.png\","))
         refused("icon", slackWith("\"script\": \"plugin.js\",", "\"script\": \"plugin.js\", \"icon\": \"icon.svg\","))

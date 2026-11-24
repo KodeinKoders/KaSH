@@ -127,7 +127,7 @@ A plugin without one has the site's icon by default.
 
 | `matches`
 | yes
-| The addresses of the pages where the script runs, <<where-the-script-runs,in the top frame>>. Not empty.
+| The addresses of the pages where the script runs, <<where-the-script-runs,in the top frame>>: `http(s)://`, a host without `*`, then a path (`https://app.slack.com/*`). Not empty.
 
 | `script`
 | yes

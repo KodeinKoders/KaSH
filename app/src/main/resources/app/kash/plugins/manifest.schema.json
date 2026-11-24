@@ -68,12 +68,12 @@
       "pattern": "^https?://"
     },
     "matches": {
-      "description": "The addresses of the pages where the script runs, in the top frame only. * matches any run of characters.",
+      "description": "The addresses of the pages where the script runs, in the top frame only: http(s)://, a host without *, then a path. * matches any run of characters.",
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "string",
-        "minLength": 1
+        "pattern": "^[hH][tT][tT][pP][sS]?://[^/*\\s]+/\\S*$"
       }
     },
     "openInKash": {

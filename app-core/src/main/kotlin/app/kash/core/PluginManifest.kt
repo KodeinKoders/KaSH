@@ -172,6 +172,10 @@ public object PluginManifests {
     private val SCRIPT = Regex("[A-Za-z0-9_][A-Za-z0-9._-]*\\.js")
     private val COLOR = Regex("#[0-9A-Fa-f]{6}")
 
+    // An address of matches: of the web, with a host without a `*` (`https://app.slack.com/*`): `*` or `https://*` ran a plugin's script on every
+    // page that its tab went to, the sign-in pages (Google's) too.
+    private val PAGE_ADDRESS = Regex("https?://[^/*\\s]+/\\S*", RegexOption.IGNORE_CASE)
+
     // An address of openInKash: of the web, with a host, which may hold a `*` (`https://*.example.com/login/*`).
     private val WEB_ADDRESS = Regex("https?://[^/\\s]+(/\\S*)?", RegexOption.IGNORE_CASE)
 
@@ -206,7 +210,9 @@ public object PluginManifests {
         rule(COLOR.matches(manifest.square.color), "square.color", "a color #RRGGBB: '${manifest.square.color}'")
         manifest.icon?.let { rule(ICON.matches(it), "icon", "a PNG, JPEG, GIF, WebP or ICO image of the plugin's folder: '$it'") }
         rule(manifest.matches.isNotEmpty(), "matches", "empty")
-        manifest.matches.forEachIndexed { index, match -> rule(match.isNotBlank(), "matches[$index]", "empty") }
+        manifest.matches.forEachIndexed { index, match ->
+            rule(PAGE_ADDRESS.matches(match), "matches[$index]", "an address of the web, http(s)://, with a host without '*', then a path: '$match'")
+        }
         rule(SCRIPT.matches(manifest.script), "script", "a .js file of the plugin's folder: '${manifest.script}'")
         manifest.openInKash.forEachIndexed { index, address ->
             rule(WEB_ADDRESS.matches(address), "openInKash[$index]", "an address of the web, http(s)://, with a host: '$address'")
