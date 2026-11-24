@@ -31,6 +31,7 @@ import app.kash.ui.KashIcons
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.jewel.ui.component.Text
@@ -67,15 +68,37 @@ class ServiceIcons(private val directories: KashDirectories, private val registr
     /** The source that each service's script gave last, in this launch: the same one is not downloaded again. */
     private val sources = HashMap<ServiceId, PluginIcon>()
 
+    // How many times in a row each icon could not be had (a site's by its host, a script's by its service), which spaces its next try (retryDelay).
+    private val failures = HashMap<String, Int>()
+
+    // [key] could not be had: [retry] runs after retryDelay, longer at each failure in a row. Offline at launch, an icon was tried again only at the
+    // next launch.
+    private fun retryLater(key: String, retry: () -> Unit) {
+        val count = (failures[key] ?: 0) + 1
+        failures[key] = count
+        scope.launch {
+            delay(retryDelay(count))
+            retry()
+        }
+    }
+
     // A browser's User-Agent: some sites answer another one with a page that has no icon ("your browser is not supported").
     private val client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(10)).build()
 
     /** The icon of the site at [url], or null while it is fetched, or when it has none. */
     fun favicon(url: String): ImageBitmap? {
         val host = runCatching { URI(url).host }.getOrNull()?.lowercase() ?: return null
-        if (requested.add("favicon:$host")) {
+        val key = "favicon:$host"
+        if (requested.add(key)) {
             scope.launch {
-                withContext(Dispatchers.IO) { loadFavicon(host, url) }?.let { favicons[host] = it }
+                val icon = withContext(Dispatchers.IO) { loadFavicon(host, url) }
+                if (icon != null) {
+                    favicons[host] = icon
+                    failures.remove(key)
+                } else {
+                    // Asked again by the next drawing once it is forgotten.
+                    retryLater(key) { requested.remove(key) }
+                }
             }
         }
         return favicons[host]
@@ -136,9 +159,20 @@ class ServiceIcons(private val directories: KashDirectories, private val registr
                 bitmap
             }
             // Only the host in the log: the address can name the user's account.
-            if (bitmap == null) logger.warn("The icon that a plugin gave cannot be shown ({})", (icon as? PluginIcon.Remote)?.uri?.host ?: "inline")
-            // A source given since then wins.
-            else if (sources[id] == icon) reported[id] = bitmap
+            if (bitmap == null) {
+                logger.warn("The icon that a plugin gave cannot be shown ({})", (icon as? PluginIcon.Remote)?.uri?.host ?: "inline")
+                // A download that failed is tried again, while the script has not given another source: it does not send the same one again.
+                if (icon is PluginIcon.Remote) retryLater("reported:${id.value}") {
+                    if (sources[id] == icon) {
+                        sources.remove(id)
+                        report(id, icon)
+                    }
+                }
+            } else if (sources[id] == icon) {
+                // A source given since then wins.
+                reported[id] = bitmap
+                failures.remove("reported:${id.value}")
+            }
         }
     }
 
@@ -302,3 +336,6 @@ internal fun decodeIcon(bytes: ByteArray): ImageBitmap? = runCatching {
     if (!acceptableIconSize(width, height)) return null
     SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
 }.getOrNull()
+
+/** How long after its [failures]th failure in a row an icon is tried again: a minute, doubled at each failure, an hour at most. */
+internal fun retryDelay(failures: Int): Long = (60_000L shl (failures - 1).coerceIn(0, 6)).coerceAtMost(3_600_000L)
