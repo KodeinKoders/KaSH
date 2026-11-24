@@ -362,23 +362,7 @@ class KashModel(
             }
             "contacts" -> {
                 if (service.plugin == null) return
-                val received = try {
-                    json.getValue("contacts").jsonArray.map { element ->
-                        val contact = element.jsonObject
-                        Contact(
-                            id = contact.getValue("id").jsonPrimitive.content,
-                            name = contact.getValue("name").jsonPrimitive.content,
-                            kind = when (contact["kind"]?.primitive()?.contentOrNull) {
-                                "group" -> ConversationKind.GROUP
-                                "channel" -> ConversationKind.CHANNEL
-                                else -> ConversationKind.DIRECT
-                            },
-                        )
-                    }
-                } catch (e: Exception) {
-                    logger.warn("The contacts of {} cannot be read", service.title, e)
-                    return
-                }
+                val received = contactsOf(json) ?: return logger.warn("The contacts of {} cannot be read", service.title)
                 val complete = json["complete"]?.primitive()?.booleanOrNull ?: false
                 val merged = Directory.merge(directory[id].orEmpty(), received, complete)
                 // Only counts in the log: the names are the user's contacts.
@@ -395,32 +379,11 @@ class KashModel(
                 reported[id] = Unit
             }
             "unread" -> {
-                conversations[id] = try {
-                    // Only counts in the log: the names are the user's contacts.
-                    json.getValue("conversations").jsonArray.map { element ->
-                        val conversation = element.jsonObject
-                        val topic = conversation["topic"]?.primitive()?.booleanOrNull ?: false
-                        Conversation(
-                            id = conversation.getValue("id").jsonPrimitive.content,
-                            name = conversation["name"]?.primitive()?.contentOrNull.orEmpty(),
-                            kind = when (conversation["kind"]?.primitive()?.contentOrNull) {
-                                "group" -> ConversationKind.GROUP
-                                "channel" -> ConversationKind.CHANNEL
-                                else -> ConversationKind.DIRECT
-                            },
-                            // A topic's messages are not counted.
-                            count = if (topic) 0 else conversation["count"]?.primitive()?.intOrNull ?: 1,
-                            mention = !topic && conversation["mention"]?.primitive()?.booleanOrNull ?: false,
-                            preview = conversation["preview"]?.primitive()?.contentOrNull.orEmpty(),
-                            time = conversation["time"]?.primitive()?.longOrNull,
-                            dayOnly = conversation["timePrecision"]?.primitive()?.contentOrNull == "day",
-                            topic = topic,
-                        )
-                    }.let { read -> withSeenTimes(id, read) }.also { logger.debug("Unread of {}: {} conversations, {} messages, {} topics", service.title, it.count { c -> !c.topic }, it.sumOf { c -> c.count }, it.count { c -> c.topic }); totals.remove(id) }
-                } catch (e: Exception) {
-                    logger.warn("The unread conversations of {} cannot be read", service.title, e)
-                    return
-                }
+                val read = conversationsOf(json) ?: return logger.warn("The unread conversations of {} cannot be read", service.title)
+                conversations[id] = withSeenTimes(id, read)
+                // Only counts in the log: the names are the user's contacts.
+                logger.debug("Unread of {}: {} conversations, {} messages, {} topics", service.title, read.count { !it.topic }, read.sumOf { it.count }, read.count { it.topic })
+                totals.remove(id)
                 reported[id] = Unit
             }
         }
