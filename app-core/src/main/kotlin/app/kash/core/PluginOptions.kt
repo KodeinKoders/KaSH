@@ -62,9 +62,15 @@ public object PluginOptions {
         }
     }
 
-    /** The address of a service of [manifest] with [values], or null when a value is not accepted. */
-    public fun resolveUrl(manifest: PluginManifest, values: Map<String, String>): String? =
-        if (isValid(manifest, values)) url(manifest.url, values) else null
+    /**
+     * The address of a service of [manifest] with [values], or null when a value is not accepted. An option that is empty (an optional one that
+     * the user emptied) is its default there: the address was null, Add stayed disabled without a word, and an edited service kept its old one.
+     */
+    public fun resolveUrl(manifest: PluginManifest, values: Map<String, String>): String? {
+        if (!isValid(manifest, values)) return null
+        val filled = manifest.options.associate { option -> option.id to (values[option.id]?.takeIf { it.isNotEmpty() } ?: defaultOf(option)) }
+        return url(manifest.url, values + filled)
+    }
 
     /** [template] with the `${id}` replaced by their values, encoded as components of a URI; null when one has none, or when it is not an http(s) address. */
     internal fun url(template: String, values: Map<String, String>): String? {

@@ -197,7 +197,7 @@ A text field.
 | Whether the field must have a value. `false` by default.
 
 | `default`
-| The value of a new service.
+| The value of a new service, and the one that the URL takes when the field is left empty.
 
 | `placeholder`
 | What the empty field shows, a localized text.

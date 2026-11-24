@@ -63,6 +63,16 @@ class PluginOptionsTest {
     }
 
     @Test
+    fun anEmptyOptionalOptionIsItsDefaultInTheUrl() {
+        val zone = PluginOption.Text(id = "zone", label = LocalizedText(mapOf("en" to "Zone")), default = "eu")
+        val regional = manifest.copy(url = "https://\${zone}.example.com/", options = listOf(zone))
+        assertEquals("https://eu.example.com/", PluginOptions.resolveUrl(regional, mapOf("zone" to "")))
+        assertEquals("https://fr.example.com/", PluginOptions.resolveUrl(regional, mapOf("zone" to "fr")))
+        // What is saved and what the script sees stay as the user left them.
+        assertEquals("", PluginOptions.values(regional, mapOf("zone" to ""))["zone"])
+    }
+
+    @Test
     fun theValuesAreEncodedInTheUrl() {
         assertEquals("https://example.com/a%20b%2Fc%C3%A9", PluginOptions.url("https://example.com/\${path}", mapOf("path" to "a b/cé")))
     }
