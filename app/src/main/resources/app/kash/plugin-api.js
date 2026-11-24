@@ -51,7 +51,8 @@ const conversationOf = (value) => {
         count,
         mention: !topic && value.mention === true,
         preview: typeof value.preview === 'string' ? value.preview : '',
-        time: Number.isFinite(time) ? time : null,
+        // In whole milliseconds: KaSH reads an integer, and a time with a fraction (seconds * 1000) was lost.
+        time: Number.isFinite(time) ? Math.round(time) : null,
         timePrecision: value.timePrecision === 'day' && Number.isFinite(time) ? 'day' : 'minute',
         topic,
     };
@@ -212,10 +213,13 @@ let openHandler = null;
 Object.defineProperty(window, '__kashOpenConversation', {
     value: (id) => {
         if (typeof openHandler !== 'function') return;
+        const failed = (e) => console.error(`[KaSH] ${config.plugin.id}: opening a conversation failed`, e);
         try {
-            openHandler(String(id));
+            const opening = openHandler(String(id));
+            // An asynchronous handler's rejection too.
+            if (opening && typeof opening.then === 'function') Promise.resolve(opening).catch(failed);
         } catch (e) {
-            console.error(`[KaSH] ${config.plugin.id}: opening a conversation failed`, e);
+            failed(e);
         }
     },
 });

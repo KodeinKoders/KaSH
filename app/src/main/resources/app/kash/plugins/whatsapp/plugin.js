@@ -145,15 +145,16 @@ kash.onMarkRead(async (id) => {
     }
 });
 
-kash.onOpenConversation((id) => {
+kash.onOpenConversation(async (id) => {
     const collections = module('WAWebCollections');
     const commands = module('WAWebCmd');
     const chat = collections && collections.Chat && collections.Chat.get(id);
     if (!chat || !commands || !commands.Cmd) return;
-    // Its argument was the chat, and is now an object that holds it: whatsapp-web.js calls it both ways depending on the version.
+    // Its argument was the chat, and is now an object that holds it: whatsapp-web.js calls it both ways depending on the version. Awaited, so that
+    // a call that rejects (it is asynchronous) falls back too, not only one that throws.
     try {
-        commands.Cmd.openChatBottom({ chat });
+        await commands.Cmd.openChatBottom({ chat });
     } catch (e) {
-        commands.Cmd.openChatBottom(chat);
+        await commands.Cmd.openChatBottom(chat);
     }
 });
