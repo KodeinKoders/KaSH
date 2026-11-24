@@ -453,6 +453,7 @@ KaSH offers to mark a conversation as read without showing its service (a button
 The handler marks it as the user would: through the service's model (WhatsApp's), or the item "Mark as read" of its row's menu, told by what does not depend on the service's language (an attribute, an id, an icon), and only when the row is unread when the item toggles.
 It may be async; what it throws, or the promise that it rejects, is caught.
 KaSH takes the conversation out of the Unread tab at once, and the plugin's next report says whether it was read.
+Once the handler is done (its promise settled, when it returns one), the next state is sent even when it did not change: a conversation that the handler could not mark comes back.
 A service that has no way to mark a conversation as read but opening it (Instagram, Google Messages) says so with `byOpening: true`, and KaSH says it in its item, "Mark as read (by opening it)".
 Its handler opens the conversation (clicks its row), waits for it to be read, then goes back to what was open before (`history.back()`), unless the user went elsewhere meanwhile, one at a time.
 Opening a conversation may load a document of its own (Instagram's does, from its list), where the script runs again: what is being marked as read is kept in the tab's `sessionStorage`, and the new document finishes it.

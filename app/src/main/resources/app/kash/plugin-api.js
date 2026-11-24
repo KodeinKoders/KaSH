@@ -188,15 +188,22 @@ const watchContacts = (read, options) => {
 };
 
 // Marking a conversation as read, from KaSH (its Unread tab, a notification), when the plugin can: KaSH offers it only once the plugin said so.
+// KaSH takes the conversation out of its unread ones at once, and the next state says whether it was read: once the handler is done, that state
+// is sent even when it is the same as the last one (a handler that could do nothing: no such row, no such item), which puts the conversation
+// back. While the handler runs (marking by opening takes seconds), nothing changes.
 let markReadHandler = null;
 Object.defineProperty(window, '__kashMarkRead', {
     value: (id) => {
         if (typeof markReadHandler !== 'function') return;
+        const failed = (e) => console.error(`[KaSH] ${config.plugin.id}: marking a conversation as read failed`, e);
+        const done = () => { last = null; };
         try {
-            const done = markReadHandler(String(id));
-            if (done && typeof done.catch === 'function') done.catch((e) => console.error(`[KaSH] ${config.plugin.id}: marking a conversation as read failed`, e));
+            const running = markReadHandler(String(id));
+            if (running && typeof running.then === 'function') Promise.resolve(running).catch(failed).finally(done);
+            else done();
         } catch (e) {
-            console.error(`[KaSH] ${config.plugin.id}: marking a conversation as read failed`, e);
+            failed(e);
+            done();
         }
     },
 });
