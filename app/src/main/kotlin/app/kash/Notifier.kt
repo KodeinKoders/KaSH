@@ -313,6 +313,7 @@ class Notifier(private val model: KashModel) {
                     // Gone: the next notification of the contact counts from its unread messages again.
                     if (toasts.removeAll { it === toast }) {
                         groups.remove(key)
+                        titles.remove(key)
                         reads.forget(key)
                     }
                 }
@@ -349,6 +350,8 @@ class Notifier(private val model: KashModel) {
 
     fun dismiss(key: String) {
         groups.remove(key)
+        // A contact's name: not kept longer than its notification.
+        titles.remove(key)
         reads.forget(key)
         toasts.removeAll { it.key == key }
     }

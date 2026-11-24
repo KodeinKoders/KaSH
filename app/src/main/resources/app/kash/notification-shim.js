@@ -21,6 +21,7 @@
     };
 
     const shown = new Map();
+    const KEPT = 100;
     let next = 0;
     // The ids are this document's: KaSH keeps a notification's id across the page's reloads, and a counter that started again at `n1` gave a
     // click on an earlier document's notification to another of this one.
@@ -51,6 +52,9 @@
             this.__kashId = 'n' + documentId + '-' + (++next);
             this.__kashShownAt = Date.now();
             shown.set(this.__kashId, this);
+            // The last ones only: a page that never closes its notifications (showNotification's) kept them all for the document's life. A click
+            // on an older one is told to KaSH (notification-click-missed), which opens its conversation itself.
+            if (shown.size > KEPT) shown.delete(shown.keys().next().value);
             send({ type: 'notification', id: this.__kashId, title: this.title, body: this.body, tag: this.tag, silent: this.silent });
             setTimeout(() => fire(this, 'show'), 0);
         }
