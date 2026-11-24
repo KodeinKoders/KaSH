@@ -75,6 +75,10 @@ class Notifier(private val model: KashModel) {
     // The titles of the groups, which the Notification Center's notifications do not keep.
     private val titles = HashMap<String, String>()
 
+    // The last click given to a page (its service, the page's id of the notification, and its conversation as the plugin listed it then): when the
+    // page says that it does not have that notification any more (it was loaded again since), KaSH opens the conversation itself.
+    private var lastClick: Triple<ServiceId, String, String?>? = null
+
     // When a group is over because what it says was read (in KaSH, on the phone…): its notification goes, KaSH's own and the Notification
     // Center's. What it knew of the groups of the last launch, whose notifications the Notification Center may still show, is in its file.
     private val reads = NotificationReads(model.notificationReadsFile.load())
@@ -188,11 +192,24 @@ class Notifier(private val model: KashModel) {
 
     private fun received(service: Service, json: JsonObject) {
         val id = json["id"]?.jsonPrimitive?.content ?: return
-        if (json["type"]?.jsonPrimitive?.content == "notification-close") return closed(service, id, json["after"]?.jsonPrimitive?.longOrNull)
+        when (json["type"]?.jsonPrimitive?.content) {
+            "notification-close" -> return closed(service, id, json["after"]?.jsonPrimitive?.longOrNull)
+            "notification-click-missed" -> return clickMissed(service, id)
+        }
         val title = json["title"]?.jsonPrimitive?.content.orEmpty()
         val body = json["body"]?.jsonPrimitive?.content.orEmpty()
         val silent = json["silent"]?.jsonPrimitive?.booleanOrNull ?: false
         notify(service, id, title, body, silent)
+    }
+
+    // The page of [service] does not have the notification [id] that was clicked (it was loaded again since): the conversation of its group, when
+    // the plugin lists it, is opened by the plugin (the service is shown already).
+    private fun clickMissed(service: Service, id: String) {
+        val (clickedService, clickedId, conversation) = lastClick ?: return
+        if (clickedService != service.id || clickedId != id) return
+        lastClick = null
+        logger.debug("A notification of {} was clicked after its page was loaded again: {}", service.title, if (conversation == null) "its service is shown" else "its conversation is opened")
+        if (conversation != null) model.openConversation(service, conversation)
     }
 
     /**
@@ -201,7 +218,7 @@ class Notifier(private val model: KashModel) {
      * itself (some pages close their notifications after a while, read or not).
      */
     private fun closed(service: Service, id: String, after: Long?) {
-        // The ids are the page's own (`n1`, `n2`…): another service's page has the same.
+        // The ids are the page's own: another service's page may have the same.
         val key = groups.entries.firstOrNull { (key, group) -> group.latest == id && NotificationReads.serviceOf(key) == service.id }?.key
         // How the pages close their notifications, to see which ones say what was read: never which notification.
         logger.debug("Notification of {} closed by its page after {} ms: {}", service.title, after, if (key == null) "not the last of its group" else "the last of its group")
@@ -306,6 +323,9 @@ class Notifier(private val model: KashModel) {
     fun clicked(key: String) {
         // The button "Mark as read" of the Notification Center's.
         if (key.startsWith(MacosNotifications.MARK_READ_PREFIX)) return markRead(key.removePrefix(MacosNotifications.MARK_READ_PREFIX))
+        // Its conversation, as the plugin lists it, before what is known of the notification goes: the one that KaSH opens when the page does not
+        // have the notification any more.
+        val conversation = conversationOf(key)?.second?.id
         toasts.removeAll { it.key == key }
         reads.forget(key)
         // A contact's: its page's last notification is the one clicked.
@@ -319,6 +339,7 @@ class Notifier(private val model: KashModel) {
         val notificationId = latest ?: key.substringAfter('|')
         val service = model.service(ServiceId(serviceId)) ?: return
         model.show(service)
+        lastClick = Triple(service.id, notificationId, conversation)
         val quoted = Json.encodeToString(kotlinx.serialization.json.JsonPrimitive(notificationId))
         model.loaded[service.id]?.tab?.execute("window.__kashNotificationClick && window.__kashNotificationClick($quoted)")
     }

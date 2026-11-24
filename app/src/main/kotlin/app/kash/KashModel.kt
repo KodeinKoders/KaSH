@@ -325,7 +325,7 @@ class KashModel(
             return
         }
         when (json["type"]?.jsonPrimitive?.contentOrNull) {
-            "notification", "notification-close" -> onPageNotification(service, json)
+            "notification", "notification-close", "notification-click-missed" -> onPageNotification(service, json)
             "icon" -> {
                 // Only a plugin's script has the API: a web application's page has nothing to say about its tile.
                 if (service.plugin == null) return

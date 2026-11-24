@@ -4,7 +4,8 @@
 // the service worker's `showNotification`) by an implementation that sends them to KaSH through `window.cefQuery`, which shows them on the
 // desktop. The permission is always granted: KaSH decides whether a notification is shown. When the user clicks it, KaSH calls
 // `__kashNotificationClick(id)`, which fires the notification's `click` event, as a browser does (a messaging service opens the conversation).
-// When the page closes a notification (`close()`), KaSH is told (`notification-close`), with how long after it was shown.
+// When the page closes a notification (`close()`), KaSH is told (`notification-close`), with how long after it was shown; and when a click is for
+// a notification that the page does not have (`notification-click-missed`: it was loaded again since).
 // It is the same for every service: it does not read anything of the page.
 (() => {
     if (window.__kashNotificationClick) return;
@@ -21,6 +22,9 @@
 
     const shown = new Map();
     let next = 0;
+    // The ids are this document's: KaSH keeps a notification's id across the page's reloads, and a counter that started again at `n1` gave a
+    // click on an earlier document's notification to another of this one.
+    const documentId = Math.random().toString(36).slice(2, 10);
 
     const fire = (target, type) => {
         const event = new Event(type, { cancelable: type === 'click' });
@@ -42,7 +46,7 @@
             this.onclose = null;
             this.onerror = null;
             this.onshow = null;
-            this.__kashId = 'n' + (++next);
+            this.__kashId = 'n' + documentId + '-' + (++next);
             this.__kashShownAt = Date.now();
             shown.set(this.__kashId, this);
             send({ type: 'notification', id: this.__kashId, title: this.title, body: this.body, tag: this.tag, silent: this.silent });
@@ -72,10 +76,13 @@
 
     Object.defineProperty(window, 'Notification', { value: KashNotification, writable: true, configurable: true });
 
+    // A click on a notification: its `click` event, as a browser fires it. One of an earlier document (the page was loaded again since) is not
+    // this one's: KaSH is told, and opens its conversation itself when it can.
     Object.defineProperty(window, '__kashNotificationClick', {
         value: (id) => {
             const notification = shown.get(id);
             if (notification) fire(notification, 'click');
+            else send({ type: 'notification-click-missed', id: String(id) });
         },
     });
 
