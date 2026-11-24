@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -144,7 +145,7 @@ private fun InboxSection(title: String, rows: List<InboxRow>, empty: String, sor
             sort == InboxSort.BY_DATE -> RowsCard(Inbox.byDate(rows)) { row -> InboxRowView(row, icons, withService = true, actions) { onOpen(row) } }
             sort == InboxSort.BY_COUNT -> RowsCard(Inbox.byCount(rows)) { row -> InboxRowView(row, icons, withService = true, actions) { onOpen(row) } }
             else -> Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                for (group in Inbox.byService(rows)) {
+                for (group in Inbox.byService(rows)) key(group.service.id) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             ServiceTile(group.service, icons, 20.dp)
@@ -171,7 +172,9 @@ private fun RowsCard(rows: List<InboxRow>, row: @Composable (InboxRow) -> Unit) 
         Modifier.fillMaxWidth().clip(shape).background(Kash.colors.line).border(1.dp, Kash.colors.line, shape),
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
-        for (r in rows) row(r)
+        // Each row keyed by its conversation: what a row keeps (its context menu, its hover) is its conversation's, not its place's, which changes
+        // when a message comes; a menu kept by its place acted on the conversation that took the place.
+        for (r in rows) key(r.service.id, r.conversation) { row(r) }
     }
 }
 
