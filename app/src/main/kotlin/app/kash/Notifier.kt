@@ -51,7 +51,9 @@ private const val PLUGIN_KEY = "plugin"
 data class Toast(val key: String, val service: Service?, val title: String, val body: String, val received: Int = 0)
 
 // A contact's notifications (see NotificationGroups): the page's id of the last one, which a click is given, and how many came since it was shown.
-private class Group(var latest: String, var received: Int)
+// A contact's notifications: the page's id of its last one, whether that one came from a service worker's showNotification (whose click no page
+// listener takes: KaSH opens its conversation itself), and how many came.
+private class Group(var latest: String, var received: Int, var fromWorker: Boolean = false)
 
 /**
  * Shows the notifications that the pages send (see `notification-shim.js`), when [NotificationPolicy] allows them, as the settings say
@@ -199,7 +201,8 @@ class Notifier(private val model: KashModel) {
         val title = json["title"]?.primitive()?.contentOrNull.orEmpty()
         val body = json["body"]?.primitive()?.contentOrNull.orEmpty()
         val silent = json["silent"]?.primitive()?.booleanOrNull ?: false
-        notify(service, id, title, body, silent)
+        val fromWorker = json["fromWorker"]?.primitive()?.booleanOrNull ?: false
+        notify(service, id, title, body, silent, fromWorker)
     }
 
     // The page of [service] does not have the notification [id] that was clicked (it was loaded again since): the conversation of its group, when
@@ -225,7 +228,7 @@ class Notifier(private val model: KashModel) {
         if (key != null && service.plugin == null) end(key)
     }
 
-    private fun notify(service: Service, id: String, title: String, body: String, silent: Boolean) {
+    private fun notify(service: Service, id: String, title: String, body: String, silent: Boolean, fromWorker: Boolean = false) {
         // A priority contact's goes through Do Not Disturb and the service's mute (the user's choice).
         val conversation = NotificationGroups.conversationOf(model.unread[service.id]?.conversations.orEmpty(), title.ifBlank { service.title })
         val priority = Priorities.isNotification(model.priorities, service.id, title.ifBlank { service.title }, conversation?.id)
@@ -238,6 +241,7 @@ class Notifier(private val model: KashModel) {
         val key = NotificationGroups.key(service.id, shownTitle)
         val group = groups.getOrPut(key) { Group(id, 0) }
         group.latest = id
+        group.fromWorker = fromWorker
         group.received++
         titles[key] = shownTitle
         reads.shown(key, model.unread[service.id])
@@ -332,6 +336,7 @@ class Notifier(private val model: KashModel) {
         reads.forget(key)
         // A contact's: its page's last notification is the one clicked.
         val latest = groups[key]?.latest
+        val fromWorker = groups[key]?.fromWorker == true
         if (latest != null) end(key)
         val serviceId = key.substringBefore('|')
         // A test notification is no service's: KaSH comes to the front, as a click on a notification brings it.
@@ -339,8 +344,9 @@ class Notifier(private val model: KashModel) {
         // A plugin's new version: Settings › Plugins, which installs it.
         if (serviceId == PLUGIN_KEY) return model.openSettings(SettingsPage.PLUGINS)
         val service = model.service(ServiceId(serviceId)) ?: return
-        // One of an earlier launch: its page has no id for it, the plugin opens its conversation when it lists it.
-        if (latest == null) return model.openConversation(service, conversation)
+        // One of an earlier launch: its page has no id for it, the plugin opens its conversation when it lists it. One of a service worker
+        // (showNotification): no listener of the page takes its click, which its service worker's notificationclick would have.
+        if (latest == null || fromWorker) return model.openConversation(service, conversation)
         model.show(service)
         val notificationId = latest
         lastClick = Triple(service.id, notificationId, conversation)
