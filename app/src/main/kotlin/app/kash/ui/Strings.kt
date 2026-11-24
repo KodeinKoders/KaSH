@@ -786,7 +786,8 @@ object English : Strings {
     override fun aboutCommitted(date: String) = "Committed: $date"
     override val aboutMadeBy = "Made with love by "
 
-    private fun s(count: Int) = if (count > 1) "s" else ""
+    // English puts a plural on everything but one: "0 services", "1 service".
+    private fun s(count: Int) = if (count != 1) "s" else ""
 }
 
 /** The strings of [language]: French when the system is in French, English otherwise. */
