@@ -136,7 +136,8 @@ const finishMarkingRead = async () => {
 };
 
 // A document that opening a conversation loaded finishes marking it as read.
-finishMarkingRead();
+// In the queue, so that a conversation marked as read meanwhile waits for it: two at once would cross.
+markingRead = finishMarkingRead().catch(() => {});
 
 kash.onMarkRead((id) => {
     markingRead = markingRead.then(() => markReadByOpening(id)).catch(() => {});
