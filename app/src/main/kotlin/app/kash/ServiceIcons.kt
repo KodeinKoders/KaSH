@@ -42,6 +42,8 @@ import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
+import org.jetbrains.skia.Codec
+import org.jetbrains.skia.Data
 import org.jetbrains.skia.Image as SkiaImage
 
 private val logger = LoggerFactory.getLogger(ServiceIcons::class.java)
@@ -209,8 +211,7 @@ class ServiceIcons(private val directories: KashDirectories, private val registr
 
     private fun decode(path: Path): ImageBitmap? = if (Files.isRegularFile(path)) runCatching { decode(Files.readAllBytes(path)) }.getOrNull() else null
 
-    /** Decoded by Skia (PNG, ICO, JPEG, WebP, GIF…); SVG is not, and an SVG icon is skipped for the next candidate. */
-    private fun decode(bytes: ByteArray): ImageBitmap? = runCatching { SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+    private fun decode(bytes: ByteArray): ImageBitmap? = decodeIcon(bytes)
 
     private companion object {
         val LINK = Regex("<link\\b[^>]*>", RegexOption.IGNORE_CASE)
@@ -284,3 +285,20 @@ fun Tile(content: TileContent, size: Dp, modifier: Modifier = Modifier) {
         }
     }
 }
+
+/** The largest side of an icon, in pixels: a tile is tens of them, and the services' icons are 32 to 512. */
+internal const val MAX_ICON_SIDE = 1024
+
+/** Whether an image of [width] by [height] pixels is decoded as an icon. */
+internal fun acceptableIconSize(width: Int, height: Int): Boolean = width in 1..MAX_ICON_SIDE && height in 1..MAX_ICON_SIDE
+
+/**
+ * An icon, decoded by Skia (PNG, ICO, JPEG, WebP, GIF…; SVG is not, and an SVG icon is skipped for the next candidate), once its size in pixels
+ * was read without decoding it: a small file that declares huge dimensions (from a page, a site) allocated a huge bitmap, kept on disk and decoded
+ * again at each launch. Null when it cannot be decoded, or is too big.
+ */
+internal fun decodeIcon(bytes: ByteArray): ImageBitmap? = runCatching {
+    val (width, height) = Codec.makeFromData(Data.makeFromBytes(bytes)).use { it.width to it.height }
+    if (!acceptableIconSize(width, height)) return null
+    SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+}.getOrNull()
