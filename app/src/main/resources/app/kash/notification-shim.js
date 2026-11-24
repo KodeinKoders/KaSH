@@ -34,8 +34,10 @@
     };
 
     class KashNotification extends EventTarget {
-        constructor(title, options = {}) {
+        constructor(title, options) {
             super();
+            // The API takes null for no options, as undefined: a default value would only take undefined.
+            options = options || {};
             this.title = String(title);
             this.body = options.body ? String(options.body) : '';
             this.tag = options.tag ? String(options.tag) : '';
