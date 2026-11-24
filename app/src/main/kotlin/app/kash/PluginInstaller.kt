@@ -173,13 +173,22 @@ class PluginInstaller(
         return Files.readAllBytes(path)
     }
 
-    // The regular files of [folder], by their paths in it; links are not followed (a plugin's files are its own).
+    // The regular files of [folder], by their paths in it; links are not followed (a plugin's files are its own). Refused as soon as they are too
+    // many or too big: walked lazily and stopped past MAX_FILES, their sizes added before any is read (choosing the home folder by mistake walked
+    // it whole, then read up to 200 files of 10 MB).
     private fun readFolder(folder: Path): Map<String, ByteArray> {
         if (!Files.isDirectory(folder)) throw IOException("$folder is not a folder")
-        val paths = Files.walk(folder).use { stream ->
-            stream.filter { Files.isRegularFile(it, LinkOption.NOFOLLOW_LINKS) && it.fileName.toString() != ".DS_Store" }.toList()
+        val paths = ArrayList<Path>()
+        var bytes = 0L
+        Files.walk(folder).use { stream ->
+            for (path in stream.iterator()) {
+                if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || path.fileName.toString() == ".DS_Store") continue
+                paths.add(path)
+                if (paths.size > PluginPackage.MAX_FILES) throw PluginPackageException("The folder has more than ${PluginPackage.MAX_FILES} files")
+                bytes += Files.size(path)
+                if (bytes > PluginPackage.MAX_BYTES) throw PluginPackageException("The folder is bigger than ${PluginPackage.MAX_BYTES / 1024 / 1024} MB")
+            }
         }
-        if (paths.size > PluginPackage.MAX_FILES) throw PluginPackageException("The folder has more than ${PluginPackage.MAX_FILES} files")
         return paths.associate { folder.relativize(it).invariantSeparatorsPathString to readFile(it) }
     }
 

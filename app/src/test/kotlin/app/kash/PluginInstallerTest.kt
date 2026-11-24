@@ -120,6 +120,21 @@ class PluginInstallerTest {
     }
 
     @Test
+    fun aFolderWithTooManyOrTooBigFilesIsRefusedBeforeItIsRead() {
+        val many = root.resolve("many")
+        Files.createDirectories(many)
+        repeat(201) { many.resolve("f$it.txt").writeText("") }
+        val tooMany = assertFailsWith<PluginPackageException> { installer.read(PluginSource.Folder(many.toString())) }
+        assertTrue("200 files" in tooMany.message.orEmpty())
+
+        // A sparse file of 11 MB: refused by its size, not read.
+        val big = folder()
+        java.io.RandomAccessFile(big.resolve("big.bin").toFile(), "rw").use { it.setLength(11L * 1024 * 1024) }
+        val tooBig = assertFailsWith<PluginPackageException> { installer.read(PluginSource.Folder(big.toString())) }
+        assertTrue("10 MB" in tooBig.message.orEmpty())
+    }
+
+    @Test
     fun aZipIsCopiedAndNotWatched() {
         val path = root.resolve("my-chat.zip")
         path.writeBytes(zip(files().mapKeys { "my-chat/${it.key}" }))
