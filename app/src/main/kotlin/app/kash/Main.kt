@@ -42,6 +42,7 @@ import org.jetbrains.skiko.SystemTheme
 import org.jetbrains.skiko.currentSystemTheme
 import org.slf4j.LoggerFactory
 import java.awt.Desktop
+import java.awt.desktop.QuitResponse
 import java.awt.Taskbar
 import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
@@ -180,6 +181,8 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
     val notifier = remember { Notifier(model) }
     // Once, whichever asks first: the window's close button, or the system's Quit (⌘Q, the Dock, logging out).
     val quitting = remember { booleanArrayOf(false) }
+    // The system's Quit, answered once KaSH stopped: yes, so that a logout, a restart or a shutdown goes on.
+    val quitResponse = remember { arrayOfNulls<QuitResponse>(1) }
     val quit: () -> Unit = {
         if (!quitting[0]) {
             quitting[0] = true
@@ -199,15 +202,18 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                 runCatching { model.close() }.onFailure { logger.error("The model could not be closed", it) }
                 logger.info("Closing the windows")
                 exitApplication()
+                // macOS waits for this answer (KaSH asked it to, NSTerminateLater): a logout, a restart or a shutdown goes on now.
+                quitResponse[0]?.let { response -> runCatching { response.performQuit() }.onFailure { logger.error("The system's Quit could not be answered", it) } }
             }
         }
     }
     DisposableEffect(Unit) {
         // The system's Quit would end the process without stopping Chromium, which can lose the last writes of the profiles: it quits as the
-        // close button does instead.
+        // close button does, and answers the system once it is done. Cancelled at once, as it was, it was a refusal: macOS stopped the logout,
+        // the restart or the shutdown that asked ("KaSH interrupted logging out"), and the user had to ask again.
         if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_QUIT_HANDLER)) {
             Desktop.getDesktop().setQuitHandler { _, response ->
-                response.cancelQuit()
+                quitResponse[0] = response
                 quit()
             }
         }
