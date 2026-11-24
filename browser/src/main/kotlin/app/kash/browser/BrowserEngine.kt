@@ -165,8 +165,12 @@ public class BrowserEngine private constructor(
                 // On Chromium's UI thread, before the page asks for anything: the languages that changed hold from this load.
                 tab.profile.applyLanguages()
                 val target = navigationTarget(request.url, tab.initialUrl, frame.url, userGesture, isRedirect, request.method, tab.openInKash)
-                // A frame of the page only loads what it can: an application's address, which some pages open in a hidden frame, is not.
-                if (!frame.isMain) return (target == LinkTarget.NOWHERE).also { if (it) notLoaded(request.url) }
+                // A frame of the page only loads what it can: an application's address, which some pages open in a hidden frame, is not; the mail
+                // or the phone that the user clicked in it goes to the system (loaded in the frame, it failed there).
+                if (!frame.isMain) {
+                    if (target == LinkTarget.SYSTEM && isSystemAddress(request.url)) return true.also { openInSystem(request.url) }
+                    return (target == LinkTarget.NOWHERE).also { if (it) notLoaded(request.url) }
+                }
                 return when (target) {
                     LinkTarget.KASH -> false
                     LinkTarget.SYSTEM -> true.also { openInSystem(request.url) }

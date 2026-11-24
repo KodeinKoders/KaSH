@@ -116,16 +116,19 @@ int kash_notifications_alert_style(void) {
 // and the window server's flag that it sets when a panel is created with it (`_setPreventsActivation:`, when the panel has it): the style
 // alone, set after the panel was created, may not be read again. On AppKit's thread, later.
 void kash_panel_make_nonactivating(const char *title) {
-    NSString *name = [NSString stringWithUTF8String:title];
-    dispatch_async(dispatch_get_main_queue(), ^{
-        for (NSWindow *window in NSApp.windows) {
-            if (![window isKindOfClass:NSPanel.class] || ![window.title isEqualToString:name]) continue;
-            window.styleMask |= NSWindowStyleMaskNonactivatingPanel;
-            ((NSPanel *)window).hidesOnDeactivate = NO;
-            SEL prevents = NSSelectorFromString(@"_setPreventsActivation:");
-            if ([window respondsToSelector:prevents]) ((void (*)(id, SEL, BOOL))objc_msgSend)(window, prevents, YES);
-        }
-    });
+    // Called on Swing's thread, which has no autorelease pool of its own: the string made here is released with this one.
+    @autoreleasepool {
+        NSString *name = [NSString stringWithUTF8String:title];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            for (NSWindow *window in NSApp.windows) {
+                if (![window isKindOfClass:NSPanel.class] || ![window.title isEqualToString:name]) continue;
+                window.styleMask |= NSWindowStyleMaskNonactivatingPanel;
+                ((NSPanel *)window).hidesOnDeactivate = NO;
+                SEL prevents = NSSelectorFromString(@"_setPreventsActivation:");
+                if ([window respondsToSelector:prevents]) ((void (*)(id, SEL, BOOL))objc_msgSend)(window, prevents, YES);
+            }
+        });
+    }
 }
 
 // A category of the notifications of a conversation, whose button "Mark as read" is titled [title].

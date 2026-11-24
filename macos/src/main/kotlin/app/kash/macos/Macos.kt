@@ -5,6 +5,12 @@ import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.ValueLayout
 
 /** Whether KaSH runs as an application bundle (KaSH.app): the Notification Center and the login items only know those. */
+/**
+ * Whether libkash_macos.dylib could be loaded: without it, [inAppBundle] is false whatever KaSH runs from, and what must not be in KaSH.app (the
+ * inspection port) is refused too.
+ */
+public val macosLibraryLoaded: Boolean by lazy { MacosLibrary.function("kash_in_app_bundle", FunctionDescriptor.of(ValueLayout.JAVA_INT)) != null }
+
 public val inAppBundle: Boolean by lazy {
     val function = MacosLibrary.function("kash_in_app_bundle", FunctionDescriptor.of(ValueLayout.JAVA_INT)) ?: return@lazy false
     (function.invoke() as Int) == 1

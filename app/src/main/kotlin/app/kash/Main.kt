@@ -25,6 +25,7 @@ import app.kash.core.WindowFile
 import app.kash.core.WindowGeometry
 import app.kash.core.deleteClosedProfiles
 import app.kash.macos.inAppBundle
+import app.kash.macos.macosLibraryLoaded
 import app.kash.ui.KashTheme
 import app.kash.ui.LocalUiScale
 import app.kash.ui.UiScaled
@@ -154,8 +155,9 @@ private fun resource(name: String): String =
  */
 private fun inspectPort(): Int? {
     val port = System.getProperty(INSPECT_PROPERTY)?.toIntOrNull() ?: return null
-    if (inAppBundle) {
-        logger.error("Remote debugging is for development only: {} is ignored in the application bundle", INSPECT_PROPERTY)
+    // Refused in the bundle, and when KaSH cannot tell (the native library did not load, and inAppBundle is false whatever KaSH runs from).
+    if (inAppBundle || !macosLibraryLoaded) {
+        logger.error("Remote debugging is for development only: {} is ignored in the application bundle (or where KaSH cannot tell)", INSPECT_PROPERTY)
         return null
     }
     return port

@@ -73,6 +73,13 @@ private fun escaped(url: String): String {
 
 private fun uri(url: String): URI? = parseAddress(url)
 
+// Google's hosts, where its redirector is: `google.com`, `www.google.fr`, `google.co.uk`, `www.google.com.br`; not any site whose name starts with
+// `google.` (`google.evil.example`).
+private val GOOGLE_HOST = Regex("(www\\.)?google\\.(co\\.|com\\.)?[a-z]{2,3}")
+
+/** Whether [url] is an address of another application of the system: the mail, the phone, the messages (`mailto:`, `tel:`…). */
+internal fun isSystemAddress(url: String): Boolean = url.trim().substringBefore(':', "").lowercase() in SYSTEM_SCHEMES
+
 // Whether [url] says it is an address of the web, read or not.
 private fun looksWeb(url: String): Boolean = url.trim().let { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
 
@@ -93,7 +100,7 @@ private fun URI.hostName(): String? {
  */
 private fun unwrapped(target: URI): URI {
     val host = target.hostName()?.lowercase() ?: return target
-    if (!siteOf(host).startsWith("google.") || target.rawPath != "/url") return target
+    if (!GOOGLE_HOST.matches(host) || target.rawPath != "/url") return target
     val parameters = target.rawQuery.orEmpty().split('&').mapNotNull { pair ->
         val (key, value) = pair.split('=', limit = 2).takeIf { it.size == 2 } ?: return@mapNotNull null
         key to runCatching { java.net.URLDecoder.decode(value, Charsets.UTF_8) }.getOrNull()

@@ -159,7 +159,11 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
         .map { service -> enabled[service.id]?.let { service.copy(enabled = it) } ?: service }
     val dirty = draft != model.settings || services != model.services
     val apply = {
-        if (draft.launchAtLogin != model.settings.launchAtLogin && inAppBundle) MacosLoginItem.set(draft.launchAtLogin)
+        // SMAppService answers synchronously: off Swing's thread, and not cancelled when Settings closes (OK).
+        if (draft.launchAtLogin != model.settings.launchAtLogin && inAppBundle) {
+            val launchAtLogin = draft.launchAtLogin
+            kotlin.concurrent.thread(isDaemon = true, name = "KaSH-login-item") { MacosLoginItem.set(launchAtLogin) }
+        }
         model.updateSettings { current -> SettingsDraft.rebase(draft, base, current) }
         model.applyServices(order, enabled)
         order = null
@@ -254,12 +258,20 @@ private fun LabeledRow(label: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun GeneralPage(draft: Settings, onChange: (Settings) -> Unit) {
+    // Read off Swing's thread (SMAppService answers synchronously), again every 2 s while the page is shown: the user may approve it meanwhile.
+    val loginItemStatus by produceState<LoginItemStatus?>(null) {
+        if (!inAppBundle) return@produceState
+        while (true) {
+            value = withContext(Dispatchers.IO) { MacosLoginItem.status() }
+            delay(2_000)
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionTitle(strings.startup)
         CheckboxRow(strings.launchAtLogin, draft.launchAtLogin, { onChange(draft.copy(launchAtLogin = it)) }, enabled = inAppBundle)
         when {
             !inAppBundle -> Hint(strings.launchAtLoginUnavailable, Modifier.padding(start = 24.dp))
-            MacosLoginItem.status() == LoginItemStatus.REQUIRES_APPROVAL -> Hint(strings.launchAtLoginApproval, Modifier.padding(start = 24.dp))
+            loginItemStatus == LoginItemStatus.REQUIRES_APPROVAL -> Hint(strings.launchAtLoginApproval, Modifier.padding(start = 24.dp))
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {

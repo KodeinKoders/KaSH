@@ -86,6 +86,18 @@ class LinksTest {
     }
 
     @Test
+    fun onlyGooglesHostsAreItsRedirector() {
+        val elsewhere = "https%3A%2F%2Fkodein.net%2F"
+        assertEquals(LinkTarget.SYSTEM, popupTarget("https://www.google.fr/url?q=$elsewhere", "https://mail.google.com/chat/"))
+        assertEquals(LinkTarget.SYSTEM, popupTarget("https://www.google.co.uk/url?q=$elsewhere", "https://mail.google.com/chat/"))
+        // Not a site whose name starts with google.: its /url is its own page, on the service's site, not where its q leads.
+        assertEquals(LinkTarget.KASH, popupTarget("https://google.evil.example/url?q=$elsewhere", "https://google.evil.example/"))
+        assertTrue(isSystemAddress("mailto:someone@example.com"))
+        assertTrue(isSystemAddress(" TEL:+33100000000"))
+        assertFalse(isSystemAddress("https://example.com/"))
+    }
+
+    @Test
     fun aWindowToTheSystemOpensOnlyFromAPageThatIsLookedAt() {
         assertTrue(systemPopupAllowed(shown = true, active = true))
         assertFalse(systemPopupAllowed(shown = false, active = true))
