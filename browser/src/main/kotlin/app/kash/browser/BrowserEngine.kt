@@ -146,7 +146,13 @@ public class BrowserEngine private constructor(
                 if (targetUrl == null) return false
                 return when (popupTarget(targetUrl, tab.initialUrl, tab.openInKash)) {
                     LinkTarget.KASH -> false
-                    LinkTarget.SYSTEM -> true.also { openInSystem(targetUrl) }
+                    // Only from a page that the user looks at, in KaSH's active window: JCEF does not say whether a gesture opened the window, and
+                    // a hidden page (all of them are loaded at launch) could open the browser, the mail, FaceTime or the phone without a click.
+                    LinkTarget.SYSTEM -> true.also {
+                        val active = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow != null
+                        if (systemPopupAllowed(tab.browser.uiComponent.isShowing, active)) openInSystem(targetUrl)
+                        else logger.info("A window to the system ({}:) that a page not shown opened was not opened", targetUrl.substringBefore(':').take(32))
+                    }
                     LinkTarget.NOWHERE -> true.also { notLoaded(targetUrl) }
                 }
             }

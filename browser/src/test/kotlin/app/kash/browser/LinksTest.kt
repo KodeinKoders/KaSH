@@ -86,6 +86,13 @@ class LinksTest {
     }
 
     @Test
+    fun aWindowToTheSystemOpensOnlyFromAPageThatIsLookedAt() {
+        assertTrue(systemPopupAllowed(shown = true, active = true))
+        assertFalse(systemPopupAllowed(shown = false, active = true))
+        assertFalse(systemPopupAllowed(shown = true, active = false))
+    }
+
+    @Test
     fun onlyThePagesOfTheServicesSiteAreItsOwn() {
         assertTrue(isServicePage("https://chat.google.com/u/0/app/home", "https://mail.google.com/chat/u/0/"))
         assertTrue(isServicePage("https://app.slack.com/client/T0/C1", "https://my-team.slack.com/"))

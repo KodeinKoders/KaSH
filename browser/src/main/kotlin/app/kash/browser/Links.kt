@@ -161,6 +161,13 @@ internal fun popupTarget(url: String, serviceUrl: String, openInKash: List<Regex
 }
 
 /**
+ * Whether a window that a page opens to the system (another site, the mail, the phone: [popupTarget]'s SYSTEM) is opened: only from a page that
+ * is [shown], in KaSH's [active] window. JCEF does not give the user's gesture to `onBeforePopup`, and a hidden page (every service's is loaded at
+ * launch), or one behind another application, could open the browser, FaceTime or the phone without a click.
+ */
+internal fun systemPopupAllowed(shown: Boolean, active: Boolean): Boolean = shown && active
+
+/**
  * Where a navigation of a service's page goes: nowhere when it is an application's address (see PAGE_SCHEMES); in the system's browser when the
  * user clicked a link (a gesture, a `GET`, not a redirect) to another
  * site than the service's at [serviceUrl] and than the page's at [pageUrl], which is not a sign-in page nor one of [openInKash]; in KaSH otherwise.
