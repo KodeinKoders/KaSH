@@ -25,6 +25,7 @@ import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 import kotlin.time.Duration
@@ -52,6 +53,9 @@ public class BrowserEngine private constructor(
     // The tabs whose browser is to be created, one after the other (see create), and the one being created.
     private val pendingCreations = ArrayDeque<BrowserTab>()
     private var creating: BrowserTab? = null
+
+    // Watches the browser being created (see watchCreation): one that Chromium refuses never comes to onAfterCreated.
+    private val creationWatch = Executors.newSingleThreadScheduledExecutor { runnable -> Thread(runnable, "KaSH-browser-creation").apply { isDaemon = true } }
 
     // The languages of the pages (see setPageLanguages): Chromium's own until they are given.
     private val languages = AtomicReference<String?>(null)
@@ -175,7 +179,36 @@ public class BrowserEngine private constructor(
         val now = synchronized(pendingCreations) {
             if (creating == null) true.also { creating = tab } else false.also { pendingCreations += tab }
         }
-        if (now) tab.browser.createImmediately()
+        if (now) start(tab)
+    }
+
+    // Asks Chromium for the browser of [tab], and watches that it comes.
+    private fun start(tab: BrowserTab) {
+        tab.browser.createImmediately()
+        watchCreation(tab)
+    }
+
+    /**
+     * Every second while [tab]'s browser is being created: one that Chromium refused (JCEF logs "refusing to create browser with an unresolved
+     * request context", a profile that it could not make, and marks the browser closed) never comes to `onAfterCreated`, and every tab after it
+     * waited for good, gray. It is given up, and the next one is created. One that is only slow is waited for: creating another one meanwhile is
+     * what gave a browser to the wrong profile.
+     */
+    private fun watchCreation(tab: BrowserTab) {
+        creationWatch.schedule({
+            val (refused, waiting) = synchronized(pendingCreations) {
+                val waiting = creating == tab && !tab.created.value
+                (waiting && tab.browser.isClosed) to waiting
+            }
+            when {
+                refused -> {
+                    logger.error("Chromium refused to create the page of the profile {}: the next ones are created", tab.profile.directory.fileName)
+                    tab.creationFailed()
+                    creationEnded(tab)
+                }
+                waiting -> watchCreation(tab)
+            }
+        }, 1, TimeUnit.SECONDS)
     }
 
     /** The browser of [tab] is created, or will never be (the tab is closed): the next one is created, on Swing's thread, where they all are. */
@@ -185,7 +218,7 @@ public class BrowserEngine private constructor(
             if (creating != tab) return
             pendingCreations.removeFirstOrNull().also { creating = it }
         } ?: return
-        javax.swing.SwingUtilities.invokeLater { next.browser.createImmediately() }
+        javax.swing.SwingUtilities.invokeLater { start(next) }
     }
 
     /**
@@ -200,6 +233,7 @@ public class BrowserEngine private constructor(
         val elapsed = { (System.nanoTime() - start) / 1_000_000 }
         // Each step goes on when the one before fails: Chromium is stopped whatever happened to a profile.
         val step = { name: String, action: () -> Unit -> runCatching(action).onFailure { logger.error("{} failed", name, it) } }
+        creationWatch.shutdownNow()
         logger.info("Closing {} profiles", profiles.size)
         profiles.toList().forEach { profile -> step("Closing ${profile.directory.fileName}") { profile.close() } }
         logger.info("Profiles closed after {} ms, stopping Chromium", elapsed())

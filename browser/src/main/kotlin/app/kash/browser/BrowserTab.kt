@@ -101,6 +101,16 @@ public class BrowserTab internal constructor(
      */
     public val created: StateFlow<Boolean> = _created.asStateFlow()
 
+    private val _failed = MutableStateFlow(false)
+
+    /** Whether Chromium refused to create the browser (a profile that it could not make): the tab will never show a page. */
+    public val failed: StateFlow<Boolean> = _failed.asStateFlow()
+
+    /** Chromium refused to create the browser ([BrowserEngine]'s watch of the creation). */
+    internal fun creationFailed() {
+        _failed.value = true
+    }
+
     /**
      * The AWT view of the page: a native view of Chromium, which keeps its page while it is removed from a window and added to another one.
      */
