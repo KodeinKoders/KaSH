@@ -44,8 +44,11 @@ kash.watch(() => {
     const image = workspaceImage();
     if (image !== undefined) kash.setIcon(image);
 
+    // No sidebar yet (the page is loading): nothing to say, rather than no conversation, which would take every one for read.
+    const all = rows();
+    if (all.length === 0) return null;
     const conversations = [];
-    for (const row of rows()) {
+    for (const row of all) {
         if (row.dataset.qaChannelSidebarChannelIsMuted === 'true' || row.dataset.qaChannelSidebarIsYou === 'true') continue;
         const badge = row.querySelector('[data-qa="badge"]');
         const bold = row.classList.contains('p-channel_sidebar__channel--unread');

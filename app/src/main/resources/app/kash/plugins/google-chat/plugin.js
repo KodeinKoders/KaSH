@@ -60,9 +60,12 @@ const previewOfRow = (row) => {
 const previewOf = new Map();
 
 kash.watch(() => {
+    // No side panel yet (the page is loading): nothing to say, rather than no conversation, which would take every one for read.
+    const panel = panelRows();
+    if (panel.length === 0) return null;
     const home = homeRows();
     const conversations = [];
-    for (const row of panelRows()) {
+    for (const row of panel) {
         const badge = row.querySelector(BADGE);
         const homeRow = home.get(row.dataset.groupId);
         const bold = row.classList.contains(UNREAD) || (homeRow !== undefined && homeRow.dataset.isUnread === 'true');
