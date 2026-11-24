@@ -32,13 +32,14 @@ class PageMessagesTest {
             {"id":"c","name":"général","kind":"channel","topic":true,"count":5,"mention":true},
             {"id":7,"name":"Seven","kind":"unknown","count":-2}
         ]}"""))!!
-        assertEquals(listOf(ConversationKind.DIRECT, ConversationKind.GROUP, ConversationKind.CHANNEL, ConversationKind.DIRECT), read.map { it.kind })
-        // A count by default is 1; a topic's is 0, without a mention; a negative one is read as it is (the frames' checks are to come).
-        assertEquals(listOf(3, 1, 0, -2), read.map { it.count })
+        assertEquals(listOf(ConversationKind.DIRECT, ConversationKind.GROUP, ConversationKind.CHANNEL), read.map { it.kind })
+        // A count by default is 1; a topic's is 0, without a mention; a negative one is left out.
+        assertEquals(listOf(3, 1, 0), read.map { it.count })
         assertEquals(false, read[2].mention)
         assertEquals(1732000000000, read[0].time)
         assertEquals(true, read[0].dayOnly)
-        assertEquals("7", read[3].id)
+        assertEquals(listOf("a", "b", "c"), read.map { it.id })
+        assertEquals("7", conversationsOf(message("""{"conversations":[{"id":7,"name":"Seven"}]}"""))!!.single().id)
     }
 
     @Test

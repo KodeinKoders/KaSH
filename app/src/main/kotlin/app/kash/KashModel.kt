@@ -373,12 +373,15 @@ class KashModel(
                 }
             }
             "unreadCount" -> {
+                // Only a plugin's script has the API: a web application tells its total by its title.
+                if (service.plugin == null) return
                 val count = json["count"]?.primitive()?.intOrNull?.takeIf { it >= 0 } ?: return logger.warn("The unread total of {} cannot be read", service.title)
                 conversations.remove(id)
                 totals[id] = count
                 reported[id] = Unit
             }
             "unread" -> {
+                if (service.plugin == null) return
                 val read = conversationsOf(json) ?: return logger.warn("The unread conversations of {} cannot be read", service.title)
                 conversations[id] = withSeenTimes(id, read)
                 // Only counts in the log: the names are the user's contacts.

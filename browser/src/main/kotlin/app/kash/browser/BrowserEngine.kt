@@ -93,7 +93,13 @@ public class BrowserEngine private constructor(
             override fun onQuery(
                 browser: CefBrowser, frame: CefFrame, queryId: Long, request: String, persistent: Boolean, callback: CefQueryCallback,
             ): Boolean {
-                tabs[browser]?.messageReceived(request)
+                val tab = tabs[browser]
+                // Only the service's own page speaks for it: its main frame, on its site. Any frame has `cefQuery`, and so has a page of another
+                // site in the tab (a sign-in, where a redirection led): their messages are left out (never their addresses in the log).
+                if (tab != null) {
+                    if (frame.isMain && isServicePage(frame.url, tab.initialUrl)) tab.messageReceived(request)
+                    else logger.debug("A message of a frame that is not the service's page was left out")
+                }
                 callback.success("")
                 return true
             }

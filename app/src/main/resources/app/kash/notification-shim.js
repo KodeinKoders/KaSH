@@ -8,7 +8,9 @@
 // a notification that the page does not have (`notification-click-missed`: it was loaded again since).
 // It is the same for every service: it does not read anything of the page.
 (() => {
-    if (window.__kashNotificationClick) return;
+    // The page's top frame only: a frame in it (an advertisement, an embed of another site) has no notifications, as Chrome refuses them to a
+    // frame of another site; KaSH takes the messages of the service's main frame only.
+    if (window.top !== window || window.__kashNotificationClick) return;
 
     const send = (message) => {
         try {

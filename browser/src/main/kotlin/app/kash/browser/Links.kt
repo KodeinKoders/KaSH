@@ -127,6 +127,16 @@ private fun List<Regex>.matchAny(target: URI): Boolean = isNotEmpty() && target.
 
 private fun sameSite(a: URI, b: URI?): Boolean = b != null && b.isWeb() && siteOf(a.hostName()!!) == siteOf(b.hostName()!!)
 
+/**
+ * Whether a page at [frameUrl] is the service's own, on the site of its address [serviceUrl]: the only page whose messages KaSH takes (its unread
+ * conversations, its notifications). Not a frame of another site in it (an advertisement, an embed), nor another site that the tab went to (a
+ * sign-in page, a page that a redirection led to).
+ */
+internal fun isServicePage(frameUrl: String?, serviceUrl: String): Boolean {
+    val frame = frameUrl?.let(::uri)?.takeIf { it.isWeb() } ?: return false
+    return sameSite(frame, uri(serviceUrl))
+}
+
 /** Whether [target] is a page where one signs in with an account of another site (Google, Microsoft, Apple, Facebook, GitHub). */
 internal fun isSignIn(target: URI): Boolean {
     val host = target.hostName()?.lowercase() ?: return false

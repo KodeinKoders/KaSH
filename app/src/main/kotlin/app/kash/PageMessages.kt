@@ -21,10 +21,11 @@ internal fun JsonElement?.primitive(): JsonPrimitive? = this as? JsonPrimitive
 
 /**
  * The unread conversations of an `unread` message (`kash.unread.set`), or null when its list cannot be read (not a list, an entry without an id):
- * a topic has a count of 0, a count that is not one is 1. Not the times that KaSH keeps itself (`withSeenTimes`).
+ * a topic has a count of 0, a count that is not one is 1, and a conversation of a count under 1 that is not a topic is left out (as the API leaves
+ * it out). Not the times that KaSH keeps itself (`withSeenTimes`).
  */
 internal fun conversationsOf(message: JsonObject): List<Conversation>? = runCatching {
-    message.getValue("conversations").jsonArray.map { element ->
+    message.getValue("conversations").jsonArray.mapNotNull { element ->
         val conversation = element.jsonObject
         val topic = conversation["topic"].primitive()?.booleanOrNull ?: false
         Conversation(
@@ -38,7 +39,7 @@ internal fun conversationsOf(message: JsonObject): List<Conversation>? = runCatc
             time = conversation["time"].primitive()?.longOrNull,
             dayOnly = conversation["timePrecision"].primitive()?.contentOrNull == "day",
             topic = topic,
-        )
+        ).takeIf { it.topic || it.count >= 1 }
     }
 }.getOrNull()
 

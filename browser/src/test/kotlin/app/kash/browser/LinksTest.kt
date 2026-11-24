@@ -86,6 +86,18 @@ class LinksTest {
     }
 
     @Test
+    fun onlyThePagesOfTheServicesSiteAreItsOwn() {
+        assertTrue(isServicePage("https://chat.google.com/u/0/app/home", "https://mail.google.com/chat/u/0/"))
+        assertTrue(isServicePage("https://app.slack.com/client/T0/C1", "https://my-team.slack.com/"))
+        assertTrue(isServicePage("https://web.whatsapp.com/", "https://web.whatsapp.com/"))
+        // Another site in the tab or in a frame, a sign-in page, what is not an address of the web.
+        assertFalse(isServicePage("https://ads.example.com/frame", "https://web.whatsapp.com/"))
+        assertFalse(isServicePage("https://accounts.google.com/signin", "https://web.whatsapp.com/"))
+        assertFalse(isServicePage("about:blank", "https://web.whatsapp.com/"))
+        assertFalse(isServicePage(null, "https://web.whatsapp.com/"))
+    }
+
+    @Test
     fun aHostWithAnUnderscoreIsAHost() {
         assertEquals(LinkTarget.SYSTEM, popupTarget("https://my_site.example.org/", whatsApp))
         assertEquals(LinkTarget.SYSTEM, navigationTarget("https://my_site.example.org/", whatsApp, whatsApp, userGesture = true, isRedirect = false, method = "GET"))
