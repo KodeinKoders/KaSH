@@ -128,6 +128,26 @@ class NotificationReadsTest {
     }
 
     @Test
+    fun aGroupOfTheLastLaunchWaitsForItsServiceToSayWhatItHasUnread() {
+        val reads = NotificationReads(setOf(NotificationReads.hash(laila)))
+        // The service is there, but its page has not said anything yet: not taken for read.
+        assertFalse(reads.restored(laila, null, serviceThere = true))
+        assertFalse(reads.restored(lucas, null, serviceThere = true))
+        assertEquals(emptyList(), reads.update(emptyMap(), setOf(whatsApp)))
+        // Laila's is still listed: kept. Lucas' never was, and the service has something unread: kept.
+        assertEquals(emptyList(), reads.update(mapOf(whatsApp to unread(direct("Laila"))), setOf(whatsApp)))
+        // Both read.
+        assertEquals(listOf(laila, lucas), reads.update(mapOf(whatsApp to unread()), setOf(whatsApp)))
+    }
+
+    @Test
+    fun aGroupOfTheLastLaunchIsOverAtOnceWhenItsServiceSaysItHasNothingUnread() {
+        val reads = NotificationReads()
+        assertFalse(reads.restored(lucas, null, serviceThere = true))
+        assertEquals(listOf(lucas), reads.update(mapOf(whatsApp to unread()), setOf(whatsApp)))
+    }
+
+    @Test
     fun theFileKeepsTheHashesOnly() {
         val path = Files.createTempDirectory("kash-reads").resolve("notification-reads.json")
         val file = NotificationReadsFile(path)

@@ -20,8 +20,8 @@ private val logger = LoggerFactory.getLogger(NotificationReads::class.java)
  *   service had something unread after the notification came, and has nothing any more: everything was read.
  *
  * Not the service's total at once: a notification often comes before the plugin's report of its message. A group of the last launch, whose
- * notification the Notification Center still shows ([restored]), is over at once when its conversation is not listed and was before (the
- * groups whose conversation was listed are kept, by [seen]), or when its service has nothing unread.
+ * notification the Notification Center still shows ([restored]), is over once its service said what it has unread, when its conversation is not
+ * listed and was before (the groups whose conversation was listed are kept, by [seen]), or when its service has nothing unread.
  */
 public class NotificationReads(seenBefore: Set<String> = emptySet()) {
     private class Followed(var listed: Boolean, var serviceHadUnread: Boolean, val restored: Boolean)
@@ -46,12 +46,16 @@ public class NotificationReads(seenBefore: Set<String> = emptySet()) {
     }
 
     /**
-     * The group [key] of a notification of the last launch, which the Notification Center still shows, once its service had the time to say
-     * what it has unread ([unread]: null for a service that is not there any more). True when it is over at once.
+     * The group [key] of a notification of the last launch, which the Notification Center still shows: true when it is over at once. Its service
+     * is [serviceThere] or deleted (over); [unread] is what it has unread, or null while it has not said it since the launch (a page still loading,
+     * a service disabled, a plugin whose read fails): the group is then followed as it is, and judged by the first [update] where its service
+     * said it, rather than taken for read.
      */
-    public fun restored(key: String, unread: ServiceUnread?): Boolean {
+    public fun restored(key: String, unread: ServiceUnread?, serviceThere: Boolean = unread != null): Boolean {
+        if (!serviceThere) return true
         val group = Followed(listed = hash(key) in seenBefore, serviceHadUnread = false, restored = true)
         followed[key] = group
+        if (unread == null) return false
         return over(key, group, unread).also { if (it) followed.remove(key) }
     }
 

@@ -102,7 +102,14 @@ class Notifier(private val model: KashModel) {
     private suspend fun restoreDelivered() {
         val delivered = withContext(Dispatchers.IO) { MacosNotifications.delivered() } ?: return logger.debug("The Notification Center did not say what it shows")
         val restored = delivered.filter { key -> key !in groups && !key.startsWith("$TEST_KEY|") && !key.startsWith("$PLUGIN_KEY|") }
-        val over = restored.filter { key -> reads.restored(key, model.unread[NotificationReads.serviceOf(key)]) }
+        // What a service has unread only once it said it since the launch: one that has not (still loading, disabled, its plugin failing) is
+        // not taken for one that has nothing, and its notifications wait for it.
+        val reporting = model.reporting
+        val unread = model.unread
+        val over = restored.filter { key ->
+            val service = NotificationReads.serviceOf(key)
+            reads.restored(key, unread[service]?.takeIf { service in reporting }, serviceThere = model.service(service) != null)
+        }
         over.forEach(MacosNotifications::remove)
         logger.debug("Notifications of the last launch: {} shown, {} read meanwhile", restored.size, over.size)
         saveReads()
