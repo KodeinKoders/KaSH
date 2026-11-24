@@ -8,6 +8,8 @@
 
 *Your messaging services in one window, each in its own isolated browser.*
 
+image::logo.png[KaSH, 256]
+
 KaSH shows the web versions of messaging services in tabs, in the manner of Ferdium.
 Each service runs in a Chromium profile of its own: two services share nothing, not a cookie, not a cache entry, not an IndexedDB database, and each one keeps its data on disk, so it is still logged in at the next launch.
 An unread badge on each tab, and the *Unread* tab, show what waits in every service: the *Unread* tab lists the conversations with unread messages, then the topics, the channels with new messages that their service does not count (in bold, without a mention).
