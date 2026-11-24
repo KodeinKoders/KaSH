@@ -107,7 +107,7 @@ public class BrowserEngine private constructor(
             }
         })
         client.addMessageRouter(router)
-        client.addKeyboardHandler(PageShortcuts { shortcut -> onShortcut(shortcut) })
+        client.addKeyboardHandler(PageShortcuts(isTab = { browser -> tabs.containsKey(browser) }) { shortcut -> onShortcut(shortcut) })
         client.addLifeSpanHandler(object : CefLifeSpanHandlerAdapter() {
             override fun onAfterCreated(browser: CefBrowser) {
                 val tab = tabs[browser] ?: return

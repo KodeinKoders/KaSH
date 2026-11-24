@@ -121,7 +121,7 @@ internal fun browserShortcutOf(type: CefKeyEvent.EventType, modifiers: Int, char
 /**
  * The shortcuts of the pages, the client's only keyboard handler (a `CefClient` keeps the first one that it is given, and ignores the others).
  *
- * - KaSH's own ([browserShortcutOf]: ⇧⌘K, ⌘0 to ⌘9, ⌘+ and ⌘−, ⌘R, ⌘[ and ⌘], ⌥⌘I), before the page sees them (`onPreKeyEvent`): they go to [onShortcut], on Swing's thread, whatever the
+ * - KaSH's own ([browserShortcutOf]: ⇧⌘K, ⌘0 to ⌘9, ⌘+ and ⌘−, ⌘R, ⌘[ and ⌘], ⌥⌘I), in a service's page ([isTab]: not in DevTools nor a popup), before the page sees them (`onPreKeyEvent`): they go to [onShortcut], on Swing's thread, whatever the
  *   service does with them, and the page never gets them (Chromium drops the key's release too). JetBrains' JCEF never called `onPreKeyEvent`
  *   (its native code read the value of the `BoolRef` that it made for checking that it was made): `jcef-native/patches/on-pre-key-event.patch`
  *   fixes it. AppKit gives a key with ⌘ to KaSH's window too (AWT's view, which Chromium's is inside): KaSH lets the twin through once
@@ -131,8 +131,14 @@ internal fun browserShortcutOf(type: CefKeyEvent.EventType, modifiers: Int, char
  *   view only gets the key press, which the page does not handle: once the page had its chance (a page that handles the shortcut itself keeps
  *   it), the command is run on the focused frame, as Chrome's menu would.
  */
-internal class PageShortcuts(private val onShortcut: (BrowserShortcut) -> Unit) : CefKeyboardHandlerAdapter() {
+internal class PageShortcuts(
+    private val isTab: (CefBrowser) -> Boolean,
+    private val onShortcut: (BrowserShortcut) -> Unit,
+) : CefKeyboardHandlerAdapter() {
     override fun onPreKeyEvent(browser: CefBrowser, event: CefKeyEvent, isKeyboardShortcut: BoolRef): Boolean {
+        // Only in a service's page: DevTools and the popups are the client's browsers too, where ⌘[ changes DevTools' panel, ⌘R reloads the
+        // popup, and KaSH's shortcuts acted on the service of the main window instead.
+        if (!isTab(browser)) return false
         val shortcut = browserShortcutOf(event.type, event.modifiers, event.unmodified_character, event.windows_key_code) ?: return false
         // Chromium's thread: KaSH's state is Swing's.
         SwingUtilities.invokeLater { onShortcut(shortcut) }
