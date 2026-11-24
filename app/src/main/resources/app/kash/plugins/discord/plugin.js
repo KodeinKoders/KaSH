@@ -32,6 +32,18 @@ const countOf = (badge) => {
     return count > 0 ? count : 1;
 };
 
+// Whether an entry of the column has unread messages: a direct message has a badge (it is in the column only while it has some); a server has a
+// badge (the user is mentioned in it), or its pill, or, for the server that is shown (whose pill always shows), a label that says something before
+// its name ("Messages non lus, <name>").
+const entryUnread = (entry) => {
+    const badge = entry.querySelector('[class*="numberBadge_"]');
+    const serverName = entry.querySelector('[data-dnd-name]')?.getAttribute('data-dnd-name');
+    if (!serverName || badge) return !!badge;
+    const label = kash.dom.text(entry.querySelector('[class*="hiddenVisually_"]'));
+    const pill = entry.querySelector('[class*="overlay_"] > span');
+    return hasClass(pill, 'selected_') ? label !== serverName && label.endsWith(`, ${serverName}`) : hasClass(pill, 'visible_');
+};
+
 kash.watch(() => {
     const nav = column();
     // The column is not there yet (the page is loading, or the user is not logged in): nothing to say.
@@ -61,13 +73,7 @@ kash.watch(() => {
             continue;
         }
 
-        // A server with unread messages: a badge (the user is mentioned in it), or its pill, or, for the server that is shown (whose pill always
-        // shows), a label that says something before its name ("Messages non lus, <name>").
-        const pill = entry.querySelector('[class*="overlay_"] > span');
-        const unread = !!badge || (hasClass(pill, 'selected_')
-            ? label !== serverName && label.endsWith(`, ${serverName}`)
-            : hasClass(pill, 'visible_'));
-        if (unread) conversations.push({ id, name: serverName, kind: 'channel', topic: true });
+        if (entryUnread(entry)) conversations.push({ id, name: serverName, kind: 'channel', topic: true });
     }
     return conversations;
 });
@@ -119,16 +125,17 @@ kash.contacts.watch(() => {
     return contacts;
 });
 
-// Marks a server or a direct message as read as the user would: its entry's context menu, and its item "Mark as read", told by its id (a
-// server's `guild-context-mark-guild-read`; any `…mark-…-read`), which does not depend on Discord's language. Escape closes the menu when it has
-// none.
-const MARK_READ_ITEM = /(^|-)mark-[a-z-]*read$/;
+// Marks a server or a direct message as read as the user would, only when it is unread: its entry's context menu, and its item "Mark as read",
+// told by its id (a server's `guild-context-mark-guild-read`; any `…mark-…-read`, but not `…mark-…unread`, "Mark as unread"), which does not
+// depend on Discord's language. Escape closes the menu when it has none.
+const MARK_READ_ITEM = /(^|-)mark-(?![a-z-]*unread$)[a-z-]*read$/;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 kash.onMarkRead(async (id) => {
     const entryId = id.startsWith('@me/') ? id.slice(4) : id;
     const item = column()?.querySelector(`[data-list-item-id="${ENTRY_PREFIX}${CSS.escape(entryId)}"]`);
-    if (!item) return;
+    const entry = item?.closest('[class*="listItem_"]');
+    if (!item || !entry || !entryUnread(entry)) return;
     const box = item.getBoundingClientRect();
     item.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: box.x + 10, clientY: box.y + 10, button: 2 }));
     for (let tries = 0; tries < 20; tries++) {
