@@ -77,9 +77,13 @@ const previewOf = new Map();
 kash.watch(() => {
     const collections = module('WAWebCollections');
     if (!collections || !collections.Chat) return null;
+    // A model that WhatsApp changed (a method or a field renamed) throws: nothing is sent, rather than every chat taken for unread.
+    if (typeof collections.Chat.getModelsArray !== 'function') throw new Error('WAWebCollections.Chat.getModelsArray is not a function any more');
     const myIds = me();
     const rendered = renderedPreviews();
-    const conversations = collections.Chat.getModelsArray()
+    const chats = collections.Chat.getModelsArray();
+    if (chats.some((chat) => typeof chat.unreadCount !== 'number')) throw new Error('A chat of WhatsApp\'s model has no unreadCount any more');
+    const conversations = chats
         .filter((chat) => chat.unreadCount !== 0 && !chat.archive && !muted(chat))
         .map((chat) => {
             const id = chat.id._serialized;
