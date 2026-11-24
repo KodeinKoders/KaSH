@@ -23,9 +23,10 @@ class MakeIcon {
     static final int CANVAS = 1024;
     static final double SQUARE = 824;
     static final double RADIUS = 185.4;
-    // KaSH's logo is wider than high, and its file has transparent margins that are not even: what is drawn of it (its pixels that are not
-    // transparent) is fitted in this part of the square, its proportions kept, and centered.
-    static final double LOGO = 0.9;
+    // KaSH's logo is nearly square, and its file has transparent margins that are not even: what is drawn of it (its pixels that are not
+    // transparent) is fitted in this part of the square, its proportions kept, and centered, with a margin of pink around it as the glyphs of
+    // macOS's icons have.
+    static final double LOGO = 0.7;
     // The shadow that macOS draws under the icons of the other applications in the Dock, at 46 points: black at 28 %, 21 pixels down (of the 1024),
     // blurred over 40 (the standard deviation of a Gaussian blur), measured on the icon of Visual Studio Code. macOS draws it about 2 points wide at
     // any size, so it is relatively smaller in a bigger icon: the Dock is where this image is shown as it is (see `appIcon` in `build.gradle.kts`).
