@@ -22,5 +22,8 @@ out/
 ### Mac OS ###
 .DS_Store
 
+### Windows ###
+Thumbs.db
+
 ### Local review scratch file
 ISSUES.adoc
