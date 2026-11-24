@@ -78,8 +78,14 @@ public object UnreadTimes {
             val key = key(conversation.id)
             val before = previous.conversations[key]
             key to when {
-                // Seen before, without a new message (fewer: some were read).
-                before != null && conversation.count <= before.count -> before.copy(count = conversation.count)
+                // Seen before, without a new message.
+                before != null && conversation.count == before.count -> before
+                // Fewer, seen before KaSH was closed: some were read, or all of them and then a new one came, which the counts cannot tell. Not
+                // its old time, which would be wrong in the second case: when KaSH saw it, after the time it had, true in both.
+                before != null && conversation.count < before.count && whileClosed && before.time < loadedAt ->
+                    SeenUnread(conversation.count, now, whileClosed = true, after = before.time)
+                // Fewer while KaSH watched: some were read.
+                before != null && conversation.count < before.count -> before.copy(count = conversation.count)
                 whileClosed -> SeenUnread(conversation.count, now, whileClosed = true, after = watchedUntil)
                 else -> SeenUnread(conversation.count, now)
             }

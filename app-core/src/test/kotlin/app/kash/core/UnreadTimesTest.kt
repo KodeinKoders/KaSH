@@ -41,6 +41,20 @@ class UnreadTimesTest {
     }
 
     @Test
+    fun fewerMessagesAfterKashWasClosedAreNotGivenTheirOldTime() {
+        // 3 unread, seen the evening before; KaSH closed; read on the phone, then a new one came, or only 2 read: 1 at the launch.
+        val evening = loadedAt - 15 * 60 * minute
+        val closedAt = evening + 60 * minute
+        val before = SeenService(until = closedAt, conversations = mapOf(UnreadTimes.key("a") to SeenUnread(3, evening)))
+        val now = loadedAt + 5000
+        val seen = UnreadTimes.update(before, listOf(conversation("a", 1)), now, loadedAt, closedAt)
+        assertEquals(SeenUnread(1, now, whileClosed = true, after = evening), seen.of("a"))
+        // Later, while KaSH watches, one more is read: some were read, the time stays.
+        val after = UnreadTimes.update(SeenService(until = later, conversations = mapOf(UnreadTimes.key("b") to SeenUnread(3, later))), listOf(conversation("b", 2)), later + minute, loadedAt, closedAt)
+        assertEquals(SeenUnread(2, later), after.of("b"))
+    }
+
+    @Test
     fun aTopicKeepsTheTimeWhenItWasFirstSeen() {
         var seen = UnreadTimes.update(SeenService(), listOf(conversation("t", topic = true)), later, loadedAt, loadedAt - 1000)
         seen = UnreadTimes.update(seen, listOf(conversation("t", topic = true)), later + minute, loadedAt, loadedAt - 1000)
