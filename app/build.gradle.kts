@@ -3,6 +3,9 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.LinkOption
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.deleteRecursively
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
@@ -184,13 +187,15 @@ abstract class DevBundle : DefaultTask() {
     @get:OutputDirectory
     abstract val bundle: DirectoryProperty
 
+    @OptIn(ExperimentalPathApi::class)
     @TaskAction
     fun make() {
         val contents = bundle.get().asFile.resolve("Contents")
-        // The links to the JDK's directories are deleted as links, before the rest: File.deleteRecursively follows them, and emptied the JDK's
-        // own `lib`, `conf` and `legal` once.
+        // The links to the JDK's directories are deleted as links, before the rest; and the rest without following any link (Path's
+        // deleteRecursively, not File's): File.deleteRecursively follows them, and emptied the JDK's own `lib`, `conf` and `legal` once, and a
+        // link of another name, left by an earlier version of this task, would have been followed too.
         for (name in LINKS) Files.deleteIfExists(contents.resolve(name).toPath())
-        contents.deleteRecursively()
+        contents.toPath().takeIf { Files.exists(it, LinkOption.NOFOLLOW_LINKS) }?.deleteRecursively()
         contents.resolve("MacOS").mkdirs()
         contents.resolve("Resources").mkdirs()
         val home = File(javaHome.get())
@@ -266,7 +271,9 @@ tasks.withType<JavaExec>().matching { it.name == "run" }.configureEach {
         val run = this as JavaExec
         run.setExecutable(executable)
         // The copies of the launches before: a KaSH that still runs keeps its jars open, which deleting their files does not take from it.
-        snapshots.listFiles()?.forEach { it.deleteRecursively() }
+        // Without following any link (Path's deleteRecursively, not File's).
+        @OptIn(ExperimentalPathApi::class)
+        snapshots.listFiles()?.forEach { it.toPath().deleteRecursively() }
         val snapshot = File(snapshots, System.currentTimeMillis().toString()).apply { mkdirs() }
         val copied = run.classpath.files.mapIndexed { index, file ->
             if (!file.startsWith(projectRoot) || !file.exists()) return@mapIndexed file
