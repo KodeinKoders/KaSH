@@ -270,7 +270,11 @@ public class BrowserEngine private constructor(
         val step = { name: String, action: () -> Unit -> runCatching(action).onFailure { logger.error("{} failed", name, it) } }
         creationWatch.shutdownNow()
         logger.info("Closing {} profiles", profiles.size)
-        profiles.toList().forEach { profile -> step("Closing ${profile.directory.fileName}") { profile.close() } }
+        // Every profile's cookies are written at once, and each profile waits for its own, 5 s at most in all: one after the other, 5 s each, many
+        // services went past the watchdog of the quit (haltIfNotQuitIn), which stopped the process before Chromium.
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        val flushes = profiles.toList().map { profile -> profile to runCatching { profile.startFlush() }.getOrElse { CountDownLatch(0) } }
+        flushes.forEach { (profile, flushed) -> step("Closing ${profile.directory.fileName}") { profile.close(flushed, deadline) } }
         logger.info("Profiles closed after {} ms, stopping Chromium", elapsed())
         step("Disposing the message router") { router.dispose() }
         step("Disposing the client") { client.dispose() }

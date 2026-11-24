@@ -97,20 +97,34 @@ public class BrowserProfile internal constructor(
 
     /**
      * Closes the tabs of the profile, after writing its cookies to disk (Chromium writes them a while after they change, and the last ones would
-     * be lost when it stops).
+     * be lost when it stops): 5 s at most.
      */
     public fun close() {
+        close(startFlush(), System.nanoTime() + FLUSH_TIMEOUT_NANOS)
+    }
+
+    /** Starts writing the profile's cookies to disk, without waiting: the latch is down once they are written (at once when they cannot be). */
+    internal fun startFlush(): CountDownLatch {
+        val flushed = CountDownLatch(1)
+        if (closed || context.cookieManager?.flushStore { flushed.countDown() } != true) flushed.countDown()
+        return flushed
+    }
+
+    /**
+     * Closes the tabs of the profile once its cookies are written ([flushed], from [startFlush]), or at [deadline] ([System.nanoTime]): at quit,
+     * every profile's are written at once, and each one waits for its own (BrowserEngine.shutdown), not 5 s each, one after the other.
+     */
+    internal fun close(flushed: CountDownLatch, deadline: Long) {
         if (closed) return
         closed = true
-        val flushed = CountDownLatch(1)
-        if (context.cookieManager?.flushStore { flushed.countDown() } != true) flushed.countDown()
-        if (!flushed.await(5, TimeUnit.SECONDS)) logger.warn("The cookies of {} were not written in 5 s", directory)
+        if (!flushed.await((deadline - System.nanoTime()).coerceAtLeast(0), TimeUnit.NANOSECONDS)) logger.warn("The cookies of {} were not written in time", directory)
         own.toList().forEach { it.close() }
         context.dispose()
         onClose(this)
     }
 
     private companion object {
+        val FLUSH_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(5)
         const val BLANK = "about:blank"
         val LANGUAGE_PREFERENCES = listOf("intl.selected_languages", "intl.accept_languages")
     }
