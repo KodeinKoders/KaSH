@@ -318,8 +318,8 @@ const parseTime = (text, language) => {
         const dayOfMonth = numbers.find((number) => number <= 31);
         if (dayOfMonth !== undefined) return dateOf(year, month, dayOfMonth, now);
     }
-    // A date in digits, in the language's order: "11/7/24", "07/11/2024".
-    match = label.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
+    // A date in digits, in the language's order: "11/7/24", "07/11/2024", "19.09.2025". Read on the label as it is: its normalized form has no dots.
+    match = text.trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})\.?$/);
     if (match) {
         const year = Number(match[3]) + (match[3].length === 2 ? 2000 : 0);
         const [dayOfMonth, monthNumber] = words.dayFirst ? [match[1], match[2]] : [match[2], match[1]];
