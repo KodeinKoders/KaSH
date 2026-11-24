@@ -20,6 +20,20 @@ class DirectoryTest {
     }
 
     @Test
+    fun whatAPluginSendsIsBounded() {
+        // Each id once, its first.
+        assertEquals(listOf(contact("a", "first")), Directory.merge(emptyList(), listOf(contact("a", "first"), contact("a", "second")), complete = true))
+        // An id or a name too long is left out.
+        val long = listOf(contact("x".repeat(Directory.MAX_ID + 1)), contact("n", "y".repeat(Directory.MAX_NAME + 1)), contact("ok"))
+        assertEquals(listOf(contact("ok")), Directory.merge(emptyList(), long, complete = false))
+        // At most MAX_CONTACTS, the page's first.
+        val many = (1..Directory.MAX_CONTACTS + 50).map { contact("c$it") }
+        val merged = Directory.merge(listOf(contact("old")), many, complete = false)
+        assertEquals(Directory.MAX_CONTACTS, merged.size)
+        assertEquals(contact("c1"), merged.first())
+    }
+
+    @Test
     fun theFileKeepsTheContactsOfEachService() {
         val path = Files.createTempDirectory("kash-directory").resolve("contacts.json")
         val file = DirectoryFile(path)

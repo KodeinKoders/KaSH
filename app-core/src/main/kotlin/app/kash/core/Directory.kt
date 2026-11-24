@@ -25,10 +25,23 @@ public object Directory {
      * others in their order before.
      */
     public fun merge(previous: List<Contact>, received: List<Contact>, complete: Boolean): List<Contact> {
-        if (complete) return received
-        val ids = received.mapTo(HashSet()) { it.id }
-        return received + previous.filter { it.id !in ids }
+        val shown = bounded(received)
+        if (complete) return shown.take(MAX_CONTACTS)
+        val ids = shown.mapTo(HashSet()) { it.id }
+        return (shown + previous.filter { it.id !in ids }).take(MAX_CONTACTS)
     }
+
+    /** How many contacts a service keeps at most: the ones that its page showed last first. */
+    public const val MAX_CONTACTS: Int = 10_000
+
+    /** The longest id and name of a contact. */
+    public const val MAX_ID: Int = 512
+    public const val MAX_NAME: Int = 256
+
+    // What a plugin sent, within bounds: each id once (its first), without an id or a name too long. Everything is kept in contacts.json and read
+    // at each launch, and a plugin, a buggy one or a hostile one, could grow it without end.
+    private fun bounded(received: List<Contact>): List<Contact> =
+        received.asSequence().filter { it.id.length <= MAX_ID && it.name.length <= MAX_NAME }.distinctBy { it.id }.toList()
 }
 
 @Serializable
