@@ -26,9 +26,9 @@ public class BrowserProfile internal constructor(
     private val tabs: ConcurrentHashMap<CefBrowser, BrowserTab>,
     private val hiddenSize: AtomicReference<Dimension>,
     private val languages: AtomicReference<String?>,
-    // Creates a tab's browser, after the ones asked before (BrowserEngine.create), and says that one will never be.
+    // Creates a tab's browser, after the ones asked before (BrowserEngine.create), and closes it when its tab is (BrowserEngine.tabClosed).
     private val create: (BrowserTab) -> Unit,
-    private val creationEnded: (BrowserTab) -> Unit,
+    private val tabClosed: (BrowserTab) -> Unit,
     private val onClose: (BrowserProfile) -> Unit,
 ) {
     private val context: CefRequestContext = CefRequestContext.createContext(
@@ -61,7 +61,7 @@ public class BrowserProfile internal constructor(
         val tab = BrowserTab(browser, this, url, initScripts, openInKash.map(::addressPattern), hiddenSize) { closedTab ->
             own -= closedTab
             tabs -= closedTab.browser
-            creationEnded(closedTab)
+            tabClosed(closedTab)
         }
         tabs[browser] = tab
         own += tab

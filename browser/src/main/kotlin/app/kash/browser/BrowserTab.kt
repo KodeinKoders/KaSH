@@ -183,10 +183,9 @@ public class BrowserTab internal constructor(
         if (_created.value) browser.setZoomLevel(level)
     }
 
-    /** Closes the page. */
+    /** Closes the page: its browser is closed by the engine, now or once Chromium created it (BrowserEngine.tabClosed). */
     public fun close() {
         browser.closeDevTools()
-        browser.close(true)
         onClose(this)
     }
 

@@ -54,6 +54,11 @@ public class BrowserEngine private constructor(
     private val pendingCreations = ArrayDeque<BrowserTab>()
     private var creating: BrowserTab? = null
 
+    // The tabs' browsers that Chromium created, and those of tabs closed while they were being created, which are closed once they are (see
+    // tabClosed): guarded by pendingCreations, as the queue.
+    private val createdBrowsers = HashSet<CefBrowser>()
+    private val closeOnCreation = HashMap<CefBrowser, BrowserTab>()
+
     // Watches the browser being created (see watchCreation): one that Chromium refuses never comes to onAfterCreated.
     private val creationWatch = Executors.newSingleThreadScheduledExecutor { runnable -> Thread(runnable, "KaSH-browser-creation").apply { isDaemon = true } }
 
@@ -114,6 +119,15 @@ public class BrowserEngine private constructor(
         client.addKeyboardHandler(PageShortcuts(isTab = { browser -> tabs.containsKey(browser) }) { shortcut -> onShortcut(shortcut) })
         client.addLifeSpanHandler(object : CefLifeSpanHandlerAdapter() {
             override fun onAfterCreated(browser: CefBrowser) {
+                // A tab closed while its browser was being created: closed now that it can be, and the next one is created.
+                val closed = synchronized(pendingCreations) {
+                    closeOnCreation.remove(browser) ?: null.also { if (tabs.containsKey(browser)) createdBrowsers += browser }
+                }
+                if (closed != null) {
+                    browser.close(true)
+                    creationEnded(closed)
+                    return
+                }
                 val tab = tabs[browser] ?: return
                 tab.created()
                 creationEnded(tab)
@@ -164,7 +178,7 @@ public class BrowserEngine private constructor(
     public fun profile(directory: Path): BrowserProfile {
         val absolute = directory.toAbsolutePath().normalize()
         require(absolute.parent == profilesRoot) { "A profile must be a direct child of $profilesRoot, not $absolute" }
-        return BrowserProfile(absolute, client, tabs, hiddenSize, languages, ::create, ::creationEnded) { profiles -= it }.also { profiles += it }
+        return BrowserProfile(absolute, client, tabs, hiddenSize, languages, ::create, ::tabClosed) { profiles -= it }.also { profiles += it }
     }
 
     /**
@@ -202,6 +216,7 @@ public class BrowserEngine private constructor(
             }
             when {
                 refused -> {
+                    synchronized(pendingCreations) { closeOnCreation.remove(tab.browser) }
                     logger.error("Chromium refused to create the page of the profile {}: the next ones are created", tab.profile.directory.fileName)
                     tab.creationFailed()
                     creationEnded(tab)
@@ -209,6 +224,26 @@ public class BrowserEngine private constructor(
                 waiting -> watchCreation(tab)
             }
         }, 1, TimeUnit.SECONDS)
+    }
+
+    /**
+     * [tab] is closed: its browser is closed when Chromium created it; when it is being created, once it is (JCEF's own `close` before that marks
+     * it closing, and its deferred close then does nothing: the native browser stayed, and Chromium never stopped at quit); when its creation did
+     * not start, never (there is no browser to close, and JCEF would keep the handler that it adds for it).
+     */
+    internal fun tabClosed(tab: BrowserTab) {
+        val closeNow = synchronized(pendingCreations) {
+            when {
+                createdBrowsers.remove(tab.browser) -> true
+                creating == tab -> {
+                    closeOnCreation[tab.browser] = tab
+                    return
+                }
+                else -> false
+            }
+        }
+        if (closeNow) tab.browser.close(true)
+        creationEnded(tab)
     }
 
     /** The browser of [tab] is created, or will never be (the tab is closed): the next one is created, on Swing's thread, where they all are. */
