@@ -1,5 +1,7 @@
 package app.kash.core
 
+import java.text.BreakIterator
+
 /** A plugin: its manifest, the source of its script, and its icon (the image file that its manifest names; null when it names none). */
 public class Plugin(public val manifest: PluginManifest, public val script: String, public val icon: ByteArray? = null) {
     public val id: String get() = manifest.id
@@ -42,13 +44,31 @@ public object WebApplications {
     /** The square of a web application named [name]: its initials ([monoOf]) on [COLOR]. */
     public fun square(name: String): PluginSquare = PluginSquare(monoOf(name), COLOR)
 
-    /** Two letters for [name]: the initials of its first two words, or its first two letters when it is one word. */
+    /**
+     * Two letters for [name]: the initials of its first two words, or its first two letters when it is one word. Letters as they are seen
+     * (graphemes): an emoji is two UTF-16 units, or more, and half of one was drawn as a replacement glyph.
+     */
     public fun monoOf(name: String): String {
         val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         return when {
             words.isEmpty() -> "?"
-            words.size == 1 -> words[0].take(2).replaceFirstChar { it.uppercaseChar() }
-            else -> "${words[0].first().uppercaseChar()}${words[1].first().uppercaseChar()}"
+            words.size == 1 -> graphemes(words[0]).take(2).let { letters -> letters.first().uppercase() + letters.drop(1).joinToString("") }
+            else -> graphemes(words[0]).first().uppercase() + graphemes(words[1]).first().uppercase()
         }
+    }
+
+    // The letters of [word] as they are seen: a letter and its accents, an emoji and its modifiers.
+    private fun graphemes(word: String): List<String> {
+        val breaks = BreakIterator.getCharacterInstance()
+        breaks.setText(word)
+        val letters = ArrayList<String>()
+        var start = breaks.first()
+        var end = breaks.next()
+        while (end != BreakIterator.DONE) {
+            letters += word.substring(start, end)
+            start = end
+            end = breaks.next()
+        }
+        return letters
     }
 }

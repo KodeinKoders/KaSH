@@ -45,5 +45,10 @@ class SmallLogicTest {
         assertEquals("MA", WebApplications.monoOf("Mon application"))
         assertEquals("Ex", WebApplications.monoOf("exemple"))
         assertEquals("?", WebApplications.monoOf("  "))
+        // Letters as they are seen: an emoji whole, a letter with its accent.
+        assertEquals("🙂C", WebApplications.monoOf("🙂 Chat"))
+        assertEquals("🙂", WebApplications.monoOf("🙂"))
+        assertEquals("👍🏽C", WebApplications.monoOf("👍🏽 Chat"))
+        assertEquals("Ét", WebApplications.monoOf("été"))
     }
 }
