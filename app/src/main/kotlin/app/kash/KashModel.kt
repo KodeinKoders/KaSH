@@ -49,6 +49,7 @@ import app.kash.ui.stringsOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -178,6 +179,17 @@ class KashModel(
     /** The unread total of each plugin's service whose script only tells that (`kash.unread.setCount`). */
     private val totals = mutableStateMapOf<ServiceId, Int>()
 
+    // The services whose page said what it has unread since it was loaded: a plugin's by its first report, a web application's (its title) once
+    // its first load ended.
+    private val reported = mutableStateMapOf<ServiceId, Unit>()
+
+    /**
+     * The services whose page is loaded and said what it has unread since it was loaded ([unread] has their own, not a default): what a page that
+     * is closed, still loading or not loaded (a disabled service) has is not known, and its notifications are not taken for read
+     * ([NotificationReads.update]).
+     */
+    val reporting: Set<ServiceId> get() = reported.keys
+
     // When KaSH saw the unread conversations whose service does not tell their time (UnreadTimes), kept across launches; the services that no
     // longer exist are forgotten.
     private val unreadTimesFile = UnreadTimesFile(directories.unreadTimesFile)
@@ -289,9 +301,15 @@ class KashModel(
             zooms[service.id] = zoom
             tab.setZoomLevel(Zoom.chromiumLevel(zoom))
         }
-        val jobs = listOf(
+        val jobs = listOfNotNull(
             scope.launch { tab.title.collect { titles[service.id] = it } },
             scope.launch { tab.messages.collect { message -> received(service.id, message) } },
+            // A web application tells its count by its title, which is its page's once its first load ended.
+            if (service.plugin == null) scope.launch {
+                tab.loading.first { it }
+                tab.loading.first { !it }
+                reported[service.id] = Unit
+            } else null,
         )
         loaded[service.id] = LoadedService(profile, tab, jobs)
         pageLoads[service.id] = System.currentTimeMillis() to seen[service.id]?.until
@@ -354,32 +372,36 @@ class KashModel(
                 val count = json["count"]?.jsonPrimitive?.intOrNull?.takeIf { it >= 0 } ?: return logger.warn("The unread total of {} cannot be read", service.title)
                 conversations.remove(id)
                 totals[id] = count
+                reported[id] = Unit
             }
-            "unread" -> conversations[id] = try {
-                // Only counts in the log: the names are the user's contacts.
-                json.getValue("conversations").jsonArray.map { element ->
-                    val conversation = element.jsonObject
-                    val topic = conversation["topic"]?.jsonPrimitive?.booleanOrNull ?: false
-                    Conversation(
-                        id = conversation.getValue("id").jsonPrimitive.content,
-                        name = conversation["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                        kind = when (conversation["kind"]?.jsonPrimitive?.contentOrNull) {
-                            "group" -> ConversationKind.GROUP
-                            "channel" -> ConversationKind.CHANNEL
-                            else -> ConversationKind.DIRECT
-                        },
-                        // A topic's messages are not counted.
-                        count = if (topic) 0 else conversation["count"]?.jsonPrimitive?.intOrNull ?: 1,
-                        mention = !topic && conversation["mention"]?.jsonPrimitive?.booleanOrNull ?: false,
-                        preview = conversation["preview"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                        time = conversation["time"]?.jsonPrimitive?.longOrNull,
-                        dayOnly = conversation["timePrecision"]?.jsonPrimitive?.contentOrNull == "day",
-                        topic = topic,
-                    )
-                }.let { read -> withSeenTimes(id, read) }.also { logger.debug("Unread of {}: {} conversations, {} messages, {} topics", service.title, it.count { c -> !c.topic }, it.sumOf { c -> c.count }, it.count { c -> c.topic }); totals.remove(id) }
-            } catch (e: Exception) {
-                logger.warn("The unread conversations of {} cannot be read", service.title, e)
-                return
+            "unread" -> {
+                conversations[id] = try {
+                    // Only counts in the log: the names are the user's contacts.
+                    json.getValue("conversations").jsonArray.map { element ->
+                        val conversation = element.jsonObject
+                        val topic = conversation["topic"]?.jsonPrimitive?.booleanOrNull ?: false
+                        Conversation(
+                            id = conversation.getValue("id").jsonPrimitive.content,
+                            name = conversation["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                            kind = when (conversation["kind"]?.jsonPrimitive?.contentOrNull) {
+                                "group" -> ConversationKind.GROUP
+                                "channel" -> ConversationKind.CHANNEL
+                                else -> ConversationKind.DIRECT
+                            },
+                            // A topic's messages are not counted.
+                            count = if (topic) 0 else conversation["count"]?.jsonPrimitive?.intOrNull ?: 1,
+                            mention = !topic && conversation["mention"]?.jsonPrimitive?.booleanOrNull ?: false,
+                            preview = conversation["preview"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                            time = conversation["time"]?.jsonPrimitive?.longOrNull,
+                            dayOnly = conversation["timePrecision"]?.jsonPrimitive?.contentOrNull == "day",
+                            topic = topic,
+                        )
+                    }.let { read -> withSeenTimes(id, read) }.also { logger.debug("Unread of {}: {} conversations, {} messages, {} topics", service.title, it.count { c -> !c.topic }, it.sumOf { c -> c.count }, it.count { c -> c.topic }); totals.remove(id) }
+                } catch (e: Exception) {
+                    logger.warn("The unread conversations of {} cannot be read", service.title, e)
+                    return
+                }
+                reported[id] = Unit
             }
         }
     }
@@ -446,6 +468,7 @@ class KashModel(
         titles.remove(id)
         conversations.remove(id)
         totals.remove(id)
+        reported.remove(id)
         markReadable.remove(id)
         if (loadedService == null) {
             then()

@@ -87,8 +87,12 @@ class Notifier(private val model: KashModel) {
         logger.info("Notifications are shown {}", if (system) "by the Notification Center" else "in KaSH's own window")
         model.onPageNotification = ::received
         model.onPluginUpdate = ::pluginUpdate
-        // A contact's notification goes away once its conversation is read.
-        scope.launch { snapshotFlow { model.unread }.collect(::unreadChanged) }
+        // A contact's notification goes away once its conversation is read: by what the services whose page said it have unread, not those
+        // whose page is closed or still loading, which would seem to have nothing.
+        scope.launch {
+            snapshotFlow { model.reporting.let { reporting -> model.unread.filterKeys { it in reporting } } to model.services.mapTo(HashSet()) { it.id } }
+                .collect { (unread, services) -> unreadChanged(unread, services) }
+        }
         // Those of the last launch that the Notification Center still shows, once the services had the time to say what they have unread.
         if (system) scope.launch { delay(UnreadTimes.SETTLE_MS); restoreDelivered() }
     }
@@ -127,8 +131,8 @@ class Notifier(private val model: KashModel) {
         return NotificationGroups.count(toast.received, NotificationGroups.conversationOf(model.unread[service.id]?.conversations.orEmpty(), toast.title))
     }
 
-    private fun unreadChanged(unread: Map<ServiceId, ServiceUnread>) {
-        val over = reads.update(unread)
+    private fun unreadChanged(unread: Map<ServiceId, ServiceUnread>, services: Set<ServiceId>) {
+        val over = reads.update(unread, services)
         // Never which ones: their titles are the user's contacts.
         if (over.isNotEmpty()) logger.debug("Notifications read: {}", over.size)
         over.forEach(::end)

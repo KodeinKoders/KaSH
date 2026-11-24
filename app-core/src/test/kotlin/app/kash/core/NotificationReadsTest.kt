@@ -73,10 +73,21 @@ class NotificationReadsTest {
     }
 
     @Test
+    fun aServiceThatHasNotSaidWhatItHasUnreadEndsNothing() {
+        val reads = NotificationReads()
+        reads.shown(laila, unread(direct("Laila")))
+        // Its page closed (a plugin's update, its options edited, disabled) or still loading: it is there, and says nothing.
+        assertEquals(emptyList(), reads.update(emptyMap(), setOf(whatsApp)))
+        assertEquals(emptyList(), reads.update(mapOf(whatsApp to unread(direct("Laila"))), setOf(whatsApp)))
+        // Read once it says it again.
+        assertEquals(listOf(laila), reads.update(mapOf(whatsApp to unread()), setOf(whatsApp)))
+    }
+
+    @Test
     fun aDeletedServicesGroupsAreOver() {
         val reads = NotificationReads()
         reads.shown(laila, unread(direct("Laila")))
-        assertEquals(listOf(laila), reads.update(emptyMap()))
+        assertEquals(listOf(laila), reads.update(emptyMap(), emptySet()))
     }
 
     @Test

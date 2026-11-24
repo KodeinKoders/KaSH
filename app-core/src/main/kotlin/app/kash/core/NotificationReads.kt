@@ -55,9 +55,20 @@ public class NotificationReads(seenBefore: Set<String> = emptySet()) {
         return over(key, group, unread).also { if (it) followed.remove(key) }
     }
 
-    /** What every service has unread now ([unread]): the groups that are over, which are not followed any more. */
-    public fun update(unread: Map<ServiceId, ServiceUnread>): List<String> {
-        val over = followed.filter { (key, group) -> over(key, group, unread[serviceOf(key)]) }.keys.toList()
+    /**
+     * What the services that said it have unread now ([unread]), among the services that are there ([services]): the groups that are over, which
+     * are not followed any more. A group of a service that is not there any more is over; one of a service that is there but is not in [unread]
+     * (its page is closed, not loaded yet, or has not said what it has unread since it was loaded) is not judged: it stays as it is.
+     */
+    public fun update(unread: Map<ServiceId, ServiceUnread>, services: Set<ServiceId> = unread.keys): List<String> {
+        val over = followed.filter { (key, group) ->
+            val service = serviceOf(key)
+            when {
+                service !in services -> true
+                service !in unread -> false
+                else -> over(key, group, unread[service])
+            }
+        }.keys.toList()
         over.forEach(followed::remove)
         return over
     }
