@@ -193,15 +193,17 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
             if (model.settingsDot) Box(Modifier.align(Alignment.TopEnd).padding(9.dp).size(7.dp).background(Kash.colors.accent, CircleShape))
         }
     }
-    menu?.let { (id, anchor) ->
-        val service = model.services.firstOrNull { it.id == id }
-        if (service == null) {
-            menu = null
-        } else {
-            val close = { menu = null }
-            // Wide enough for the longest item in French ("Réactiver les notifications", "Effacer toutes les données…").
-            WindowMenu(anchor, width = 260.dp, alignEnd = false, onDismiss = close) { model.contextMenu(this, service, close) }
-        }
+    // The menu of a service that is not there any more (deleted from its own menu, or elsewhere) is closed, after the composition: not a write
+    // during it. It is not shown meanwhile, its service being gone.
+    val menuService = menu?.let { (id, _) -> model.services.firstOrNull { it.id == id } }
+    LaunchedEffect(menu, menuService) {
+        if (menu != null && menuService == null) menu = null
+    }
+    menu?.let { (_, anchor) ->
+        val service = menuService ?: return@let
+        val close = { menu = null }
+        // Wide enough for the longest item in French ("Réactiver les notifications", "Effacer toutes les données…").
+        WindowMenu(anchor, width = 260.dp, alignEnd = false, onDismiss = close) { model.contextMenu(this, service, close) }
     }
     if (vertical) {
         val edge = if (side == RailSide.LEFT) Modifier.padding(end = 1.dp) else Modifier.padding(start = 1.dp)
