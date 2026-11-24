@@ -50,6 +50,11 @@ public object MacosNotifications {
         "kash_notifications_post",
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT),
     )
+    private val remove = MacosLibrary.function("kash_notifications_remove", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
+    private val delivered = MacosLibrary.function(
+        "kash_notifications_delivered",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+    )
     private val markReadTitles = MacosLibrary.function(
         "kash_notifications_set_mark_read_titles",
         FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS),
@@ -114,6 +119,34 @@ public object MacosNotifications {
                 markRead.ordinal,
             )
         }
+    }
+
+    /** Takes the notification [identifier] away, from the screen and from the Notification Center's list, once [start] succeeded. */
+    public fun remove(identifier: String) {
+        val function = remove ?: return
+        if (!started) return
+        Arena.ofConfined().use { arena -> function.invoke(MacosLibrary.cString(arena, identifier)) }
+    }
+
+    /**
+     * The identifiers of KaSH's notifications that the Notification Center still shows, those of the last launches too, once [start] succeeded;
+     * null when macOS did not answer. Waits for macOS's answer (2 s at most): not on Swing's thread.
+     */
+    public fun delivered(): List<String>? {
+        val function = delivered ?: return null
+        if (!started) return null
+        var size = 64 * 1024
+        repeat(2) {
+            Arena.ofConfined().use { arena ->
+                val buffer = arena.allocate(size.toLong())
+                val length = function.invoke(buffer, size) as Int
+                if (length < 0) return null
+                if (length < size) return buffer.getString(0).split('\u001F').filter(String::isNotEmpty)
+                // More than the buffer: once more, with room for them.
+                size = length + 1
+            }
+        }
+        return null
     }
 }
 

@@ -167,6 +167,37 @@ void kash_notifications_post(const char *identifier, const char *title, const ch
     }
 }
 
+// Takes the notification [identifier] away, from the screen and from the Notification Center's list: what it says was read.
+void kash_notifications_remove(const char *identifier) {
+    if (delegate == nil) return;
+    @autoreleasepool {
+        [UNUserNotificationCenter.currentNotificationCenter removeDeliveredNotificationsWithIdentifiers:@[[NSString stringWithUTF8String:identifier]]];
+    }
+}
+
+// The identifiers of KaSH's notifications that the Notification Center still shows (those of the last launches too), separated by U+001F, in
+// [buffer] of [size] bytes, as a C string. The length that they need (without the final 0), which is more than [size] when they did not fit (none
+// are written then); -1 when macOS did not answer in 2 s.
+int kash_notifications_delivered(char *buffer, int size) {
+    if (delegate == nil) return -1;
+    @autoreleasepool {
+        __block NSString *joined = nil;
+        dispatch_semaphore_t answered = dispatch_semaphore_create(0);
+        [UNUserNotificationCenter.currentNotificationCenter getDeliveredNotificationsWithCompletionHandler:^(NSArray<UNNotification *> *notifications) {
+            NSMutableArray<NSString *> *identifiers = [NSMutableArray arrayWithCapacity:notifications.count];
+            for (UNNotification *notification in notifications) [identifiers addObject:notification.request.identifier];
+            joined = [identifiers componentsJoinedByString:@"\x1F"];
+            dispatch_semaphore_signal(answered);
+        }];
+        if (dispatch_semaphore_wait(answered, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC)) != 0) return -1;
+        const char *utf8 = joined.UTF8String;
+        int length = (int) strlen(utf8);
+        if (length < size) memcpy(buffer, utf8, length + 1);
+        else if (size > 0) buffer[0] = 0;
+        return length;
+    }
+}
+
 // The status of the application's login item (SMAppServiceStatus): 0 not registered, 1 enabled, 2 waiting for the user's approval in the System
 // Settings, 3 not found. -1 outside an application bundle.
 int kash_login_item_status(void) {
