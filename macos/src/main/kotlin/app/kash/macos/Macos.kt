@@ -54,7 +54,10 @@ public object MacosNotifications {
     private val start = MacosLibrary.function("kash_notifications_start", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS))
     private val post = MacosLibrary.function(
         "kash_notifications_post",
-        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT),
+        FunctionDescriptor.ofVoid(
+            ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS,
+        ),
     )
     private val remove = MacosLibrary.function("kash_notifications_remove", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS))
     private val delivered = MacosLibrary.function(
@@ -109,25 +112,31 @@ public object MacosNotifications {
     }
 
     /**
-     * Shows a notification, once [start] succeeded. [identifier] is what [start]'s callback is given when it is clicked, after [MARK_READ_PREFIX]
-     * when its button [markRead] is.
+     * Shows a notification [identifier] (one per message) of the group [thread] (a contact's, which the Notification Center stacks), once [start]
+     * succeeded. [thread] is what [start]'s callback is given when it is clicked, after [MARK_READ_PREFIX] when its button [markRead] is; [image]
+     * (a PNG, its service's icon) is its thumbnail, which macOS moves into its own store.
      */
-    public fun post(identifier: String, title: String, subtitle: String, body: String, sound: Boolean, markRead: MarkReadButton = MarkReadButton.NONE) {
+    public fun post(
+        identifier: String, thread: String, title: String, subtitle: String, body: String, sound: Boolean,
+        markRead: MarkReadButton = MarkReadButton.NONE, image: java.nio.file.Path? = null,
+    ) {
         val function = post ?: return
         if (!started) return
         Arena.ofConfined().use { arena ->
             function.invoke(
                 MacosLibrary.cString(arena, identifier),
+                MacosLibrary.cString(arena, thread),
                 MacosLibrary.cString(arena, title),
                 MacosLibrary.cString(arena, subtitle),
                 MacosLibrary.cString(arena, body),
                 if (sound) 1 else 0,
                 markRead.ordinal,
+                MacosLibrary.cString(arena, image?.toString().orEmpty()),
             )
         }
     }
 
-    /** Takes the notification [identifier] away, from the screen and from the Notification Center's list, once [start] succeeded. */
+    /** Takes the notifications of the group [identifier] away (every message's), from the screen and from the Notification Center's list, once [start] succeeded. */
     public fun remove(identifier: String) {
         val function = remove ?: return
         if (!started) return

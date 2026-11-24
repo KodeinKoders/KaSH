@@ -4,6 +4,7 @@ import app.kash.core.PluginManifest
 import app.kash.ui.stringsOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.graphics.asSkiaBitmap
 import app.kash.core.NotificationDuration
 import app.kash.core.NotificationGroups
 import app.kash.core.NotificationPolicy
@@ -60,7 +61,7 @@ private class Group(var latest: String, var received: Int, var fromWorker: Boole
  * ([Settings.notificationStyle]): in KaSH's own window ([ToastWindow]), or in macOS's Notification Center, which only KaSH.app has (KaSH's own
  * window otherwise, `./gradlew :app:run`). Clicking one shows its service and gives the click to the page.
  */
-class Notifier(private val model: KashModel) {
+class Notifier(private val model: KashModel, private val icons: ServiceIcons? = null) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     // Whether KaSH is the Notification Center's delegate, which gets the clicks (on a thread of macOS) and makes macOS ask the user for the
@@ -296,14 +297,15 @@ class Notifier(private val model: KashModel) {
         received: Int = 0, markable: MarkRead? = null,
     ) {
         if (system) {
-            // How long it stays is macOS's to decide (KaSH's settings in its Notification settings: banners or alerts). The same identifier
-            // replaces the contact's notification before.
+            // How long it stays is macOS's to decide (KaSH's settings in its Notification settings: banners or alerts). One notification per
+            // message, each with its banner (one that replaced the one before by its identifier showed none), which macOS stacks by their
+            // contact's group (the thread: the key, which a click gives back, and which `end` takes every one of away).
             val button = when (markable) {
                 null -> MarkReadButton.NONE
                 MarkRead.DIRECT -> MarkReadButton.DIRECT
                 MarkRead.BY_OPENING -> MarkReadButton.BY_OPENING
             }
-            MacosNotifications.post(key, title, subtitle, body, sound, button)
+            MacosNotifications.post("$key\u001E${System.nanoTime()}", key, title, subtitle, body, sound, button, service?.let(::thumbnailOf))
         } else {
             // A new notification of the same contact replaces the one before, as the Notification Center does.
             val toast = Toast(key, service, title, body, received)
@@ -323,6 +325,16 @@ class Notifier(private val model: KashModel) {
                 }
             }
         }
+    }
+
+    // The icon of [service] as a PNG file of its own (macOS moves it into its store): the thumbnail of its notification in the Notification
+    // Center; null when its tile draws no image.
+    private fun thumbnailOf(service: Service): java.nio.file.Path? {
+        val picture = icons?.pictureOf(service) ?: return null
+        return runCatching {
+            val png = org.jetbrains.skia.Image.makeFromBitmap(picture.asSkiaBitmap()).encodeToData(org.jetbrains.skia.EncodedImageFormat.PNG)?.bytes ?: return null
+            java.nio.file.Files.createTempFile("kash-notification-", ".png").also { java.nio.file.Files.write(it, png) }
+        }.onFailure { logger.warn("The icon of a notification cannot be written", it) }.getOrNull()
     }
 
     /** The notification [key] was clicked: its service is shown, and its page given the click (a messaging service opens the conversation). */

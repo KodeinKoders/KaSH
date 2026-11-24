@@ -30,14 +30,22 @@ static NSString *const KashMarkReadAction = @"markRead";
     completionHandler(UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionList | UNNotificationPresentationOptionSound);
 }
 
+// The group of a notification, which KaSH knows it by: its thread (a contact's notifications, one per message), or its identifier for one
+// posted before they had a thread (one per contact).
+static NSString *kash_group_of(UNNotificationRequest *request) {
+    NSString *thread = request.content.threadIdentifier;
+    return thread.length > 0 ? thread : request.identifier;
+}
+
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
 didReceiveNotificationResponse:(UNNotificationResponse *)response
          withCompletionHandler:(void (^)(void))completionHandler {
+    NSString *group = kash_group_of(response.notification.request);
     if (clickCallback != NULL && [response.actionIdentifier isEqualToString:UNNotificationDefaultActionIdentifier]) {
-        clickCallback(response.notification.request.identifier.UTF8String);
+        clickCallback(group.UTF8String);
     } else if (clickCallback != NULL && [response.actionIdentifier isEqualToString:KashMarkReadAction]) {
-        // Its button "Mark as read": the callback is given the identifier after `mark-read:`.
-        clickCallback([@"mark-read:" stringByAppendingString:response.notification.request.identifier].UTF8String);
+        // Its button "Mark as read": the callback is given the group after `mark-read:`.
+        clickCallback([@"mark-read:" stringByAppendingString:group].UTF8String);
     }
     completionHandler();
 }
@@ -150,12 +158,30 @@ void kash_notifications_set_mark_read_titles(const char *direct, const char *byO
     }
 }
 
-// Shows a notification, which the click callback is given [identifier] of when it is clicked; with the button "Mark as read" when [markRead] is
-// 1 (its plugin's own way) or 2 (by opening the conversation), none for 0.
-void kash_notifications_post(const char *identifier, const char *title, const char *subtitle, const char *body, int sound, int markRead) {
+// Shows a notification [identifier] (one per message) of the group [thread] (a contact's), which the Notification Center stacks and which the
+// click callback is given when it is clicked; with the button "Mark as read" when [markRead] is 1 (its plugin's own way) or 2 (by opening the
+// conversation), none for 0; with the image at [imagePath] (its service's icon, a PNG) as its thumbnail when it is not empty, which macOS moves into
+// its own store.
+void kash_notifications_post(const char *identifier, const char *thread, const char *title, const char *subtitle, const char *body, int sound,
+                             int markRead, const char *imagePath) {
     if (delegate == nil) return;
     @autoreleasepool {
         UNMutableNotificationContent *content = [UNMutableNotificationContent new];
+        content.threadIdentifier = [NSString stringWithUTF8String:thread];
+        if (imagePath != NULL && imagePath[0] != 0) {
+            NSString *path = [NSString stringWithUTF8String:imagePath];
+            NSError *error = nil;
+            UNNotificationAttachment *image = [UNNotificationAttachment attachmentWithIdentifier:@"icon"
+                                                                                            URL:[NSURL fileURLWithPath:path]
+                                                                                        options:nil
+                                                                                          error:&error];
+            if (image != nil) {
+                content.attachments = @[image];
+            } else {
+                NSLog(@"KaSH: the notification's image is not attached: %@", error);
+                [NSFileManager.defaultManager removeItemAtPath:path error:nil];
+            }
+        }
         content.title = [NSString stringWithUTF8String:title];
         if (subtitle != NULL && subtitle[0] != 0) content.subtitle = [NSString stringWithUTF8String:subtitle];
         if (body != NULL && body[0] != 0) content.body = [NSString stringWithUTF8String:body];
@@ -171,15 +197,24 @@ void kash_notifications_post(const char *identifier, const char *title, const ch
     }
 }
 
-// Takes the notification [identifier] away, from the screen and from the Notification Center's list: what it says was read.
-void kash_notifications_remove(const char *identifier) {
+// Takes the notifications of the group [group] away (every message's), from the screen and from the Notification Center's list: what they say was
+// read.
+void kash_notifications_remove(const char *group) {
     if (delegate == nil) return;
     @autoreleasepool {
-        [UNUserNotificationCenter.currentNotificationCenter removeDeliveredNotificationsWithIdentifiers:@[[NSString stringWithUTF8String:identifier]]];
+        NSString *wanted = [NSString stringWithUTF8String:group];
+        UNUserNotificationCenter *center = UNUserNotificationCenter.currentNotificationCenter;
+        [center getDeliveredNotificationsWithCompletionHandler:^(NSArray<UNNotification *> *notifications) {
+            NSMutableArray<NSString *> *identifiers = [NSMutableArray array];
+            for (UNNotification *notification in notifications) {
+                if ([kash_group_of(notification.request) isEqualToString:wanted]) [identifiers addObject:notification.request.identifier];
+            }
+            if (identifiers.count > 0) [center removeDeliveredNotificationsWithIdentifiers:identifiers];
+        }];
     }
 }
 
-// The identifiers of KaSH's notifications that the Notification Center still shows (those of the last launches too), separated by U+001F, in
+// The groups of KaSH's notifications that the Notification Center still shows (those of the last launches too), each once, separated by U+001F, in
 // [buffer] of [size] bytes, as a C string. The length that they need (without the final 0), which is more than [size] when they did not fit (none
 // are written then); -1 when macOS did not answer in 2 s.
 int kash_notifications_delivered(char *buffer, int size) {
@@ -188,9 +223,9 @@ int kash_notifications_delivered(char *buffer, int size) {
         __block NSString *joined = nil;
         dispatch_semaphore_t answered = dispatch_semaphore_create(0);
         [UNUserNotificationCenter.currentNotificationCenter getDeliveredNotificationsWithCompletionHandler:^(NSArray<UNNotification *> *notifications) {
-            NSMutableArray<NSString *> *identifiers = [NSMutableArray arrayWithCapacity:notifications.count];
-            for (UNNotification *notification in notifications) [identifiers addObject:notification.request.identifier];
-            joined = [identifiers componentsJoinedByString:@"\x1F"];
+            NSMutableOrderedSet<NSString *> *groups = [NSMutableOrderedSet orderedSetWithCapacity:notifications.count];
+            for (UNNotification *notification in notifications) [groups addObject:kash_group_of(notification.request)];
+            joined = [groups.array componentsJoinedByString:@"\x1F"];
             dispatch_semaphore_signal(answered);
         }];
         if (dispatch_semaphore_wait(answered, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC)) != 0) return -1;

@@ -85,6 +85,17 @@ class ServiceIcons(private val directories: KashDirectories, private val registr
     // A browser's User-Agent: some sites answer another one with a page that has no icon ("your browser is not supported").
     private val client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(10)).build()
 
+    /**
+     * The image that the tile of [service] draws (as `tileContent`: the image that its script gave, its plugin's icon or its site's, the image
+     * that the user chose), or null when it draws none (a square of a color, a globe) or it is not had yet: the thumbnail of its notifications.
+     */
+    fun pictureOf(service: Service): ImageBitmap? = when (val icon = service.icon) {
+        is ServiceIcon.Square -> null
+        ServiceIcon.Plugin -> service.plugin?.let { reported(service.id) } ?: pluginIcon(service.plugin)
+        is ServiceIcon.Image -> image(icon.file)
+        ServiceIcon.Favicon -> service.plugin?.let { reported(service.id) } ?: favicon(service.url)
+    }
+
     /** The icon of the site at [url], or null while it is fetched, or when it has none. */
     fun favicon(url: String): ImageBitmap? {
         val host = runCatching { URI(url).host }.getOrNull()?.lowercase() ?: return null

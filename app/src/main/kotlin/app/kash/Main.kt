@@ -180,7 +180,7 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
     // Where the window is, how big and in which mode is kept as it changes, and a last time when KaSH quits.
     val flushWindow = keepWindowGeometry(windowState, windowFile, geometry)
     val scope = rememberCoroutineScope()
-    val notifier = remember { Notifier(model) }
+    val notifier = remember { Notifier(model, icons) }
     // Once, whichever asks first: the window's close button, or the system's Quit (⌘Q, the Dock, logging out).
     val quitting = remember { booleanArrayOf(false) }
     // The system's Quit, answered once KaSH stopped: yes, so that a logout, a restart or a shutdown goes on.
