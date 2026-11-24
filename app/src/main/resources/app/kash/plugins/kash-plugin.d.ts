@@ -128,6 +128,14 @@ declare namespace KashPlugin {
         onMarkRead(handler: (id: string) => void | Promise<void>, options?: MarkReadOptions): void;
 
         /**
+         * Marks the conversations as read by opening them, for a service that has no other way: calls onMarkRead(…, { byOpening: true }) with a
+         * handler of KaSH's that opens the conversation (open, which returns whether it found it), waits for it to be read (isUnread false, 6 s
+         * at most), then goes back to what was open before (history.back()), unless the user went elsewhere; one at a time, also across the
+         * document that opening it may load (kept in the tab's sessionStorage). isUnread is null while the conversation is not shown.
+         */
+        markReadByOpening(handlers: { open(id: string): boolean; isUnread(id: string): boolean | null }): void;
+
+        /**
          * Called when the user opens the conversation id from the Unread tab or from the search (KaSH already shows the service): it may not be
          * unread, nor shown by the page (a row of a virtual list that is not rendered).
          */

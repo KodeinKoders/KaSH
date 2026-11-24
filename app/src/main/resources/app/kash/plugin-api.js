@@ -209,6 +209,63 @@ Object.defineProperty(window, '__kashMarkRead', {
     },
 });
 
+// Marking a conversation as read by opening it (kash.markReadByOpening), for a service that has no other way (Instagram, Google Messages): its
+// conversation is opened (the plugin's `open`), and once the plugin says it is read (`isUnread`), the page goes back to what was open before
+// (history.back()), unless the user went elsewhere meanwhile. One at a time: two that come together would cross. Opening a conversation may load a
+// document of its own (Instagram's, from its list), which ended the script: what is being marked as read is kept in the tab's sessionStorage, and
+// the document that opening it loads finishes it (this script runs again in it), first in the queue.
+const BY_OPENING = 'kash.markReadByOpening';
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const here = () => location.pathname + location.search;
+let byOpening = null;
+let markingByOpening = Promise.resolve();
+
+// Waits for the conversation being marked as read to be read (6 s at most), then goes back to what was open before, unless the user went elsewhere
+// meanwhile; nothing when there is none, or it is old (a document loaded long after).
+const finishMarkingByOpening = async () => {
+    let pending = null;
+    try {
+        pending = JSON.parse(sessionStorage.getItem(BY_OPENING) || 'null');
+    } catch (e) {
+        pending = null;
+    }
+    if (!pending || Date.now() - pending.at > 30000) {
+        sessionStorage.removeItem(BY_OPENING);
+        return;
+    }
+    let opened = null;
+    for (let tries = 0; tries < 30; tries++) {
+        await wait(200);
+        if (opened === null && here() !== pending.before) opened = here();
+        if (opened !== null && byOpening.isUnread(pending.id) === false) break;
+    }
+    sessionStorage.removeItem(BY_OPENING);
+    if (opened !== null && here() === opened) history.back();
+};
+
+const markByOpening = async (id) => {
+    if (byOpening.isUnread(id) !== true) return;
+    sessionStorage.setItem(BY_OPENING, JSON.stringify({ id, before: here(), at: Date.now() }));
+    if (!byOpening.open(id)) {
+        sessionStorage.removeItem(BY_OPENING);
+        return;
+    }
+    await finishMarkingByOpening();
+};
+
+const markReadByOpening = (handlers) => {
+    if (!handlers || typeof handlers.open !== 'function' || typeof handlers.isUnread !== 'function') {
+        throw new TypeError('kash.markReadByOpening() takes { open(id), isUnread(id) }');
+    }
+    byOpening = handlers;
+    // A document that opening a conversation loaded finishes marking it as read.
+    markingByOpening = finishMarkingByOpening().catch(() => {});
+    kash.onMarkRead((id) => {
+        markingByOpening = markingByOpening.then(() => markByOpening(id)).catch(() => {});
+        return markingByOpening;
+    }, { byOpening: true });
+};
+
 let openHandler = null;
 Object.defineProperty(window, '__kashOpenConversation', {
     value: (id) => {
@@ -357,6 +414,7 @@ const kash = Object.freeze({
         if (markReadHandler === null) send({ type: 'capabilities', markRead: true, byOpening: !!(options && options.byOpening) });
         markReadHandler = handler;
     },
+    markReadByOpening: (handlers) => markReadByOpening(handlers),
     dom: Object.freeze({ text: (element) => (element ? clean(shown(element)) : '') }),
     time: Object.freeze({ parse: parseTime }),
 });

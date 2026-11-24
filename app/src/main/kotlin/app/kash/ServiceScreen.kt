@@ -214,6 +214,16 @@ fun ServiceMenuButton(service: Service, actions: ServiceActions, devToolsEnabled
 
 /** The items of a service's menu, which [close] closes. */
 fun MenuScope.serviceMenu(service: Service, actions: ServiceActions, devToolsEnabled: Boolean, close: () -> Unit) {
+    serviceActionsItems(service, actions, devToolsEnabled, close)
+    separator()
+    selectableItem(selected = false, onClick = { close(); actions.onDelete() }) { MenuRow(KashIcons.Trash, StringsKey.Delete, destructive = true) }
+}
+
+/**
+ * The items that a service's "…" menu and its context menu share, which [close] closes: the zoom of its page, its DevTools ([devToolsEnabled]:
+ * its page is loaded), editing it, emptying its cache and erasing its data. Once for both: a new item or shortcut could miss one of them.
+ */
+private fun MenuScope.serviceActionsItems(service: Service, actions: ServiceActions, devToolsEnabled: Boolean, close: () -> Unit) {
     // The zoom of its page: one step up or down, and back to the default of Settings, which says the zoom that it has now.
     selectableItem(selected = false, onClick = { close(); actions.onZoomIn() }) { MenuRow(KashIcons.Plus, StringsKey.ZoomIn, shortcut = ZOOM_IN_SHORTCUT) }
     selectableItem(selected = false, onClick = { close(); actions.onZoomOut() }) { MenuRow(KashIcons.Minus, StringsKey.ZoomOut, shortcut = ZOOM_OUT_SHORTCUT) }
@@ -227,8 +237,6 @@ fun MenuScope.serviceMenu(service: Service, actions: ServiceActions, devToolsEna
     selectableItem(selected = false, onClick = { close(); actions.onEdit() }) { MenuRow(KashIcons.Pencil, StringsKey.Edit) }
     selectableItem(selected = false, onClick = { close(); actions.onResetCache() }) { MenuRow(KashIcons.Refresh, StringsKey.ResetCache) }
     selectableItem(selected = false, onClick = { close(); actions.onErase() }) { MenuRow(KashIcons.Eraser, StringsKey.Erase) }
-    separator()
-    selectableItem(selected = false, onClick = { close(); actions.onDelete() }) { MenuRow(KashIcons.Trash, StringsKey.Delete, destructive = true) }
 }
 
 /**
@@ -260,19 +268,7 @@ fun MenuScope.serviceContextMenu(service: Service, tab: BrowserTab?, actions: Se
         if (service.muted) MenuRow(KashIcons.Bell, StringsKey.Unmute) else MenuRow(KashIcons.BellOff, StringsKey.Mute)
     }
     separator()
-    // The zoom of its page: one step up or down, and back to the default of Settings, which says the zoom that it has now.
-    selectableItem(selected = false, onClick = { close(); actions.onZoomIn() }) { MenuRow(KashIcons.Plus, StringsKey.ZoomIn, shortcut = ZOOM_IN_SHORTCUT) }
-    selectableItem(selected = false, onClick = { close(); actions.onZoomOut() }) { MenuRow(KashIcons.Minus, StringsKey.ZoomOut, shortcut = ZOOM_OUT_SHORTCUT) }
-    selectableItem(selected = false, onClick = { close(); actions.onZoomReset() }, enabled = service.zoom != null) {
-        MenuRow(KashIcons.Search, StringsKey.ZoomReset, argument = actions.zoom().toString(), enabled = service.zoom != null)
-    }
-    separator()
-    selectableItem(selected = false, onClick = { close(); actions.onDevTools() }, enabled = tab != null) {
-        MenuRow(KashIcons.Code, StringsKey.DevTools, enabled = tab != null, shortcut = DEV_TOOLS_SHORTCUT)
-    }
-    selectableItem(selected = false, onClick = { close(); actions.onEdit() }) { MenuRow(KashIcons.Pencil, StringsKey.Edit) }
-    selectableItem(selected = false, onClick = { close(); actions.onResetCache() }) { MenuRow(KashIcons.Refresh, StringsKey.ResetCache) }
-    selectableItem(selected = false, onClick = { close(); actions.onErase() }) { MenuRow(KashIcons.Eraser, StringsKey.Erase) }
+    serviceActionsItems(service, actions, devToolsEnabled = tab != null, close)
     separator()
     selectableItem(selected = false, onClick = { close(); actions.onDisable() }) { MenuRow(KashIcons.Close, StringsKey.Disable) }
     selectableItem(selected = false, onClick = { close(); actions.onDelete() }) { MenuRow(KashIcons.Trash, StringsKey.Delete, destructive = true) }
