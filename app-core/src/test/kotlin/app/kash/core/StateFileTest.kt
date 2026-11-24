@@ -3,6 +3,7 @@ package app.kash.core
 import java.nio.file.Files
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
+import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,9 +77,28 @@ class StateFileTest {
     }
 
     @Test
-    fun anUnreadableFileIsAnEmptyState() {
+    fun anUnreadableFileIsSetAsideAndTheStateIsEmpty() {
         val path = directory.resolve("broken.json").also { it.writeText("{ not json") }
-        assertEquals(KashState(), StateFile(path).load())
+        val file = StateFile(path)
+        assertEquals(KashState(), file.load())
+        // Saving the empty state does not replace what could not be read: it is next to it, as it was.
+        file.save(KashState())
+        val aside = Files.list(directory).use { files -> files.filter { it.fileName.toString().startsWith("broken.json.unreadable-") }.toList() }
+        assertEquals(1, aside.size)
+        assertEquals("{ not json", aside.single().readText())
+    }
+
+    @Test
+    fun aValueThatThisVersionDoesNotKnowIsTheDefaultAndTheServicesAreKept() {
+        val path = directory.resolve("state.json")
+        val file = StateFile(path)
+        val services = listOf(service("whatsapp", "WhatsApp"))
+        file.save(KashState(services = services))
+        path.writeText(path.readText().replace("\"theme\": \"SYSTEM\"", "\"theme\": \"PURPLE\""))
+        assertTrue("PURPLE" in path.readText())
+        val state = file.load()
+        assertEquals(services, state.services)
+        assertEquals(ThemeMode.SYSTEM, state.settings.theme)
     }
 
     @Test

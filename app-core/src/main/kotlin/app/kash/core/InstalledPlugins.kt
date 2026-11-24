@@ -6,7 +6,6 @@ import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 
 private val logger = LoggerFactory.getLogger(InstalledPluginsFile::class.java)
 
@@ -63,26 +62,30 @@ public class InstalledPluginsFile(private val path: Path) {
         prettyPrint = true
         ignoreUnknownKeys = true
         encodeDefaults = true
+        // A value that this version does not know, which has a default, is the default rather than a file that cannot be read.
+        coerceInputValues = true
     }
 
-    /** The installed plugins, or none when there is no file or it cannot be read (which is logged). */
+    /**
+     * The installed plugins, or none when there is no file or it cannot be read. One that cannot be read (a kind of source that this version does
+     * not know) is set aside ([setAside], which is logged) before the next installation saves over it: the other plugins are still in it.
+     */
+    @Synchronized
     public fun load(): List<InstalledPlugin> {
         if (!Files.exists(path)) return emptyList()
         return try {
             json.decodeFromString(InstalledPluginsContent.serializer(), Files.readString(path)).plugins
         } catch (e: Exception) {
-            logger.error("Cannot read {}: no installed plugin is loaded", path, e)
+            val aside = setAside(path)
+            logger.error("Cannot read {}: no installed plugin is loaded, the file is kept as {}", path, aside.fileName, e)
             emptyList()
         }
     }
 
-    /** Writes [plugins] to a temporary file next to the file, then moves it in place: a crash while writing leaves the list before. */
+    /** Writes [plugins] durably ([writeDurably]): a crash while writing leaves the list before. */
     @Synchronized
     public fun save(plugins: List<InstalledPlugin>) {
-        Files.createDirectories(path.toAbsolutePath().parent)
-        val temporary = path.resolveSibling("${path.fileName}.tmp")
-        Files.writeString(temporary, json.encodeToString(InstalledPluginsContent.serializer(), InstalledPluginsContent(plugins = plugins)))
-        Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        writeDurably(path, json.encodeToString(InstalledPluginsContent.serializer(), InstalledPluginsContent(plugins = plugins)))
     }
 }
 

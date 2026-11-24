@@ -2,6 +2,7 @@ package app.kash.core
 
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -35,6 +36,9 @@ class InstalledPluginsFileTest {
         assertEquals(emptyList(), file.load())
         path.writeText("{not json")
         assertEquals(emptyList(), file.load())
+        // Set aside, so that the next installation does not save over the plugins that it lists.
+        val aside = Files.list(path.parent).use { files -> files.filter { it.fileName.toString().startsWith("${path.fileName}.unreadable-") }.toList() }
+        assertEquals("{not json", aside.single().readText())
     }
 
     @Test
