@@ -575,12 +575,22 @@ class KashModel(
         }
     }
 
-    /** The services in [order], with what Settings › Services changed in them (enabled or not). */
-    fun applyServices(order: List<Service>) {
-        val byId = order.associateBy { it.id }
-        val changed = services.filter { byId[it.id] != null && byId[it.id] != it }
-        update { state -> state.copy(services = order.filter { service -> state.services.any { it.id == service.id } }) }
-        changed.forEach { previous -> byId[previous.id]?.let { replaceLoaded(previous, it) } }
+    /**
+     * What Settings › Services changed, applied to the services as they are now: their [order] when a row was moved there (the services that it
+     * does not name, added meanwhile, after them), and whether each one of [enabled] is. Only the order and the flags: the services' objects are
+     * the model's, which may have changed since Settings read them (a name refreshed in another language, an edit).
+     */
+    fun applyServices(order: List<ServiceId>?, enabled: Map<ServiceId, Boolean>) {
+        val before = services
+        update { state ->
+            val ordered = order?.let { ids -> ids.mapNotNull { id -> state.services.firstOrNull { it.id == id } } + state.services.filter { it.id !in ids } }
+                ?: state.services
+            state.copy(services = ordered.map { service -> enabled[service.id]?.let { service.copy(enabled = it) } ?: service })
+        }
+        for (service in services) {
+            val previous = before.firstOrNull { it.id == service.id } ?: continue
+            if (previous.enabled != service.enabled) replaceLoaded(previous, service)
+        }
     }
 
     private fun replaceLoaded(previous: Service, service: Service) {

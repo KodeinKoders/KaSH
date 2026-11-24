@@ -58,6 +58,7 @@ import app.kash.core.RailSide
 import app.kash.core.Service
 import app.kash.core.ServiceId
 import app.kash.core.Settings
+import app.kash.core.SettingsDraft
 import app.kash.core.ThemeMode
 import app.kash.core.UnreadCount
 import app.kash.core.UiScales
@@ -140,17 +141,29 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
         model.settingsPage?.let { page = it }
         model.settingsPage = null
     }
+    // The draft, made from [base]: what changes elsewhere while Settings is open (the rail's Do Not Disturb, the title bar's theme, the Unread
+    // tab's sort) goes into it (SettingsDraft.rebase), so that Apply writes what was changed here, and does not undo the rest.
+    var base by remember { mutableStateOf(model.settings) }
     var draft by remember { mutableStateOf(model.settings) }
-    // The services' draft: their order and whether they are enabled, applied to the services as they are then (one may be edited meanwhile).
-    var order by remember { mutableStateOf(model.services.map { it.id }) }
-    var enabled by remember { mutableStateOf(model.services.associate { it.id to it.enabled }) }
-    val services = (order.mapNotNull { id -> model.service(id) } + model.services.filter { it.id !in order })
-        .map { it.copy(enabled = enabled[it.id] ?: it.enabled) }
+    LaunchedEffect(model.settings) {
+        if (model.settings != base) {
+            draft = SettingsDraft.rebase(draft, base, model.settings)
+            base = model.settings
+        }
+    }
+    // The services' draft: only what was done here, their order once a row was moved (the model's until then) and the switches that were
+    // toggled, over the services as they are now (one may be moved, disabled or edited elsewhere meanwhile).
+    var order by remember { mutableStateOf<List<ServiceId>?>(null) }
+    var enabled by remember { mutableStateOf(emptyMap<ServiceId, Boolean>()) }
+    val services = (order?.let { ids -> ids.mapNotNull(model::service) + model.services.filter { it.id !in ids } } ?: model.services)
+        .map { service -> enabled[service.id]?.let { service.copy(enabled = it) } ?: service }
     val dirty = draft != model.settings || services != model.services
     val apply = {
         if (draft.launchAtLogin != model.settings.launchAtLogin && inAppBundle) MacosLoginItem.set(draft.launchAtLogin)
-        model.updateSettings { draft }
-        model.applyServices(services)
+        model.updateSettings { current -> SettingsDraft.rebase(draft, base, current) }
+        model.applyServices(order, enabled)
+        order = null
+        enabled = emptyMap()
     }
     val query = rememberTextFieldState()
     val q = query.text.toString().trim().lowercase()
@@ -221,7 +234,7 @@ private fun SettingsContent(model: KashModel, notifier: Notifier, icons: Service
         Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
             OutlinedButton(onClick = onClose) { Text(s.cancel) }
             OutlinedButton(onClick = apply, enabled = dirty) { Text(s.apply) }
-            DefaultButton(onClick = { apply(); onClose() }) { Text(s.ok) }
+            DefaultButton(onClick = { if (dirty) apply(); onClose() }) { Text(s.ok) }
         }
     }
 }
