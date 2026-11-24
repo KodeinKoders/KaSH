@@ -44,6 +44,39 @@ class PluginInstaller(private val directories: KashDirectories, private val buil
 
     private val client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(10)).build()
 
+    init {
+        recover()
+    }
+
+    /**
+     * What an installation that was cut short (KaSH stopped, a crash) left next to the plugins, put right: a plugin's folder moved aside
+     * (`.previous-<id>`) without the new one in its place goes back there, the plugin was not installed any more; one next to the plugin's folder,
+     * the installation ended, is deleted, and so is a folder being made (`.staging-<id>`).
+     */
+    private fun recover() {
+        val root = directories.plugins
+        if (!Files.isDirectory(root)) return
+        val left = Files.list(root).use { stream -> stream.toList() }
+        for (path in left) {
+            val name = path.fileName.toString()
+            runCatching {
+                when {
+                    name.startsWith(STAGING) -> deleteFolder(path).also { logger.info("A plugin that was being installed is deleted: {}", name.removePrefix(STAGING)) }
+                    name.startsWith(PREVIOUS) -> {
+                        val id = name.removePrefix(PREVIOUS)
+                        val folder = directories.plugin(id) ?: return@runCatching
+                        if (Files.exists(folder)) {
+                            deleteFolder(path)
+                        } else {
+                            Files.move(path, folder, StandardCopyOption.ATOMIC_MOVE)
+                            logger.warn("The plugin {} is put back: its installation was cut short", id)
+                        }
+                    }
+                }
+            }.onFailure { logger.error("What an installation left cannot be put right: {}", name, it) }
+        }
+    }
+
     /** Every installed plugin that can be loaded from its folder: one that cannot is logged and left out. */
     fun plugins(): List<Plugin> = installed.mapNotNull { plugin ->
         runCatching { load(plugin.id) }.onFailure { logger.error("The installed plugin {} is not loaded", plugin.id, it) }.getOrNull()
@@ -84,15 +117,16 @@ class PluginInstaller(private val directories: KashDirectories, private val buil
     }
 
     /**
-     * Installs [plugin], from [source]: its files go to a folder of their own next to the plugin's, which then takes the place of the plugin's in
-     * one move (a plugin of the same id is replaced: an update). A built-in plugin's id is refused.
+     * Installs [plugin], from [source]: its files go to a folder of their own next to the plugin's, which then takes the place of the plugin's
+     * (the old one moved aside first, then deleted: a plugin of the same id is replaced, an update; one cut short between the two is put right at
+     * the next launch, [recover]). A built-in plugin's id is refused.
      */
     @Synchronized
     fun install(plugin: PluginPackage, source: PluginSource, watch: Boolean): InstalledPlugin {
         if (plugin.id in builtInIds) throw PluginPackageException("'${plugin.id}' is the id of a plugin of KaSH")
         val folder = directories.plugin(plugin.id) ?: throw PluginPackageException("'${plugin.id}' is not a plugin's id")
-        val staging = directories.plugins.resolve(".staging-${plugin.id}")
-        val previous = directories.plugins.resolve(".previous-${plugin.id}")
+        val staging = directories.plugins.resolve("$STAGING${plugin.id}")
+        val previous = directories.plugins.resolve("$PREVIOUS${plugin.id}")
         deleteFolder(staging)
         deleteFolder(previous)
         for ((name, bytes) in plugin.files) {
@@ -183,6 +217,10 @@ class PluginInstaller(private val directories: KashDirectories, private val buil
 
     private companion object {
         val LOCAL_HOSTS = setOf("localhost", "127.0.0.1", "[::1]")
+
+        // The folders that an installation makes next to the plugin's: the new one, then the old one moved aside.
+        const val STAGING = ".staging-"
+        const val PREVIOUS = ".previous-"
 
         // What the log says of a source: not its path or its address, which may say who the user is.
         fun sourceKind(source: PluginSource) = when (source) {

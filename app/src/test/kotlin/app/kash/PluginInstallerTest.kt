@@ -79,6 +79,23 @@ class PluginInstallerTest {
     }
 
     @Test
+    fun anInstallationCutShortIsPutRightAtTheNextLaunch() {
+        val source = PluginSource.Folder(folder().toString())
+        installer.install(installer.read(source), source, watch = true)
+        val plugins = directories.plugins
+        // Cut between its two moves: the plugin's folder moved aside, the new one not in its place yet.
+        Files.move(plugins.resolve("my-chat"), plugins.resolve(".previous-my-chat"))
+        Files.createDirectories(plugins.resolve(".staging-other"))
+        assertEquals(listOf("my-chat"), PluginInstaller(directories, emptySet()).plugins().map { it.id })
+        assertEquals(listOf("my-chat"), Files.list(plugins).use { stream -> stream.map { it.fileName.toString() }.toList() })
+
+        // Cut after them: what was moved aside goes.
+        Files.createDirectories(plugins.resolve(".previous-my-chat"))
+        PluginInstaller(directories, emptySet())
+        assertEquals(listOf("my-chat"), Files.list(plugins).use { stream -> stream.map { it.fileName.toString() }.toList() })
+    }
+
+    @Test
     fun aZipIsCopiedAndNotWatched() {
         val path = root.resolve("my-chat.zip")
         path.writeBytes(zip(files().mapKeys { "my-chat/${it.key}" }))
