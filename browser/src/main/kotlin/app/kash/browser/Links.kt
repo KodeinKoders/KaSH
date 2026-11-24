@@ -33,14 +33,66 @@ private val IDENTITY_PATHS = mapOf(
     "github.com" to Regex("^/login(/.*)?$"),
 )
 
-private fun uri(url: String): URI? = runCatching { URI(url.trim()) }.getOrNull()
+// What Chromium keeps in an address and java.net.URI refuses: written as `%XX` before the address is read again.
+private const val REFUSED = "\"<>\\^`{|}"
+private const val HEX_DIGITS = "0123456789abcdefABCDEF"
+
+/**
+ * The address [url], as `java.net.URI` reads it, or null when it is not one. Chromium's addresses keep characters that `URI` refuses (`|`, `{`,
+ * `^`, a `%` that is not an escape, a space, a letter that is not ASCII): such an address is read again with them escaped ([escaped]). Unread, a
+ * link to another site stayed in KaSH, in the service's profile.
+ */
+internal fun parseAddress(url: String): URI? {
+    val trimmed = url.trim()
+    return runCatching { URI(trimmed) }.getOrNull() ?: runCatching { URI(escaped(trimmed)) }.getOrNull()
+}
+
+// [url] with what `URI` refuses written as `%XX` (UTF-8): the characters of REFUSED, the controls and the space, what is not ASCII, a `%` that
+// two hexadecimal digits do not follow, and `[` and `]` after the authority (an IPv6 host has them).
+private fun escaped(url: String): String {
+    val start = url.indexOf("://").takeIf { it >= 0 }?.plus(3) ?: 0
+    val authorityEnd = url.indexOfAny(charArrayOf('/', '?', '#'), start).takeIf { it >= 0 } ?: url.length
+    val out = StringBuilder()
+    var i = 0
+    while (i < url.length) {
+        val point = url.codePointAt(i)
+        val size = Character.charCount(point)
+        val escape = when {
+            point == '%'.code -> !(i + 2 < url.length && url[i + 1] in HEX_DIGITS && url[i + 2] in HEX_DIGITS)
+            point <= 0x20 || point >= 0x7F -> true
+            point < 0x80 && point.toChar() in REFUSED -> true
+            (point == '['.code || point == ']'.code) && i >= authorityEnd -> true
+            else -> false
+        }
+        if (escape) String(Character.toChars(point)).toByteArray(Charsets.UTF_8).forEach { out.append('%').append("%02X".format(it)) }
+        else out.append(url, i, i + size)
+        i += size
+    }
+    return out.toString()
+}
+
+private fun uri(url: String): URI? = parseAddress(url)
+
+// Whether [url] says it is an address of the web, read or not.
+private fun looksWeb(url: String): Boolean = url.trim().let { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+
+/**
+ * The host of this address: `URI`'s, or the one of its authority when `URI` reads none (a host with `_`, `a_b.example.com`, which `URI` takes for
+ * a registry's name), without its user and its port.
+ */
+private fun URI.hostName(): String? {
+    host?.takeIf { it.isNotEmpty() }?.let { return it }
+    val authority = rawAuthority?.substringAfterLast('@') ?: return null
+    val name = if (authority.startsWith("[")) authority.substringBefore(']') + "]" else authority.substringBefore(':')
+    return name.takeIf { it.isNotEmpty() }
+}
 
 /**
  * Where a link goes through Google's redirector (`https://www.google.com/url?q=<address>`), which Google's applications put around the links of
  * their messages: its address, which is on another site than Google's; the link itself otherwise.
  */
 private fun unwrapped(target: URI): URI {
-    val host = target.host?.lowercase() ?: return target
+    val host = target.hostName()?.lowercase() ?: return target
     if (!siteOf(host).startsWith("google.") || target.rawPath != "/url") return target
     val parameters = target.rawQuery.orEmpty().split('&').mapNotNull { pair ->
         val (key, value) = pair.split('=', limit = 2).takeIf { it.size == 2 } ?: return@mapNotNull null
@@ -49,7 +101,7 @@ private fun unwrapped(target: URI): URI {
     return (parameters["q"] ?: parameters["url"])?.let(::uri)?.takeIf { it.isWeb() } ?: target
 }
 
-private fun URI.isWeb(): Boolean = scheme?.lowercase() in setOf("http", "https") && !host.isNullOrEmpty()
+private fun URI.isWeb(): Boolean = scheme?.lowercase() in setOf("http", "https") && !hostName().isNullOrEmpty()
 
 /**
  * The site of [host]: its last two labels (`web.whatsapp.com` → `whatsapp.com`), or three under a country's second level (`www.bbc.co.uk` →
@@ -73,11 +125,11 @@ internal fun addressPattern(address: String): Regex =
 
 private fun List<Regex>.matchAny(target: URI): Boolean = isNotEmpty() && target.toString().let { url -> any { it.matches(url) } }
 
-private fun sameSite(a: URI, b: URI?): Boolean = b != null && b.isWeb() && siteOf(a.host) == siteOf(b.host)
+private fun sameSite(a: URI, b: URI?): Boolean = b != null && b.isWeb() && siteOf(a.hostName()!!) == siteOf(b.hostName()!!)
 
 /** Whether [target] is a page where one signs in with an account of another site (Google, Microsoft, Apple, Facebook, GitHub). */
 internal fun isSignIn(target: URI): Boolean {
-    val host = target.host?.lowercase() ?: return false
+    val host = target.hostName()?.lowercase() ?: return false
     if (host in IDENTITY_HOSTS) return true
     val paths = IDENTITY_PATHS[siteOf(host)] ?: return false
     return paths.matches(target.rawPath.orEmpty())
@@ -89,7 +141,8 @@ internal fun isSignIn(target: URI): Boolean {
  * mail, the phone. What is not an address of the web (`about:blank`, which a page fills itself, `blob:`, `data:`) stays in KaSH.
  */
 internal fun popupTarget(url: String, serviceUrl: String, openInKash: List<Regex> = emptyList()): LinkTarget {
-    val target = uri(url)?.let(::unwrapped) ?: return LinkTarget.KASH
+    // An address of the web that cannot be read even escaped is not known to be the service's: the system's browser, not the service's profile.
+    val target = uri(url)?.let(::unwrapped) ?: return if (looksWeb(url)) LinkTarget.SYSTEM else LinkTarget.KASH
     val scheme = target.scheme?.lowercase()
     if (scheme in SYSTEM_SCHEMES) return LinkTarget.SYSTEM
     if (scheme != null && scheme !in PAGE_SCHEMES) return LinkTarget.NOWHERE
@@ -106,9 +159,11 @@ internal fun popupTarget(url: String, serviceUrl: String, openInKash: List<Regex
 internal fun navigationTarget(
     url: String, serviceUrl: String, pageUrl: String?, userGesture: Boolean, isRedirect: Boolean, method: String?, openInKash: List<Regex> = emptyList(),
 ): LinkTarget {
-    val target = uri(url)?.let(::unwrapped) ?: return LinkTarget.KASH
-    val scheme = target.scheme?.lowercase()
     val clicked = userGesture && !isRedirect
+    // An address of the web that cannot be read even escaped, clicked: the system's browser, not the service's profile.
+    val target = uri(url)?.let(::unwrapped)
+        ?: return if (looksWeb(url) && clicked && method.equals("GET", ignoreCase = true)) LinkTarget.SYSTEM else LinkTarget.KASH
+    val scheme = target.scheme?.lowercase()
     // The mail and the phone when the user clicked; an application's address never, even when the site sends there itself.
     if (scheme in SYSTEM_SCHEMES) return if (clicked) LinkTarget.SYSTEM else LinkTarget.NOWHERE
     if (scheme != null && scheme !in PAGE_SCHEMES) return LinkTarget.NOWHERE

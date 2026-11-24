@@ -72,6 +72,27 @@ class LinksTest {
     }
 
     @Test
+    fun anAddressThatJavaRefusesIsReadEscaped() {
+        // What Chromium keeps in an address and java.net.URI refuses: a link to another site goes to the system, clicked or in a window.
+        for (url in listOf("https://shop.example/?ids=1|2", "https://shop.example/?q={x}", "https://shop.example/a^b", "https://shop.example/?q=%zz", "https://shop.example/é")) {
+            assertEquals(LinkTarget.SYSTEM, popupTarget(url, whatsApp), url)
+            assertEquals(LinkTarget.SYSTEM, navigationTarget(url, whatsApp, whatsApp, userGesture = true, isRedirect = false, method = "GET"), url)
+        }
+        // The service's own site stays in KaSH.
+        assertEquals(LinkTarget.KASH, navigationTarget("https://web.whatsapp.com/?a|b", whatsApp, whatsApp, userGesture = true, isRedirect = false, method = "GET"))
+        // Escaped, the address opens as it was: `|` is `%7C`.
+        assertEquals("https://shop.example/?ids=1%7C2", parseAddress("https://shop.example/?ids=1|2").toString())
+        assertEquals("https://shop.example/?q=%25zz", parseAddress("https://shop.example/?q=%zz").toString())
+    }
+
+    @Test
+    fun aHostWithAnUnderscoreIsAHost() {
+        assertEquals(LinkTarget.SYSTEM, popupTarget("https://my_site.example.org/", whatsApp))
+        assertEquals(LinkTarget.SYSTEM, navigationTarget("https://my_site.example.org/", whatsApp, whatsApp, userGesture = true, isRedirect = false, method = "GET"))
+        assertEquals(LinkTarget.KASH, navigationTarget("https://my_site.example.org/b", "https://my_site.example.org/", "https://my_site.example.org/a", userGesture = true, isRedirect = false, method = "GET"))
+    }
+
+    @Test
     fun whatTheSiteDoesItselfStaysInKash() {
         val outside = "https://kodein.net/"
         // No click: the page navigates itself.

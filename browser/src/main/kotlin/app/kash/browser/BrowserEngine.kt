@@ -20,7 +20,6 @@ import org.cef.handler.CefRequestHandlerAdapter
 import org.cef.network.CefRequest
 import org.slf4j.LoggerFactory
 import java.awt.Desktop
-import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -224,7 +223,8 @@ public class BrowserEngine private constructor(
      * time. The address is not logged: it is the user's.
      */
     private fun openInSystem(url: String) {
-        val uri = runCatching { URI(url.trim()) }.getOrNull() ?: return logger.warn("A link that is not an address was not opened")
+        // Read as the links are (parseAddress): an address that Chromium keeps with `|` or `{` opens, escaped.
+        val uri = parseAddress(url) ?: return logger.warn("A link that is not an address was not opened")
         thread(isDaemon = true, name = "KaSH-open-link") {
             runCatching {
                 check(Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) { "The system cannot open links" }
