@@ -84,6 +84,16 @@ The first build of JCEF downloads CEF and builds the dependencies of JCEF with v
 `./gradlew :app:createDistributable` makes `KaSH.app`, in `app/build/compose/binaries/main/app`.
 The notifications of the macOS Notification Center and the launch at login only work in it.
 
+To launch KaSH from Spotlight or Raycast, build it and install it in `~/Applications`:
+
+[source,bash]
+----
+scripts/install.sh                      # or `--dest /Applications`
+----
+
+It replaces the application that is there, and refuses to while that one is running.
+A bundle that you built yourself is not quarantined, so macOS does not ask anything when it opens.
+
 [IMPORTANT]
 ====
 KaSH needs a JetBrains Runtime *without* JCEF.

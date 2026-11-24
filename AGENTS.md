@@ -39,6 +39,7 @@ brew install cmake ninja pkgconf bison     # once: what the build of JCEF needs
 ./gradlew :app:run                         # opens the window
 ./gradlew :app:run -Pkash.inspect          # the same, with Chromium's remote debugging on 127.0.0.1:9222 (see Inspecting the services)
 ./gradlew :app:createDistributable         # KaSH.app, in app/build/compose/binaries/main/app
+scripts/install.sh                         # builds KaSH.app and installs it in ~/Applications (or --dest <folder>), not while it runs there
 ./gradlew :jcef-native:jcefBundle          # only JCEF
 ```
 
