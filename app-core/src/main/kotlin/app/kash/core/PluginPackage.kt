@@ -40,16 +40,30 @@ public class PluginPackage private constructor(public val manifest: PluginManife
             var total = 0L
             try {
                 ZipInputStream(ByteArrayInputStream(zip)).use { input ->
+                    // What an entry that is left out holds is read too, through the same budget: the zip's reading inflates it all the same (a
+                    // deflate bomb in `__MACOSX/` made KaSH inflate gigabytes).
+                    val tooBig = { PluginPackageException("The plugin's files are bigger than ${MAX_BYTES / 1024 / 1024} MB") }
+                    val discard = {
+                        val skipped = input.readNBytes(MAX_BYTES + 1 - total.toInt()).size
+                        total += skipped
+                        if (total > MAX_BYTES) throw tooBig()
+                    }
                     while (true) {
                         val entry = input.nextEntry ?: break
-                        if (entry.isDirectory) continue
+                        if (entry.isDirectory) {
+                            discard()
+                            continue
+                        }
                         val name = entry.name.replace('\\', '/')
-                        if (SYSTEM_FILES.any { name.startsWith(it) || name.endsWith("/$it") || name == it }) continue
+                        if (SYSTEM_FILES.any { name.startsWith(it) || name.endsWith("/$it") || name == it }) {
+                            discard()
+                            continue
+                        }
                         checkName(name)
                         if (files.size >= MAX_FILES) throw PluginPackageException("The zip has more than $MAX_FILES files")
                         val bytes = input.readNBytes(MAX_BYTES + 1 - total.toInt())
                         total += bytes.size
-                        if (total > MAX_BYTES) throw PluginPackageException("The plugin's files are bigger than ${MAX_BYTES / 1024 / 1024} MB")
+                        if (total > MAX_BYTES) throw tooBig()
                         files[name] = bytes
                     }
                 }

