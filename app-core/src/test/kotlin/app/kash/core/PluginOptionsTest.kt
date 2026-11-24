@@ -47,6 +47,15 @@ class PluginOptionsTest {
     }
 
     @Test
+    fun aPatternThatBacktracksWithoutEndIsAValueThatDoesNotMatch() {
+        val catastrophic = workspace.copy(pattern = "(a+)+\$")
+        val started = System.nanoTime()
+        assertEquals(OptionError.PATTERN, PluginOptions.error(catastrophic, "a".repeat(40) + "b"))
+        assertTrue((System.nanoTime() - started) / 1_000_000 < 2_000)
+        assertNull(PluginOptions.error(catastrophic, "aaaa"))
+    }
+
+    @Test
     fun theOptionsWithoutAValueHaveTheirDefault() {
         assertEquals(mapOf("workspace" to "", "region" to "eu", "threads" to "false"), PluginOptions.values(manifest))
         assertEquals("us", PluginOptions.values(manifest, mapOf("region" to "us"))["region"])

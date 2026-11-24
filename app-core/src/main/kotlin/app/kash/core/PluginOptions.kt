@@ -38,8 +38,40 @@ public object PluginOptions {
     public fun error(option: PluginOption.Text, value: String): OptionError? {
         if (value.isEmpty()) return if (option.required) OptionError.MISSING else null
         option.maxLength?.let { if (value.length > it) return OptionError.TOO_LONG }
-        option.pattern?.let { if (!Regex(it).matches(value)) return OptionError.PATTERN }
+        option.pattern?.let { if (!matchesWithin(it, value)) return OptionError.PATTERN }
         return null
+    }
+
+    // The options' patterns, compiled once: they are checked at each key typed, on Swing's thread.
+    private val patterns = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+
+    // How many characters a pattern may read of a value before it is taken for one that does not match.
+    private const val MAX_READS = 1_000_000
+
+    /**
+     * Whether [value] matches [pattern], read [MAX_READS] characters at most: an installed plugin's pattern that backtracks without end
+     * (`(a+)+$`) froze KaSH's window at each key typed in its field; it is a value that does not match.
+     */
+    private fun matchesWithin(pattern: String, value: String): Boolean {
+        val regex = patterns.getOrPut(pattern) { Regex(pattern) }
+        return try {
+            regex.matches(Bounded(value, intArrayOf(MAX_READS)))
+        } catch (e: TooLong) {
+            false
+        }
+    }
+
+    private class TooLong : RuntimeException(null, null, false, false)
+
+    // [text], which throws once [left] reads of its characters are spent (shared with its parts).
+    private class Bounded(private val text: CharSequence, private val left: IntArray) : CharSequence {
+        override val length: Int get() = text.length
+        override fun get(index: Int): Char {
+            if (--left[0] < 0) throw TooLong()
+            return text[index]
+        }
+        override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = Bounded(text.subSequence(startIndex, endIndex), left)
+        override fun toString(): String = text.toString()
     }
 
     /** The value of every option of [manifest]: the one in [saved], else its default. */
