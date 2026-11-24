@@ -9,7 +9,7 @@
 [.lead]
 A plugin teaches KaSH a messaging service: where it is, what to ask the user when they add it, and how to read its unread conversations.
 
-Every service that KaSH knows is a plugin: WhatsApp, Google Chat, Slack, Google Messages, Telegram and Discord are the built-in ones, in `app/src/main/resources/app/kash/plugins/`.
+Every service that KaSH knows is a plugin: WhatsApp, Google Chat, Slack, Google Messages, Telegram, Discord, Instagram, Messenger, LinkedIn and Teams are the built-in ones, in `app/src/main/resources/app/kash/plugins/`.
 The user installs others in Settings › Plugins, from a zip, a folder or an address (see <<installing-a-plugin>>).
 A web application that the user adds by its address is not a plugin: it has no options and no script, and KaSH reads its unread count from its page's title (`(3) My application`).
 
@@ -51,6 +51,7 @@ A plugin that is not listed is not loaded.
     "manifestVersion": 1,
     "id": "slack",
     "version": "1.0.0",
+    "versionCode": 1,
     "name": "Slack",
     "square": { "text": "Sl", "color": "#5B2C6F" },
     "url": "https://${workspace}.slack.com/",
@@ -572,7 +573,7 @@ Rules that every plugin follows:
 
 * read the structure of the page, never more of the user's messages than what the Unread tab shows (the start of the last one), nor more of their contacts than their names, which the search shows;
 * make no network request, and send nothing anywhere but to KaSH, through the API;
-* change nothing in the page: a plugin reads it, and opens a conversation when the user asks;
+* change nothing in the page by itself: a plugin reads it, and acts in it only when the user asks (opening a conversation, marking it as read), keeping nothing but what marking by opening puts in `sessionStorage`;
 * count what the service counts: a conversation that the service does not badge (muted, archived) is not unread for KaSH either, and one that it only shows in bold (a channel without a mention) is a `topic`, which nothing counts.
 
 To add a built-in plugin, put its folder in `app/src/main/resources/app/kash/plugins/` and its id in `index.json`.
