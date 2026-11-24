@@ -210,6 +210,13 @@ class KashModel(
     }
     private var directorySave: Job? = null
 
+    // The writing of state.json that a change asked for, which the next change replaces (see saveStateLater); the generation of each state, so
+    // that a write that is late (already on its way when a newer state was written) never replaces a newer one.
+    private var stateSave: Job? = null
+    private var stateGeneration = 0L
+    private val stateWrite = Any()
+    private var writtenGeneration = 0L
+
     /** What the search lists: the contacts and topics of the enabled plugins' services, with what is unread in them. */
     val searchEntries: List<SearchEntry> get() = Search.entries(services, directory, unread)
 
@@ -496,8 +503,33 @@ class KashModel(
 
     private fun update(change: (KashState) -> KashState) {
         state = change(state)
-        save()
+        saveStateLater()
         applyZooms()
+    }
+
+    /**
+     * Writes the state 500 ms after it last changed, off Swing's thread: each change (a service selected, a zoom step, a reorder) wrote state.json,
+     * unread-times.json and contacts.json (WhatsApp's whole list) on Swing's thread. [save] writes everything at once, at quit.
+     */
+    private fun saveStateLater() {
+        stateSave?.cancel()
+        val snapshot = state
+        val generation = ++stateGeneration
+        stateSave = scope.launch {
+            delay(STATE_SAVE_MS)
+            withContext(Dispatchers.IO) { writeState(snapshot, generation) }
+        }
+    }
+
+    // Writes [snapshot], of [generation], unless a newer one was written already.
+    private fun writeState(snapshot: KashState, generation: Long) = synchronized(stateWrite) {
+        if (generation < writtenGeneration) return@synchronized
+        try {
+            file.save(snapshot)
+            writtenGeneration = generation
+        } catch (e: Exception) {
+            logger.error("Cannot save the state", e)
+        }
     }
 
 
@@ -528,11 +560,8 @@ class KashModel(
 
     /** Writes the state to its file, and when KaSH saw the unread conversations (until now: KaSH is quitting, or may be). */
     fun save() {
-        try {
-            file.save(state)
-        } catch (e: Exception) {
-            logger.error("Cannot save the state", e)
-        }
+        stateSave?.cancel()
+        writeState(state, stateGeneration)
         unreadTimesSave?.cancel()
         val now = System.currentTimeMillis()
         saveUnreadTimes(seen.mapValues { (id, service) -> if (id in loaded) service.copy(until = now) else service })
@@ -872,6 +901,7 @@ class KashModel(
         const val FOLDER_WATCH_MS = 10_000L
         const val ADDRESS_WATCH_MS = 60 * 60 * 1000L
         const val UNREAD_TIMES_SAVE_MS = 5_000L
+        const val STATE_SAVE_MS = 500L
 
         // How long after the search closed it does not open again (see toggleSearch).
         const val SEARCH_REOPEN_DELAY_MS = 300L
