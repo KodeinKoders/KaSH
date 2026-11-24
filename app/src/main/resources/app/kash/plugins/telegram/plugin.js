@@ -4,7 +4,8 @@
 // Telegram Web K keeps its state in its own modules and workers, out of a page script's reach, so it reads the chat list. Each row
 // (`a.chatlist-chat`) is a conversation, whose id is its peer's (`data-peer-id`: a person's is positive, a group's or a channel's negative, and
 // the row's address is `#<id>`): its name (`.dialog-title .peer-title`), its last message (`.dialog-subtitle`), the label of its time
-// (`.message-time`: "01:46" today, "Oct 28" this year, "09/19/2025" another one, in the language of Telegram's interface) and its unread badge
+// (`.message-time`: "01:46" today, "Oct 28" this year, "09/19/2025" another one, in the language of Telegram's interface, whose order of a date in
+// digits the labels tell) and its unread badge
 // (`.dialog-subtitle-badge-unread`, with its count). The archive is a row of its own (`archive-dialog`), left out, as Telegram leaves its chats out
 // of its counts. The list is virtual: a conversation whose row is not rendered is not seen; it is the list of the folder that is shown. Its rows
 // are also the search's contacts and topics (`kash.contacts`), and one is marked as read through its context menu.
@@ -24,10 +25,32 @@ const countOf = (badge) => {
     return count > 0 ? count : 1;
 };
 
+// The order of the dates in digits ("09/19/2025" another year): Telegram's interface's language's, which the page does not say (its
+// `<html lang>` is "en" in Telegram's own HTML, whatever that language). Told by the labels themselves, a part over 12 being the day: month first
+// in English, day first in French. Kept once seen; until then, the page's language is the guess.
+const NUMERIC_DATE = /^(\d{1,2})[/.-](\d{1,2})[/.-]\d{2,4}\.?$/;
+let dayFirst = null;
+
+const learnDateOrder = (labels) => {
+    for (const label of labels) {
+        const match = label.match(NUMERIC_DATE);
+        if (!match) continue;
+        if (Number(match[1]) > 12) dayFirst = true;
+        else if (Number(match[2]) > 12) dayFirst = false;
+    }
+};
+
+// A label's time: a date in digits in the order that the labels showed (a language whose dates have that order), the rest as the API reads it.
+const timeOf = (label) => {
+    if (dayFirst !== null && NUMERIC_DATE.test(label)) return kash.time.parse(label, dayFirst ? 'fr' : 'en-US');
+    return kash.time.parse(label);
+};
+
 kash.watch(() => {
     const all = rows();
     // The list is not there yet (the page is loading, or the user is not logged in): nothing to say.
     if (all.length === 0) return null;
+    learnDateOrder(all.map((row) => kash.dom.text(row.querySelector('.message-time'))));
     const conversations = [];
     for (const row of all) {
         const id = row.dataset.peerId;
@@ -45,7 +68,7 @@ kash.watch(() => {
             count: visible(unread) ? countOf(unread) : 1,
             mention: visible(mention),
             preview: kash.dom.text(row.querySelector('.dialog-subtitle-parts') || row.querySelector('.dialog-subtitle')),
-            ...(kash.time.parse(kash.dom.text(row.querySelector('.message-time'))) || {}),
+            ...(timeOf(kash.dom.text(row.querySelector('.message-time'))) || {}),
         });
     }
     return conversations;
