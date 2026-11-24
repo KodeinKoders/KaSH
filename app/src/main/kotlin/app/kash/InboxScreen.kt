@@ -157,7 +157,7 @@ private fun InboxSection(title: String, rows: List<InboxRow>, empty: String, sor
                             val count = if (group.rows.first().topic) strings.topicsSummary(group.rows.size) else strings.unread(group.count)
                             Text(count, color = Kash.colors.muted)
                             Box(Modifier.weight(1f))
-                            Link(strings.open(group.service.name), onClick = { onOpen(group.rows.first().copy(conversation = null)) })
+                            Link(strings.open(group.service.title), onClick = { onOpen(group.rows.first().copy(conversation = null)) })
                         }
                         RowsCard(group.rows) { row -> InboxRowView(row, icons, withService = false, actions) { onOpen(row) } }
                     }
