@@ -268,10 +268,11 @@ class Notifier(private val model: KashModel) {
         markReadLanguage = strings.code
     }
 
-    // The unread conversation of the notification [key] (a contact's), as its plugin lists it now.
+    // The unread conversation of the notification [key] (a contact's), as its plugin lists it now. Its title is the one that this launch showed,
+    // or, for a notification of an earlier launch, the key's (in lower case: the conversations are matched without case).
     private fun conversationOf(key: String): Pair<Service, app.kash.core.Conversation>? {
         val service = model.service(ServiceId(key.substringBefore('|'))) ?: return null
-        val title = toasts.firstOrNull { it.key == key }?.title ?: titles[key] ?: return null
+        val title = toasts.firstOrNull { it.key == key }?.title ?: titles[key] ?: NotificationReads.titleOf(key)
         val conversation = NotificationGroups.conversationOf(model.unread[service.id]?.conversations.orEmpty(), title) ?: return null
         return service to conversation
     }
@@ -336,9 +337,11 @@ class Notifier(private val model: KashModel) {
         if (serviceId == TEST_KEY) return model.activateWindow()
         // A plugin's new version: Settings › Plugins, which installs it.
         if (serviceId == PLUGIN_KEY) return model.openSettings(SettingsPage.PLUGINS)
-        val notificationId = latest ?: key.substringAfter('|')
         val service = model.service(ServiceId(serviceId)) ?: return
+        // One of an earlier launch: its page has no id for it, the plugin opens its conversation when it lists it.
+        if (latest == null) return model.openConversation(service, conversation)
         model.show(service)
+        val notificationId = latest
         lastClick = Triple(service.id, notificationId, conversation)
         val quoted = Json.encodeToString(kotlinx.serialization.json.JsonPrimitive(notificationId))
         model.loaded[service.id]?.tab?.execute("window.__kashNotificationClick && window.__kashNotificationClick($quoted)")
