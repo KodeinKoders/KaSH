@@ -151,7 +151,9 @@ private fun UpdateButton(description: String, updating: Boolean, onClick: () -> 
  */
 @Composable
 fun ServicePage(tab: BrowserTab?, modifier: Modifier) {
-    val created = tab?.created?.collectAsState()?.value == true
+    // Its own tab's: `collectAsState` keeps, for a composition, the value of the tab before (a service just added while another one is shown),
+    // whose view would be shown before Chromium created its browser, and stay gray. Its flow's value is read too.
+    val created = tab?.created?.collectAsState()?.value == true && tab.created.value
     val holder = remember { PageHolder() }
     SwingPanel(
         background = Kash.colors.background,
