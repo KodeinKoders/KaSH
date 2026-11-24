@@ -68,7 +68,9 @@ public class PluginPackage private constructor(public val manifest: PluginManife
             if (files.values.sumOf { it.size.toLong() } > MAX_BYTES) throw PluginPackageException("The plugin's files are bigger than ${MAX_BYTES / 1024 / 1024} MB")
             files.keys.forEach(::checkName)
             val manifest = manifestOf(files[MANIFEST] ?: throw PluginPackageException("No $MANIFEST"))
-            if (manifest.script !in files) throw PluginPackageException("$MANIFEST: script: ${manifest.script} is not in the plugin")
+            val script = files[manifest.script] ?: throw PluginPackageException("$MANIFEST: script: ${manifest.script} is not in the plugin")
+            // Its script is the body of the function that KaSH runs it in, after the checks of its pages (PluginScriptCheck).
+            PluginScriptCheck.check(script.decodeToString())?.let { throw PluginPackageException("${manifest.script}: $it") }
             manifest.icon?.let { if (it !in files) throw PluginPackageException("$MANIFEST: icon: $it is not in the plugin") }
             return PluginPackage(manifest, files.toMap())
         }

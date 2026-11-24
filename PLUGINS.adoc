@@ -578,6 +578,8 @@ What to look for, in this order:
 . attributes that the service keeps for its own tests or for accessibility (Slack's `data-qa-…`, `role`, `aria-…`), steadier than classes;
 . classes, last: those of compiled pages change with their versions (Google Chat's).
 
+The script is the body of a function of `kash`, which KaSH runs after its checks (the top frame, `matches`): it must not close that function. KaSH reads it before installing it (its strings, comments, template literals and regular expressions, and its brackets), and refuses one that would; where a `/` could be a division or a regular expression, it is read as a division, so a regular expression right after `)` or `}` may have to be written otherwise (in a variable, or `new RegExp`).
+
 Rules that every plugin follows:
 
 * read the structure of the page, never more of the user's messages than what the Unread tab shows (the start of the last one), nor more of their contacts than their names, which the search shows;

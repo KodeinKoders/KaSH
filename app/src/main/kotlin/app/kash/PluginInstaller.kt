@@ -9,6 +9,7 @@ import app.kash.core.PluginManifestException
 import app.kash.core.PluginManifests
 import app.kash.core.PluginPackage
 import app.kash.core.PluginPackageException
+import app.kash.core.PluginScriptCheck
 import app.kash.core.PluginSource
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -93,6 +94,8 @@ class PluginInstaller(
         val manifest = PluginManifests.parse(Files.readString(folder.resolve(PluginPackage.MANIFEST)))
         if (manifest.id != id) throw PluginManifestException("id", "'${manifest.id}' is in the folder '$id'")
         val script = Files.readString(folder.resolve(manifest.script))
+        // A plugin installed before its script was checked, which could run outside of its pages: left out.
+        PluginScriptCheck.check(script)?.let { throw PluginPackageException("${manifest.script}: $it") }
         val icon = manifest.icon?.let { Files.readAllBytes(folder.resolve(it)) }
         return Plugin(manifest, script, icon)
     }

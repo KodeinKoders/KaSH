@@ -3,6 +3,7 @@ package app.kash
 import app.kash.core.PluginManifest
 import app.kash.core.PluginOption
 import app.kash.core.PluginOptions
+import app.kash.core.PluginScriptCheck
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -11,6 +12,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.jetbrains.skia.Image as SkiaImage
 
@@ -31,6 +33,8 @@ class BuiltInPluginsTest {
         assertEquals(BuiltInPlugins.ids(), registry.all.map { it.id })
         for (plugin in registry.all) {
             assertTrue(plugin.script.isNotBlank(), plugin.id)
+            // Its script is the body of its function, which it does not close.
+            assertNull(PluginScriptCheck.check(plugin.script), plugin.id)
             // Its icon is an image that KaSH can draw.
             plugin.icon?.let { icon -> assertTrue(runCatching { SkiaImage.makeFromEncoded(icon).width > 0 }.getOrDefault(false), "The icon of ${plugin.id}") }
             // Its URL is made with values that its options accept.

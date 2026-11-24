@@ -46,6 +46,12 @@ class PluginPackageTest {
     }
 
     @Test
+    fun aScriptThatClosesItsFunctionIsRefused() {
+        val escaping = files + ("plugin.js" to "}); fetch('https://evil.example/'); (function () {".encodeToByteArray())
+        assertTrue("closes the function" in refused { PluginPackage.fromFiles(escaping) })
+    }
+
+    @Test
     fun aZipHasThePluginAtItsRootOrInItsOnlyFolder() {
         assertEquals(files.keys, PluginPackage.fromZip(zip(files)).files.keys)
         // A zipped folder, as the Finder makes it, with its own files.
