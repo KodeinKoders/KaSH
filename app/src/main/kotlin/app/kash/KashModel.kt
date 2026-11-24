@@ -303,7 +303,20 @@ class KashModel(
         }
         val jobs = listOfNotNull(
             scope.launch { tab.title.collect { titles[service.id] = it } },
-            scope.launch { tab.messages.collect { message -> received(service.id, message) } },
+            // A message that cannot be read is left out, and the next ones are read: an exception ended this collector, and the service said
+            // nothing more until KaSH was restarted.
+            scope.launch {
+                tab.messages.collect { message ->
+                    try {
+                        received(service.id, message)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // Never what it says: the user's messages.
+                        logger.warn("A message of {} was left out: {}", service.title, e.javaClass.simpleName)
+                    }
+                }
+            },
             // A web application tells its count by its title, which is its page's once its first load ended.
             if (service.plugin == null) scope.launch {
                 tab.loading.first { it }
@@ -324,20 +337,20 @@ class KashModel(
             logger.warn("A message of {} is not JSON", service.title)
             return
         }
-        when (json["type"]?.jsonPrimitive?.contentOrNull) {
+        when (json["type"]?.primitive()?.contentOrNull) {
             "notification", "notification-close", "notification-click-missed" -> onPageNotification(service, json)
             "icon" -> {
                 // Only a plugin's script has the API: a web application's page has nothing to say about its tile.
                 if (service.plugin == null) return
-                val source = json["source"]?.jsonPrimitive?.contentOrNull
+                val source = json["source"]?.primitive()?.contentOrNull
                 val icon = PluginIcon.parse(source) ?: return logger.warn("The icon that the plugin of {} gave is not one", service.title)
                 logger.debug("Icon of {}: {}", service.title, when (icon) { is PluginIcon.Remote -> icon.uri.host; is PluginIcon.Inline -> "inline"; PluginIcon.None -> "none" })
                 onIcon(id, icon)
             }
             "capabilities" -> {
                 if (service.plugin == null) return
-                if (json["markRead"]?.jsonPrimitive?.booleanOrNull == true) {
-                    markReadable[id] = if (json["byOpening"]?.jsonPrimitive?.booleanOrNull == true) MarkRead.BY_OPENING else MarkRead.DIRECT
+                if (json["markRead"]?.primitive()?.booleanOrNull == true) {
+                    markReadable[id] = if (json["byOpening"]?.primitive()?.booleanOrNull == true) MarkRead.BY_OPENING else MarkRead.DIRECT
                 }
             }
             "contacts" -> {
@@ -348,7 +361,7 @@ class KashModel(
                         Contact(
                             id = contact.getValue("id").jsonPrimitive.content,
                             name = contact.getValue("name").jsonPrimitive.content,
-                            kind = when (contact["kind"]?.jsonPrimitive?.contentOrNull) {
+                            kind = when (contact["kind"]?.primitive()?.contentOrNull) {
                                 "group" -> ConversationKind.GROUP
                                 "channel" -> ConversationKind.CHANNEL
                                 else -> ConversationKind.DIRECT
@@ -359,7 +372,7 @@ class KashModel(
                     logger.warn("The contacts of {} cannot be read", service.title, e)
                     return
                 }
-                val complete = json["complete"]?.jsonPrimitive?.booleanOrNull ?: false
+                val complete = json["complete"]?.primitive()?.booleanOrNull ?: false
                 val merged = Directory.merge(directory[id].orEmpty(), received, complete)
                 // Only counts in the log: the names are the user's contacts.
                 logger.debug("Contacts of {}: {} shown{}, {} known", service.title, received.size, if (complete) " (all)" else "", merged.size)
@@ -369,7 +382,7 @@ class KashModel(
                 }
             }
             "unreadCount" -> {
-                val count = json["count"]?.jsonPrimitive?.intOrNull?.takeIf { it >= 0 } ?: return logger.warn("The unread total of {} cannot be read", service.title)
+                val count = json["count"]?.primitive()?.intOrNull?.takeIf { it >= 0 } ?: return logger.warn("The unread total of {} cannot be read", service.title)
                 conversations.remove(id)
                 totals[id] = count
                 reported[id] = Unit
@@ -379,21 +392,21 @@ class KashModel(
                     // Only counts in the log: the names are the user's contacts.
                     json.getValue("conversations").jsonArray.map { element ->
                         val conversation = element.jsonObject
-                        val topic = conversation["topic"]?.jsonPrimitive?.booleanOrNull ?: false
+                        val topic = conversation["topic"]?.primitive()?.booleanOrNull ?: false
                         Conversation(
                             id = conversation.getValue("id").jsonPrimitive.content,
-                            name = conversation["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                            kind = when (conversation["kind"]?.jsonPrimitive?.contentOrNull) {
+                            name = conversation["name"]?.primitive()?.contentOrNull.orEmpty(),
+                            kind = when (conversation["kind"]?.primitive()?.contentOrNull) {
                                 "group" -> ConversationKind.GROUP
                                 "channel" -> ConversationKind.CHANNEL
                                 else -> ConversationKind.DIRECT
                             },
                             // A topic's messages are not counted.
-                            count = if (topic) 0 else conversation["count"]?.jsonPrimitive?.intOrNull ?: 1,
-                            mention = !topic && conversation["mention"]?.jsonPrimitive?.booleanOrNull ?: false,
-                            preview = conversation["preview"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                            time = conversation["time"]?.jsonPrimitive?.longOrNull,
-                            dayOnly = conversation["timePrecision"]?.jsonPrimitive?.contentOrNull == "day",
+                            count = if (topic) 0 else conversation["count"]?.primitive()?.intOrNull ?: 1,
+                            mention = !topic && conversation["mention"]?.primitive()?.booleanOrNull ?: false,
+                            preview = conversation["preview"]?.primitive()?.contentOrNull.orEmpty(),
+                            time = conversation["time"]?.primitive()?.longOrNull,
+                            dayOnly = conversation["timePrecision"]?.primitive()?.contentOrNull == "day",
                             topic = topic,
                         )
                     }.let { read -> withSeenTimes(id, read) }.also { logger.debug("Unread of {}: {} conversations, {} messages, {} topics", service.title, it.count { c -> !c.topic }, it.sumOf { c -> c.count }, it.count { c -> c.topic }); totals.remove(id) }

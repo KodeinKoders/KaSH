@@ -27,7 +27,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 import org.slf4j.LoggerFactory
 import java.awt.Toolkit
@@ -191,14 +191,14 @@ class Notifier(private val model: KashModel) {
     }
 
     private fun received(service: Service, json: JsonObject) {
-        val id = json["id"]?.jsonPrimitive?.content ?: return
-        when (json["type"]?.jsonPrimitive?.content) {
-            "notification-close" -> return closed(service, id, json["after"]?.jsonPrimitive?.longOrNull)
+        val id = json["id"]?.primitive()?.contentOrNull ?: return
+        when (json["type"]?.primitive()?.contentOrNull) {
+            "notification-close" -> return closed(service, id, json["after"]?.primitive()?.longOrNull)
             "notification-click-missed" -> return clickMissed(service, id)
         }
-        val title = json["title"]?.jsonPrimitive?.content.orEmpty()
-        val body = json["body"]?.jsonPrimitive?.content.orEmpty()
-        val silent = json["silent"]?.jsonPrimitive?.booleanOrNull ?: false
+        val title = json["title"]?.primitive()?.contentOrNull.orEmpty()
+        val body = json["body"]?.primitive()?.contentOrNull.orEmpty()
+        val silent = json["silent"]?.primitive()?.booleanOrNull ?: false
         notify(service, id, title, body, silent)
     }
 
