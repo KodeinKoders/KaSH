@@ -1,0 +1,21 @@
+diff --git a/native/util_mac.mm b/native/util_mac.mm
+index 4b3baca..1732390 100644
+--- a/native/util_mac.mm
++++ b/native/util_mac.mm
+@@ -574,12 +574,15 @@ void CefShutdownOnMainThread(void* tempWindow) {
+ }
+ 
+ void CefDoMessageLoopWorkOnMainThread() {
++  // In the modal panel mode too, which AppKit runs the main run loop in while an application answers the system's Quit later
++  // (NSTerminateLater) and while a modal panel is open: without it, Chromium's work stopped then (KaSH: its profiles wrote no cookie, and
++  // Chromium never stopped).
+   [[CefHandler class]
+       performSelector:@selector(doMessageLoopWork)
+              onThread:[NSThread mainThread]
+            withObject:nil
+         waitUntilDone:NO
+-                modes:@[ NSDefaultRunLoopMode, NSEventTrackingRunLoopMode ]];
++                modes:@[ NSDefaultRunLoopMode, NSEventTrackingRunLoopMode, NSModalPanelRunLoopMode ]];
+ }
+ 
+ void SetVisibility(CefWindowHandle handle, bool isVisible) {

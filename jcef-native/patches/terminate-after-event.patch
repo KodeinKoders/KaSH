@@ -1,0 +1,23 @@
+diff --git a/native/util_mac.mm b/native/util_mac.mm
+index 4b3baca..2ecbc87 100644
+--- a/native/util_mac.mm
++++ b/native/util_mac.mm
+@@ -258,6 +258,18 @@ - (void)_swizzled_sendEvent:(NSEvent*)event {
+ 
+ // This method will be called via Cmd+Q.
+ - (void)_swizzled_terminate:(id)sender {
++  // Cmd+Q comes while its key event is being sent (a key equivalent), and an application that answers the Quit later (NSTerminateLater)
++  // quits inside that event: Chromium did not close its browsers until it ended, which it did only once the application had answered
++  // (KaSH: Chromium never stopped, and quitting took 20 s; from the Dock or the menu, with the mouse, it took 2 s). Terminating once the
++  // event was sent quits as the Dock does.
++  if (g_handling_send_event) {
++    [self performSelector:@selector(terminate:)
++               withObject:sender
++               afterDelay:0
++                  inModes:@[ NSDefaultRunLoopMode, NSEventTrackingRunLoopMode, NSModalPanelRunLoopMode ]];
++    return;
++  }
++
+   bool continueTerminate = true;
+ 
+   if (g_client_app_.get()) {
