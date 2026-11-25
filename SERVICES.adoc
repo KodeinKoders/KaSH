@@ -170,3 +170,10 @@ Its messages are on the web at https://www.tiktok.com/messages[tiktok.com/messag
 
 *TODO*: everything.
 Its messages are on the web at https://web.snapchat.com[web.snapchat.com].
+
+
+== The services that KaSH cannot show
+
+=== Signal
+
+Signal has no web version, only Signal Desktop, an Electron application: a plugin has no page to show.
