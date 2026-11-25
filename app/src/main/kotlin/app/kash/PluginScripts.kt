@@ -16,7 +16,7 @@ object PluginScripts {
     }
 
     /** The API version that `plugin-api.js` implements. */
-    private const val API_VERSION = 3
+    private const val API_VERSION = 4
 
     /** The script of a service of [plugin] whose options have [values], for an interface in [language] (`fr`, `en`). */
     fun of(plugin: Plugin, values: Map<String, String>, language: String): String {

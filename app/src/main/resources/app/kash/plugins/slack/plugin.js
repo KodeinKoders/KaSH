@@ -41,6 +41,8 @@ const workspaceImage = () => {
     return url ? url[1].replace(/_88\.png$/, '_132.png') : undefined;
 };
 
+// A spinner over the tile until the list can be read (the page loads, the service signs in): KaSH takes it away after 2 minutes.
+kash.setLoading(true);
 kash.watch(() => {
     // The API sends it only when it changed.
     const image = workspaceImage();
@@ -49,6 +51,8 @@ kash.watch(() => {
     // No sidebar yet (the page is loading): nothing to say, rather than no conversation, which would take every one for read.
     const all = rows();
     if (all.length === 0) return null;
+    // The list can be read: the service loaded.
+    kash.setLoading(false);
     const conversations = [];
     for (const row of all) {
         if (row.dataset.qaChannelSidebarChannelIsMuted === 'true' || row.dataset.qaChannelSidebarIsYou === 'true') continue;

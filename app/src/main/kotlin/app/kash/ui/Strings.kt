@@ -87,7 +87,8 @@ interface Strings {
     val emptyHint: String
     fun unread(count: Int): String
     fun inboxTileLabel(count: Int): String
-    fun serviceTileLabel(title: String, count: Int): String
+    /** What a tile of the rail says to a screen reader: its service, its unread count, and whether its plugin says that it loads. */
+    fun serviceTileLabel(title: String, count: Int, loading: Boolean = false): String
     val unreadMessages: String
     val directConversation: String
     val groupConversation: String
@@ -342,7 +343,8 @@ object French : Strings {
     override val emptyHint = "Les conversations non lues de vos services apparaîtront ici."
     override fun unread(count: Int) = "$count non lu${s(count)}"
     override fun inboxTileLabel(count: Int) = if (count > 0) "Non lus, $count message${s(count)}" else "Non lus"
-    override fun serviceTileLabel(title: String, count: Int) = if (count > 0) "$title, $count non lu${s(count)}" else title
+    override fun serviceTileLabel(title: String, count: Int, loading: Boolean) =
+        (if (count > 0) "$title, $count non lu${s(count)}" else title) + if (loading) ", chargement" else ""
     override val unreadMessages = "Messages non lus"
     override val directConversation = "Discussion"
     override val groupConversation = "Groupe"
@@ -600,7 +602,8 @@ object English : Strings {
     override val emptyHint = "The unread conversations of your services will show up here."
     override fun unread(count: Int) = "$count unread"
     override fun inboxTileLabel(count: Int) = if (count > 0) "Unread, $count message${s(count)}" else "Unread"
-    override fun serviceTileLabel(title: String, count: Int) = if (count > 0) "$title, $count unread" else title
+    override fun serviceTileLabel(title: String, count: Int, loading: Boolean) =
+        (if (count > 0) "$title, $count unread" else title) + if (loading) ", loading" else ""
     override val unreadMessages = "Unread messages"
     override val directConversation = "Chat"
     override val groupConversation = "Group"

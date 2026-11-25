@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
@@ -54,6 +55,38 @@ class RailBadgeTest {
                 // To look at: build/renders/rail-badges-light.png, rail-badges-dark.png (WhatsApp's 3 red, Slack's 5 gray).
                 File("build/renders").mkdirs()
                 ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File("build/renders/rail-badges-${if (dark) "dark" else "light"}.png"))
+            }
+        }
+    }
+
+    @Test
+    fun aServiceThatLoadsHasASpinnerAtTheTopLeftOfItsTile() {
+        for (dark in listOf(false, true)) {
+            runComposeUiTest {
+                // The spinner turns for good: the clock moves only when the test says, so that the test does not wait for it to stop.
+                mainClock.autoAdvance = false
+                setContent {
+                    KashTheme(dark) {
+                        Box(Modifier.height(360.dp)) {
+                            ServiceRail(
+                                RailModel(
+                                    services = listOf(whatsApp, slack), selection = Selection.Inbox, badges = mapOf(whatsApp.id to 3),
+                                    inboxCount = 3, showBadges = true, showLabels = true, doNotDisturb = false,
+                                    onSelect = {}, onAdd = {}, onToggleDoNotDisturb = {}, onSettings = {}, onMove = { _, _ -> },
+                                    contextMenu = { _, _ -> }, updates = setOf(whatsApp.id), loading = setOf(whatsApp.id, slack.id),
+                                ),
+                                icons, RailSide.LEFT, RailMetrics.of(IconSize.MEDIUM),
+                            )
+                        }
+                    }
+                }
+                mainClock.advanceTimeBy(300)
+                onNodeWithContentDescription("WhatsApp, 3 unread, loading").assertExists()
+                onNodeWithContentDescription("Slack, loading").assertExists()
+                // To look at: build/renders/rail-loading-light.png, rail-loading-dark.png (both tiles with a spinner at their top left, WhatsApp
+                // with its badge and its arrow too).
+                File("build/renders").mkdirs()
+                ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File("build/renders/rail-loading-${if (dark) "dark" else "light"}.png"))
             }
         }
     }

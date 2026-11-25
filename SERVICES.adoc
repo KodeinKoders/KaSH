@@ -36,6 +36,9 @@ A web application added by its address tells only its total, by its title (`(3) 
 | Image of the workspace as the service's icon
 | NO | NO | YES | NO | NO | NO | NO | NO | NO | NO | TODO | TODO
 
+| Spinner on its tile until its list can be read
+| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO
+
 13+h| The unread conversations (the Unread tab, the badges)
 
 | Unread conversations

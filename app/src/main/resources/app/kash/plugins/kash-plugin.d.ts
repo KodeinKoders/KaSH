@@ -113,6 +113,13 @@ declare namespace KashPlugin {
         setIcon(source: string | null): void;
 
         /**
+         * Whether the service is loading (since apiVersion 4): true shows a spinner at the top left of its tile, false takes it away. There is
+         * none until the plugin says so. KaSH takes it away when the page goes to another document (a reload, a sign-in page) or is closed, and
+         * after 2 minutes. The same state is not sent again.
+         */
+        setLoading(loading: boolean): void;
+
+        /**
          * Calls read() every interval ms and sends what it returns with unread.set.
          * null or undefined means that the page is not ready: nothing is sent.
          * An exception is caught (the page changed its structure): nothing is sent, and reading goes on.

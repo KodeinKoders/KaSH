@@ -60,10 +60,14 @@ const conversationRows = () => {
     });
 };
 
+// A spinner over the tile until the list can be read (the page loads, the service signs in): KaSH takes it away after 2 minutes.
+kash.setLoading(true);
 kash.watch(() => {
     const all = conversationRows();
     // No chat list (another of Teams' apps is shown, the calendar, the calls): nothing to say.
     if (all.length === 0) return null;
+    // The list can be read: the service loaded.
+    kash.setLoading(false);
     const conversations = [];
     for (const row of all) {
         const id = idOf(row);

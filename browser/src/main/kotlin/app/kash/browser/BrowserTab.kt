@@ -38,6 +38,7 @@ public class BrowserTab internal constructor(
     private val _canGoBack = MutableStateFlow(false)
     private val _canGoForward = MutableStateFlow(false)
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 64)
+    private val _navigations = MutableSharedFlow<Unit>(extraBufferCapacity = 16)
     private val _created = MutableStateFlow(false)
 
     @Volatile
@@ -93,6 +94,12 @@ public class BrowserTab internal constructor(
 
     /** What the page sends with `window.cefQuery({request: …})`: the scripts of [BrowserProfile.openTab] use it to talk to KaSH. */
     public val messages: SharedFlow<String> = _messages.asSharedFlow()
+
+    /**
+     * Each navigation of the page to another document that stays in KaSH (a reload, a link, a redirect to a sign-in page), before it asks for
+     * anything: before the scripts of the new document run, and so before what they send ([messages]).
+     */
+    public val navigations: SharedFlow<Unit> = _navigations.asSharedFlow()
 
     /**
      * Whether Chromium created the browser: show [component] only then. Shown before, its native view is parented once it exists, but JCEF drops
@@ -229,6 +236,10 @@ public class BrowserTab internal constructor(
 
     internal fun messageReceived(request: String) {
         _messages.tryEmit(request)
+    }
+
+    internal fun navigating() {
+        _navigations.tryEmit(Unit)
     }
 
     internal fun addressChanged(url: String) {

@@ -112,6 +112,18 @@ const setIcon = (source) => {
     send({ type: 'icon', source });
 };
 
+// Whether the service is loading (a spinner over its tile), as the plugin said: none until it says so.
+let lastLoading = false;
+const setLoading = (loading) => {
+    if (typeof loading !== 'boolean') {
+        warn('setLoading() takes true or false');
+        return;
+    }
+    if (loading === lastLoading) return;
+    lastLoading = loading;
+    send({ type: 'loading', loading });
+};
+
 // The reads of the watches, which KaSH's Refresh (the Unread tab's) runs at once.
 const readers = new Set();
 
@@ -421,6 +433,7 @@ const kash = Object.freeze({
         watch: watchContacts,
     }),
     setIcon,
+    setLoading,
     watch,
     onOpenConversation: (handler) => {
         if (typeof handler !== 'function') throw new TypeError('kash.onOpenConversation() takes a function');

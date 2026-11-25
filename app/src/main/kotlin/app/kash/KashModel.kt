@@ -176,6 +176,12 @@ class KashModel(
     // How the plugin of each service marks a conversation as read (`kash.onMarkRead`), as its page said.
     private val markReadable = mutableStateMapOf<ServiceId, MarkRead>()
 
+    // The services whose plugin said that they are loading (`kash.setLoading`), each with the job that ends it after LOADING_TIMEOUT_MS.
+    private val loadingJobs = mutableStateMapOf<ServiceId, Job>()
+
+    /** The services whose plugin says that they are loading (`kash.setLoading`): a spinner over their tiles. */
+    val loadingServices: Set<ServiceId> get() = loadingJobs.keys
+
     /** The unread total of each plugin's service whose script only tells that (`kash.unread.setCount`). */
     private val totals = mutableStateMapOf<ServiceId, Int>()
 
@@ -324,6 +330,9 @@ class KashModel(
                     }
                 }
             },
+            // A new document is not loading until its plugin says so: the one before said nothing more once it was gone, and a page that the
+            // plugin does not run in (a sign-in page) never would.
+            scope.launch { tab.navigations.collect { endLoading(service.id) } },
             // A web application tells its count by its title, which is its page's once its first load ended.
             if (service.plugin == null) scope.launch {
                 tab.loading.first { it }
@@ -360,6 +369,18 @@ class KashModel(
                     markReadable[id] = if (json["byOpening"]?.primitive()?.booleanOrNull == true) MarkRead.BY_OPENING else MarkRead.DIRECT
                 }
             }
+            "loading" -> {
+                if (service.plugin == null) return
+                val loading = json["loading"]?.primitive()?.booleanOrNull ?: return logger.warn("The loading state of {} cannot be read", service.title)
+                if (!loading) return endLoading(id)
+                if (id in loadingJobs) return
+                logger.debug("{} is loading", service.title)
+                loadingJobs[id] = scope.launch {
+                    delay(LOADING_TIMEOUT_MS)
+                    logger.warn("{} was still loading after {} s: its spinner is taken away", service.title, LOADING_TIMEOUT_MS / 1000)
+                    loadingJobs.remove(id)
+                }
+            }
             "contacts" -> {
                 if (service.plugin == null) return
                 val received = contactsOf(json) ?: return logger.warn("The contacts of {} cannot be read", service.title)
@@ -390,6 +411,13 @@ class KashModel(
                 reported[id] = Unit
             }
         }
+    }
+
+    // The service [id] is not loading any more: its spinner goes.
+    private fun endLoading(id: ServiceId) {
+        val job = loadingJobs.remove(id) ?: return
+        job.cancel()
+        logger.debug("{} is not loading any more", service(id)?.title)
     }
 
     // The conversations [read] of the service [id] with the time when KaSH saw those whose service does not tell it (UnreadTimes), which is saved.
@@ -456,6 +484,7 @@ class KashModel(
         totals.remove(id)
         reported.remove(id)
         markReadable.remove(id)
+        endLoading(id)
         if (loadedService == null) {
             then()
             return
@@ -880,6 +909,9 @@ class KashModel(
         const val FOLDER_WATCH_MS = 10_000L
         const val ADDRESS_WATCH_MS = 60 * 60 * 1000L
         const val UNREAD_TIMES_SAVE_MS = 5_000L
+
+        // How long a service's spinner stays at most: a plugin that never says that its service loaded leaves no spinner for good.
+        const val LOADING_TIMEOUT_MS = 2 * 60 * 1000L
         const val STATE_SAVE_MS = 500L
 
         // How long after the search closed it does not open again (see toggleSearch).

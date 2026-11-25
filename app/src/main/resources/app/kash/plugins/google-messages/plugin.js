@@ -27,10 +27,14 @@ const timeOf = (row) => {
     return stamp ? kash.time.parse(kash.dom.text(stamp.querySelector('.weekday-aria-label') || stamp)) : null;
 };
 
+// A spinner over the tile until the list can be read (the page loads, the service signs in): KaSH takes it away after 2 minutes.
+kash.setLoading(true);
 kash.watch(() => {
     const all = rows();
     // The list is not there yet (the page is loading, or the phone is not paired): nothing to say.
     if (all.length === 0) return null;
+    // The list can be read: the service loaded.
+    kash.setLoading(false);
     const conversations = [];
     for (const row of all) {
         if (row.dataset.e2eIsUnread !== 'true' || row.dataset.e2eIsMuted === 'true') continue;

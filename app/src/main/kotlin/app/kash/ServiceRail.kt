@@ -1,5 +1,11 @@
 package app.kash
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +46,8 @@ import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -108,6 +116,8 @@ class RailModel(
     val updates: Set<ServiceId> = emptySet(),
     /** The services whose notifications are off (muted, in one of their ranges of Do Not Disturb, or turned off): their badges gray. */
     val quiet: Set<ServiceId> = emptySet(),
+    /** The services whose plugin says that they are loading (`kash.setLoading`): a spinner at the top left of their tiles. */
+    val loading: Set<ServiceId> = emptySet(),
     /** Moves a service past its neighbor in the rail (a tile dragged over it): see [KashModel.moveNextTo]. */
     val onMove: (ServiceId, ServiceId) -> Unit,
     /** The items of a service's context menu (a right click on its tile), which the function given closes. */
@@ -157,7 +167,8 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
                     badge = if (count > 0) UnreadCount.badge(count) else null,
                     update = service.id in model.updates,
                     quietBadge = service.id in model.quiet,
-                    description = strings.serviceTileLabel(service.title, count),
+                    loading = service.id in model.loading,
+                    description = strings.serviceTileLabel(service.title, count, service.id in model.loading),
                     tooltip = service.title,
                     // ⌘1 to ⌘9, the first nine of the rail (KashModel.shortcut).
                     shortcut = serviceShortcut(index),
@@ -275,7 +286,8 @@ internal fun Modifier.onContextClick(onContextClick: () -> Unit): Modifier = onP
 
 /**
  * A tile of the rail: the selection's indicator on the edge next to the content, and its ring around the tile; the label under it; the unread
- * badge over its top right corner (gray when [quietBadge]: its notifications are off), and an arrow over its bottom left one when its plugin has a new version ([update]).
+ * badge over its top right corner (gray when [quietBadge]: its notifications are off), an arrow over its bottom left one when its plugin has a new version
+ * ([update]), and a spinner over its top left one while its plugin says that it loads ([loading]).
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -286,6 +298,7 @@ private fun RailItem(
     badge: String?,
     update: Boolean = false,
     quietBadge: Boolean = false,
+    loading: Boolean = false,
     description: String,
     tooltip: String,
     shortcut: String?,
@@ -349,6 +362,8 @@ private fun RailItem(
                         contentAlignment = Alignment.Center,
                     ) { KashIcon(KashIcons.ArrowUp, Color.White, size = 9.dp) }
                 }
+                // Over the tile's top left corner, as the badge over its top right one and the arrow over its bottom left one.
+                if (loading) LoadingSpinner(Modifier.align(Alignment.TopStart))
             }
             if (showLabel && label.isNotBlank()) {
                 Text(
@@ -375,6 +390,26 @@ private fun RailItem(
                     .background(Kash.colors.accent, RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
             }
             Box(bar)
+        }
+    }
+}
+
+/** A spinner over a tile's corner: an arc that turns, in the accent's color, on a disc of the rail's color. */
+@Composable
+fun LoadingSpinner(modifier: Modifier = Modifier) {
+    val turn by rememberInfiniteTransition(label = "loading").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 900, easing = LinearEasing)),
+        label = "turn",
+    )
+    val color = Kash.colors.accent
+    Box(modifier.size(16.dp).background(Kash.colors.panel, CircleShape), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(10.dp)) {
+            val stroke = 2.dp.toPx()
+            // The track, faint, and the arc that turns over it.
+            drawCircle(color.copy(alpha = 0.25f), radius = (size.minDimension - stroke) / 2, style = Stroke(stroke))
+            drawArc(color, startAngle = turn - 90f, sweepAngle = 100f, useCenter = false, style = Stroke(stroke, cap = StrokeCap.Round))
         }
     }
 }

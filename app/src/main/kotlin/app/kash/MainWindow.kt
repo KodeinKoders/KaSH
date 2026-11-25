@@ -108,6 +108,7 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
         updates = enabled.filter { it.plugin in model.pluginUpdates }.map { it.id }.toSet(),
         // Its own mute, its own ranges, or its notifications turned off in its Edit window: not KaSH's Do Not Disturb, which is all of them.
         quiet = enabled.filter { !it.desktopNotifications || DoNotDisturb.isQuiet(it, model.now) }.map { it.id }.toSet(),
+        loading = model.loadingServices.toSet(),
         onMove = model::moveNextTo,
         contextMenu = { service, close ->
             val update = service.plugin?.takeIf { it !in model.updatingPlugins }?.let(model.pluginUpdates::get)

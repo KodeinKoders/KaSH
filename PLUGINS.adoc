@@ -494,6 +494,40 @@ A source that is none of these is not sent, with a warning in the console, once.
 The page cannot read the image of another site itself when that site does not allow it (CORS): that is why KaSH downloads an `https:` URL.
 
 
+[#showing-that-the-service-loads]
+=== Showing that the service loads
+
+[source,typescript]
+----
+kash.setLoading(loading: boolean): void
+----
+
+A page takes a while before it can be read (an application that loads its data, a list that fills in), and its tile looks ready all the same.
+`setLoading(true)` shows a spinner at the top left of the service's tile, and `setLoading(false)` takes it away, since `kash.apiVersion` 4.
+There is none until the plugin says so: a script that wants one calls `setLoading(true)` when it starts, and `setLoading(false)` once it can read the page.
+
+KaSH takes it away by itself:
+
+* when the page goes to another document (a reload, a sign-in page, where the script may not run): the new document's script shows it again;
+* when the page is closed (the service disabled, its plugin updated);
+* after 2 minutes, with a warning in KaSH's log: a page that never loads, or a script that forgets, does not leave a spinner for good.
+
+The same state is not sent again: a script can call `setLoading(false)` at each read of its page.
+A value that is not a boolean is not sent, with a warning in the console, once.
+
+[source,javascript]
+.Example: a spinner until the list is there
+----
+kash.setLoading(true);
+kash.watch(() => {
+    const rows = document.querySelectorAll('.conversation');
+    if (rows.length === 0) return null;
+    kash.setLoading(false);
+    return [...rows].filter(isUnread).map(conversationOf);
+});
+----
+
+
 === What else the script is given
 
 [cols="1,4"]
@@ -501,7 +535,7 @@ The page cannot read the image of another site itself when that site does not al
 | Member | What it is
 
 | `kash.apiVersion`
-| `3` (`2` before `kash.onMarkRead`, `1` before `kash.contacts`).
+| `4` (`3` before `kash.setLoading`, `2` before `kash.onMarkRead`, `1` before `kash.contacts`).
 
 | `kash.plugin`
 | `{ id, version }`, from the manifest.

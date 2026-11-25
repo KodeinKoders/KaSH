@@ -48,11 +48,19 @@ const timeOf = (texts) => {
 
 const onMessages = () => location.pathname.startsWith('/messages/');
 
+// A spinner over the tile until the list can be read (the page loads, the service signs in): KaSH takes it away after 2 minutes.
+kash.setLoading(true);
 kash.watch(() => {
     // The list is only on the pages of the messages: elsewhere (the feed, a profile), nothing to say.
-    if (!onMessages()) return null;
+    if (!onMessages()) {
+        // Nothing to wait for on a page that has no list.
+        kash.setLoading(false);
+        return null;
+    }
     const all = rows();
     if (all.length === 0) return null;
+    // The list can be read: the service loaded.
+    kash.setLoading(false);
     const conversations = [];
     for (const { row, link } of all) {
         const id = idOf(link);

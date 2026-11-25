@@ -29,11 +29,19 @@ const countOf = (badge) => {
 
 const onMessaging = () => location.pathname.startsWith('/messaging/');
 
+// A spinner over the tile until the list can be read (the page loads, the service signs in): KaSH takes it away after 2 minutes.
+kash.setLoading(true);
 kash.watch(() => {
     // The list is only on the pages of the messages: elsewhere (the feed, a profile), nothing to say.
-    if (!onMessaging()) return null;
+    if (!onMessaging()) {
+        // Nothing to wait for on a page that has no list.
+        kash.setLoading(false);
+        return null;
+    }
     const all = rows();
     if (all.length === 0) return null;
+    // The list can be read: the service loaded.
+    kash.setLoading(false);
     const conversations = [];
     for (const row of all) {
         const badge = badgeOf(row);

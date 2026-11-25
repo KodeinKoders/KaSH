@@ -74,9 +74,13 @@ const renderedPreviews = () => {
 // The last preview of each unread conversation, kept while its row is not rendered (scrolled out of the list).
 const previewOf = new Map();
 
+// A spinner over the tile until the list can be read (the page loads, the service signs in): KaSH takes it away after 2 minutes.
+kash.setLoading(true);
 kash.watch(() => {
     const collections = module('WAWebCollections');
     if (!collections || !collections.Chat) return null;
+    // The list can be read: the service loaded.
+    kash.setLoading(false);
     // A model that WhatsApp changed (a method or a field renamed) throws: nothing is sent, rather than every chat taken for unread.
     if (typeof collections.Chat.getModelsArray !== 'function') throw new Error('WAWebCollections.Chat.getModelsArray is not a function any more');
     const myIds = me();

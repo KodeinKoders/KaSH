@@ -46,10 +46,14 @@ const timeOf = (label) => {
     return kash.time.parse(label);
 };
 
+// A spinner over the tile until the list can be read (the page loads, the service signs in): KaSH takes it away after 2 minutes.
+kash.setLoading(true);
 kash.watch(() => {
     const all = rows();
     // The list is not there yet (the page is loading, or the user is not logged in): nothing to say.
     if (all.length === 0) return null;
+    // The list can be read: the service loaded.
+    kash.setLoading(false);
     learnDateOrder(all.map((row) => kash.dom.text(row.querySelector('.message-time'))));
     const conversations = [];
     for (const row of all) {

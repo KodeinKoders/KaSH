@@ -44,10 +44,14 @@ const entryUnread = (entry) => {
     return hasClass(pill, 'selected_') ? label !== serverName && label.endsWith(`, ${serverName}`) : hasClass(pill, 'visible_');
 };
 
+// A spinner over the tile until the list can be read (the page loads, the service signs in): KaSH takes it away after 2 minutes.
+kash.setLoading(true);
 kash.watch(() => {
     const nav = column();
     // The column is not there yet (the page is loading, or the user is not logged in): nothing to say.
     if (!nav) return null;
+    // The list can be read: the service loaded.
+    kash.setLoading(false);
     const conversations = [];
     for (const entry of nav.querySelectorAll('[class*="listItem_"]')) {
         const item = entry.querySelector(`[data-list-item-id^="${ENTRY_PREFIX}"]`);

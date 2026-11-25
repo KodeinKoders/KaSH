@@ -59,10 +59,14 @@ const previewOfRow = (row) => {
 // The last preview of each unread conversation, kept while the Home list is not rendered.
 const previewOf = new Map();
 
+// A spinner over the tile until the list can be read (the page loads, the service signs in): KaSH takes it away after 2 minutes.
+kash.setLoading(true);
 kash.watch(() => {
     // No side panel yet (the page is loading): nothing to say, rather than no conversation, which would take every one for read.
     const panel = panelRows();
     if (panel.length === 0) return null;
+    // The list can be read: the service loaded.
+    kash.setLoading(false);
     const home = homeRows();
     const conversations = [];
     for (const row of panel) {

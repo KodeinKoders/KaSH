@@ -172,7 +172,7 @@ public class BrowserEngine private constructor(
                     return (target == LinkTarget.NOWHERE).also { if (it) notLoaded(request.url) }
                 }
                 return when (target) {
-                    LinkTarget.KASH -> false
+                    LinkTarget.KASH -> false.also { tab.navigating() }
                     LinkTarget.SYSTEM -> true.also { openInSystem(request.url) }
                     LinkTarget.NOWHERE -> true.also { notLoaded(request.url) }
                 }
