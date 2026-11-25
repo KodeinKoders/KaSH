@@ -192,7 +192,8 @@ public class BrowserEngine private constructor(
      * only there, and silently uses one that is not written to disk anywhere else.
      */
     public fun profile(directory: Path): BrowserProfile {
-        val absolute = directory.toAbsolutePath().normalize()
+        // Its real path, as the root's: Chromium compares them, and a profile under a link to the root was not one of its children for it.
+        val absolute = realPath(directory)
         require(absolute.parent == profilesRoot) { "A profile must be a direct child of $profilesRoot, not $absolute" }
         return BrowserProfile(absolute, client, tabs, hiddenSize, languages, ::create, ::tabClosed) { profiles -= it }.also { profiles += it }
     }
@@ -343,8 +344,10 @@ public class BrowserEngine private constructor(
                 "This Java runtime has its own JCEF (${System.getProperty("java.home")}): KaSH needs a JetBrains Runtime without it"
             }
             require(Files.isDirectory(bundle)) { "No JCEF native bundle in $bundle" }
-            val root = profilesRoot.toAbsolutePath().normalize()
-            Files.createDirectories(root)
+            Files.createDirectories(profilesRoot)
+            // Its real path: Chromium resolves the links of the root (`/tmp` is `/private/tmp` on macOS) but not of a profile's path, which was not
+            // under the root for it then ("The cache_path is invalid. Defaulting to in-memory storage"): every profile was in memory, lost at quit.
+            val root = realPath(profilesRoot)
 
             val config = JCefAppConfig.getInstance(bundle.toAbsolutePath().toString(), false)
             // The framework is next to the helpers in KaSH's bundle, where they load it from, not inside `cef_server.app` where JCefAppConfig
@@ -385,4 +388,16 @@ public class BrowserEngine private constructor(
             return BrowserEngine(app, root, terminated).also { logger.info("Chromium {} started, profiles in {}", it.chromiumVersion, root) }
         }
     }
+}
+
+/**
+ * The absolute path of [path] without its links: its deepest directory that exists, resolved by the file system, then the rest of it, which does
+ * not exist yet (a profile that Chromium will create).
+ */
+internal fun realPath(path: Path): Path {
+    val absolute = path.toAbsolutePath().normalize()
+    var existing: Path? = absolute
+    while (existing != null && !Files.exists(existing)) existing = existing.parent
+    if (existing == null) return absolute
+    return existing.toRealPath().resolve(existing.relativize(absolute))
 }
