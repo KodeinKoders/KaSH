@@ -272,6 +272,9 @@ interface Strings {
     fun aboutBranch(branch: String): String
     fun aboutCommitted(date: String): String
     val aboutMadeBy: String
+
+    // What the main window shows while KaSH quits
+    val quittingKash: String
 }
 
 object French : Strings {
@@ -527,6 +530,7 @@ object French : Strings {
     override fun aboutBranch(branch: String) = "Branche $branch"
     override fun aboutCommitted(date: String) = "Commit du $date"
     override val aboutMadeBy = "Fait avec amour par "
+    override val quittingKash = "Fermeture de KaSH…"
 
     private fun s(count: Int) = if (count > 1) "s" else ""
 }
@@ -785,6 +789,7 @@ object English : Strings {
     override fun aboutBranch(branch: String) = "Branch $branch"
     override fun aboutCommitted(date: String) = "Committed: $date"
     override val aboutMadeBy = "Made with love by "
+    override val quittingKash = "Quitting KaSH…"
 
     // English puts a plural on everything but one: "0 services", "1 service".
     private fun s(count: Int) = if (count != 1) "s" else ""
