@@ -19,15 +19,15 @@ import java.io.File
 import javax.imageio.ImageIO
 import kotlin.test.Test
 
-class QuittingWindowTest {
+class QuittingScreenTest {
     @Test
-    fun theOverlaySaysThatKashQuitsInBothThemes() {
+    fun thePageSaysThatKashQuitsInBothThemes() {
         for (dark in listOf(false, true)) {
             runComposeUiTest {
                 setContent {
                     KashTheme(dark) {
-                        // Over a window's content, as it is shown.
-                        Box(Modifier.size(640.dp, 400.dp).background(Kash.colors.background)) { QuittingContent() }
+                        // In place of the window's content, as it is shown.
+                        Box(Modifier.size(640.dp, 400.dp).background(Kash.colors.background)) { QuittingScreen() }
                     }
                 }
                 onNodeWithText("Quitting KaSH…").assertExists()

@@ -45,6 +45,7 @@ import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -107,6 +108,11 @@ class RailModel(
     // What the bell says: Do Not Disturb, until when during a range of it.
     val doNotDisturbLabel: String = "",
     val onSelect: (Selection) -> Unit,
+    /**
+     * Whether the rail can be used: not while KaSH quits ([KashModel.quitting]), when it is faded, no tile is selected, and nothing in it can be
+     * clicked, dragged or opened.
+     */
+    val interactive: Boolean = true,
     val onAdd: () -> Unit,
     val onToggleDoNotDisturb: () -> Unit,
     val onSettings: () -> Unit,
@@ -136,9 +142,14 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
     // The tiles are dragged to change the services' order.
     val reorder = remember { ReorderState<ServiceId>() }
     val ids = model.services.map { it.id }
+    val active = model.interactive
+    LaunchedEffect(active) {
+        if (!active) menu = null
+    }
     val tiles: @Composable () -> Unit = {
         RailItem(
-            selected = model.selection == Selection.Inbox,
+            selected = active && model.selection == Selection.Inbox,
+            enabled = active,
             label = strings.inbox,
             badge = if (model.showBadges && model.inboxCount > 0) UnreadCount.badge(model.inboxCount) else null,
             description = strings.inboxTileLabel(model.inboxCount),
@@ -161,8 +172,9 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
             key(service.id) {
                 val count = model.badges[service.id] ?: 0
                 RailItem(
-                    modifier = Modifier.reorderable(reorder, service.id, vertical, RAIL_SPACING, ids, model.onMove),
-                    selected = model.selection == Selection.OfService(service.id),
+                    modifier = if (active) Modifier.reorderable(reorder, service.id, vertical, RAIL_SPACING, ids, model.onMove) else Modifier,
+                    selected = active && model.selection == Selection.OfService(service.id),
+                    enabled = active,
                     label = service.label,
                     badge = if (count > 0) UnreadCount.badge(count) else null,
                     update = service.id in model.updates,
@@ -176,7 +188,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
                     metrics = metrics,
                     showLabel = model.showLabels,
                     onClick = { model.onSelect(Selection.OfService(service.id)) },
-                    onContextMenu = { menu = service.id to pointerAnchor() },
+                    onContextMenu = if (active) ({ menu = service.id to pointerAnchor() }) else null,
                 ) {
                     ServiceTile(service, icons, metrics.tile)
                 }
@@ -186,7 +198,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
         Box(
             Modifier.padding(6.dp).size(metrics.tile)
                 .dashedBorder(Kash.colors.dashed, 1.dp, metrics.tile / 4)
-                .clickable(onClick = model.onAdd)
+                .clickable(enabled = active, onClick = model.onAdd)
                 .semantics {
                     contentDescription = addLabel
                     role = Role.Button
@@ -197,10 +209,10 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
     val buttons: @Composable () -> Unit = {
         IconOnlyButton(
             if (model.doNotDisturb) KashIcons.BellOff else KashIcons.Bell, model.doNotDisturbLabel.ifEmpty { strings.doNotDisturb }, model.onToggleDoNotDisturb,
-            size = 44.dp, iconSize = 20.dp, tint = if (model.doNotDisturb) Kash.colors.text else Kash.colors.muted,
+            size = 44.dp, iconSize = 20.dp, tint = if (model.doNotDisturb) Kash.colors.text else Kash.colors.muted, enabled = active,
         )
         Box {
-            IconOnlyButton(KashIcons.Settings, strings.settings, model.onSettings, size = 44.dp, iconSize = 20.dp)
+            IconOnlyButton(KashIcons.Settings, strings.settings, model.onSettings, size = 44.dp, iconSize = 20.dp, enabled = active)
             if (model.settingsDot) Box(Modifier.align(Alignment.TopEnd).padding(9.dp).size(7.dp).background(Kash.colors.accent, CircleShape))
         }
     }
@@ -220,7 +232,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
         val edge = if (side == RailSide.LEFT) Modifier.padding(end = 1.dp) else Modifier.padding(start = 1.dp)
         Box(Modifier.width(metrics.rail).fillMaxHeight().background(Kash.colors.separator)) {
             Column(
-                Modifier.matchParentSize().then(edge).background(Kash.colors.panel).padding(vertical = 8.dp),
+                Modifier.matchParentSize().then(edge).background(Kash.colors.panel).padding(vertical = 8.dp).alpha(if (active) 1f else INACTIVE_ALPHA),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Column(
@@ -235,7 +247,7 @@ fun ServiceRail(model: RailModel, icons: ServiceIcons, side: RailSide, metrics: 
         val edge = if (side == RailSide.TOP) Modifier.padding(bottom = 1.dp) else Modifier.padding(top = 1.dp)
         Box(Modifier.fillMaxWidth().background(Kash.colors.separator)) {
             Row(
-                Modifier.fillMaxWidth().then(edge).background(Kash.colors.panel).padding(horizontal = 8.dp),
+                Modifier.fillMaxWidth().then(edge).background(Kash.colors.panel).padding(horizontal = 8.dp).alpha(if (active) 1f else INACTIVE_ALPHA),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
@@ -260,6 +272,9 @@ fun serviceShortcut(index: Int): String? = if (index in 0..8) "⌘${index + 1}" 
 
 // How long the pointer stays over a tile before its tooltip shows.
 private const val TOOLTIP_DELAY_MS = 600L
+
+// How faded the rail is while it cannot be used (KaSH quits).
+private const val INACTIVE_ALPHA = 0.5f
 
 /** Where the pointer is on the screen, for a context menu that opens there. */
 internal fun pointerAnchor(): MenuAnchor {
@@ -294,6 +309,7 @@ internal fun Modifier.onContextClick(onContextClick: () -> Unit): Modifier = onP
 private fun RailItem(
     modifier: Modifier = Modifier,
     selected: Boolean,
+    enabled: Boolean = true,
     label: String,
     badge: String?,
     update: Boolean = false,
@@ -321,7 +337,7 @@ private fun RailItem(
         showTooltip = false
         if (hovered) {
             delay(TOOLTIP_DELAY_MS)
-            showTooltip = window?.isActive == true
+            showTooltip = enabled && window?.isActive == true
         }
     }
     val anchor = remember { MenuAnchor() }
@@ -333,7 +349,7 @@ private fun RailItem(
             // Any press, before the click and the drag see it, which it leaves to them.
             .onPointerEvent(PointerEventType.Press, PointerEventPass.Initial) { showTooltip = false }
             .then(if (onContextMenu != null) Modifier.onContextClick { showTooltip = false; onContextMenu() } else Modifier)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
             .semantics {
                 contentDescription = description
                 role = Role.Tab

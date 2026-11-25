@@ -8,7 +8,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
@@ -26,6 +28,7 @@ import java.io.File
 import java.nio.file.Files
 import javax.imageio.ImageIO
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class RailBadgeTest {
     private val icons = ServiceIcons(KashDirectories(Files.createTempDirectory("kash-rail"))) { PluginRegistry(emptyList()) }
@@ -87,6 +90,37 @@ class RailBadgeTest {
                 // with its badge and its arrow too).
                 File("build/renders").mkdirs()
                 ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File("build/renders/rail-loading-${if (dark) "dark" else "light"}.png"))
+            }
+        }
+    }
+
+    @Test
+    fun whileKashQuitsTheRailIsFadedAndItsTilesDoNothing() {
+        for (dark in listOf(false, true)) {
+            runComposeUiTest {
+                val selected = mutableListOf<Selection>()
+                setContent {
+                    KashTheme(dark) {
+                        Box(Modifier.height(360.dp)) {
+                            ServiceRail(
+                                RailModel(
+                                    services = listOf(whatsApp, slack), selection = Selection.OfService(whatsApp.id), badges = mapOf(whatsApp.id to 3),
+                                    inboxCount = 3, showBadges = true, showLabels = true, doNotDisturb = false,
+                                    onSelect = { selected += it }, onAdd = {}, onToggleDoNotDisturb = {}, onSettings = {}, onMove = { _, _ -> },
+                                    contextMenu = { _, _ -> }, interactive = false,
+                                ),
+                                icons, RailSide.LEFT, RailMetrics.of(IconSize.MEDIUM),
+                            )
+                        }
+                    }
+                }
+                // The service that was shown is not selected any more, and a click on a tile shows nothing.
+                onNodeWithContentDescription("WhatsApp, 3 unread").assertIsNotSelected().performClick()
+                onNodeWithContentDescription("Slack").performClick()
+                assertEquals(emptyList(), selected)
+                // To look at: build/renders/rail-quitting-light.png, rail-quitting-dark.png (faded, no tile selected).
+                File("build/renders").mkdirs()
+                ImageIO.write(onRoot().captureToImage().toAwtImage(), "png", File("build/renders/rail-quitting-${if (dark) "dark" else "light"}.png"))
             }
         }
     }

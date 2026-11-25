@@ -5,11 +5,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -185,14 +183,13 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
     val notifier = remember { Notifier(model, icons) }
     // Once, whichever asks first: the window's close button, or the system's Quit (⌘Q, the Dock, logging out).
     val quitting = remember { booleanArrayOf(false) }
-    // Whether the main window says that KaSH quits (QuittingWindow), from the start of the quit until KaSH is gone.
-    var quittingShown by remember { mutableStateOf(false) }
     // The system's Quit, answered once KaSH stopped: yes, so that a logout, a restart or a shutdown goes on.
     val quitResponse = remember { arrayOfNulls<QuitResponse>(1) }
     val quit: () -> Unit = {
         if (!quitting[0]) {
             quitting[0] = true
-            quittingShown = true
+            // The main window says that KaSH quits, until it is gone (QuittingScreen).
+            model.startQuitting()
             logger.info("Quitting")
             // A quit that does not end is stopped, rather than leave KaSH that can only be forced to quit by the system.
             haltIfNotQuitIn(QUIT_TIMEOUT, hangs)
@@ -289,7 +286,6 @@ private fun ApplicationScope.Kash(engine: BrowserEngine, model: KashModel, icons
                     CompositionLocalProvider(LocalAwtWindow provides window) {
                         MainWindowContent(model, icons, systemDark)
                     }
-                    if (quittingShown) QuittingWindow(window)
                     if (model.searchOpen) {
                         SearchWindow(
                             window, model.searchEntries, icons,

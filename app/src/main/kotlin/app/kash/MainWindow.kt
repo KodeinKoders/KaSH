@@ -58,36 +58,41 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
     val selected = (state.selection as? Selection.OfService)?.let { selection -> enabled.firstOrNull { it.id == selection.id } }
 
     val selectedTab = selected?.let { model.loaded[it.id]?.tab }
+    // While KaSH quits, the window says so and nothing leaves that page (QuittingScreen): no service is shown, no title nor button of the title
+    // bar, and the rail is inactive.
+    val quitting = model.quitting
     TitleBar {
-        // A service's header is here, so that its page has the whole height of the window: its tile, title, address and count on the left, its
-        // buttons on the right. The Unread tab has its title there too. The search's field is in the middle.
-        if (selected == null) {
-            Text(strings.inbox, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.Start).padding(start = 8.dp))
-        } else {
-            key(selected.id) { ServiceTitle(selected, selectedTab, badges[selected.id] ?: 0, icons, Modifier.align(Alignment.Start).padding(start = 8.dp)) }
-        }
-        Row(
-            Modifier.align(Alignment.End).padding(end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (selected != null) {
-                key(selected.id) {
-                    ServiceButtons(
-                        selected, selectedTab, onToggleMute = { model.toggleMute(selected.id) }, actions = serviceActions(model, selected.id),
-                        update = selected.plugin?.let(model.pluginUpdates::get),
-                        updating = selected.plugin in model.updatingPlugins,
-                    )
-                }
-                Box(Modifier.width(1.dp).height(16.dp).background(Kash.colors.divider))
+        if (!quitting) {
+            // A service's header is here, so that its page has the whole height of the window: its tile, title, address and count on the
+            // left, its buttons on the right. The Unread tab has its title there too. The search's field is in the middle.
+            if (selected == null) {
+                Text(strings.inbox, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.Start).padding(start = 8.dp))
+            } else {
+                key(selected.id) { ServiceTitle(selected, selectedTab, badges[selected.id] ?: 0, icons, Modifier.align(Alignment.Start).padding(start = 8.dp)) }
             }
-            // The switch, or a range of the settings (until when it ends).
-            if (model.doNotDisturb) Chip(model.doNotDisturbUntil?.let { strings.doNotDisturbUntil(untilLabel(it)) } ?: strings.doNotDisturb, height = 22.dp)
-            ThemeMenu(settings.theme, systemDark) { mode -> model.updateSettings { it.copy(theme = mode) } }
+            Row(
+                Modifier.align(Alignment.End).padding(end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (selected != null) {
+                    key(selected.id) {
+                        ServiceButtons(
+                            selected, selectedTab, onToggleMute = { model.toggleMute(selected.id) }, actions = serviceActions(model, selected.id),
+                            update = selected.plugin?.let(model.pluginUpdates::get),
+                            updating = selected.plugin in model.updatingPlugins,
+                        )
+                    }
+                    Box(Modifier.width(1.dp).height(16.dp).background(Kash.colors.divider))
+                }
+                // The switch, or a range of the settings (until when it ends).
+                if (model.doNotDisturb) Chip(model.doNotDisturbUntil?.let { strings.doNotDisturbUntil(untilLabel(it)) } ?: strings.doNotDisturb, height = 22.dp)
+                ThemeMenu(settings.theme, systemDark) { mode -> model.updateSettings { it.copy(theme = mode) } }
+            }
+            // Last: Jewel's title bar measures its children in their order and leaves out those that do not fit, and in a narrow window the
+            // field is what goes (⌘⇧K still opens the search), not the service's buttons.
+            SearchField(onClick = model::toggleSearch, modifier = Modifier.align(Alignment.CenterHorizontally))
         }
-        // Last: Jewel's title bar measures its children in their order and leaves out those that do not fit, and in a narrow window the field is
-        // what goes (⌘⇧K still opens the search), not the service's buttons.
-        SearchField(onClick = model::toggleSearch, modifier = Modifier.align(Alignment.CenterHorizontally))
     }
 
     val rail = RailModel(
@@ -101,6 +106,7 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
         doNotDisturb = model.doNotDisturb,
         doNotDisturbLabel = model.doNotDisturbUntil?.let { strings.doNotDisturbUntil(untilLabel(it)) } ?: strings.doNotDisturb,
         onSelect = model::select,
+        interactive = !quitting,
         onAdd = { model.editing = null; model.addServiceOpen = true },
         onToggleDoNotDisturb = model::toggleDoNotDisturb,
         onSettings = { model.settingsOpen = true },
@@ -119,8 +125,10 @@ fun DecoratedWindowScope.MainWindowContent(model: KashModel, icons: ServiceIcons
     val content: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize().background(Kash.colors.background)) {
             // Always there, without a size while the Unread tab is shown: a new panel for each page made it resized each time it was shown.
-            ServicePage(selectedTab, if (selected == null) Modifier.size(0.dp) else Modifier.fillMaxSize())
-            if (selected == null) {
+            ServicePage(selectedTab, if (selected == null || quitting) Modifier.size(0.dp) else Modifier.fillMaxSize())
+            if (quitting) {
+                QuittingScreen()
+            } else if (selected == null) {
                 InboxScreen(rows, settings.inboxSort, { sort -> model.updateSettings { it.copy(inboxSort = sort) } }, icons, onRefresh = { model.refresh() }, onOpen = { row -> model.openConversation(row.service, row.conversation) },
                     actions = RowActions(
                         markReadOf = { row -> model.markReadOf(row.service.id) },

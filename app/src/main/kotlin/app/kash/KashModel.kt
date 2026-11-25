@@ -243,6 +243,7 @@ class KashModel(
      * the focus), then would open it again, as `MenuState` says of the menus.
      */
     fun toggleSearch() {
+        if (quitting) return
         if (searchOpen) dismissSearch() else if (System.currentTimeMillis() - searchDismissedAt > SEARCH_REOPEN_DELAY_MS) searchOpen = true
     }
 
@@ -250,6 +251,19 @@ class KashModel(
     fun dismissSearch() {
         if (searchOpen) searchDismissedAt = System.currentTimeMillis()
         searchOpen = false
+    }
+
+    /**
+     * Whether KaSH quits: the main window shows that it does in place of the Unread tab or a service's page, and nothing leaves that page (a
+     * tile of the rail, a shortcut, a notification), until KaSH is gone.
+     */
+    var quitting by mutableStateOf(false)
+        private set
+
+    /** KaSH starts to quit: see [quitting]. */
+    fun startQuitting() {
+        quitting = true
+        dismissSearch()
     }
 
     /** Whether the About window is open: from the About item of the application menu, or Settings' button. */
@@ -564,7 +578,11 @@ class KashModel(
         saveDirectory(directory.toMap())
     }
 
-    fun select(selection: Selection) = update { it.copy(selection = selection) }
+    fun select(selection: Selection) {
+        // The page that says that KaSH quits stays until KaSH is gone.
+        if (quitting) return
+        update { it.copy(selection = selection) }
+    }
 
     /** The contacts that the user marked as priority ([PriorityContact]), kept in the state. */
     val priorities: List<PriorityContact> get() = state.priorities
@@ -584,7 +602,7 @@ class KashModel(
      * the last), the zoom and Chrome's of the page shown.
      */
     fun shortcut(shortcut: BrowserShortcut, source: ShortcutSource = ShortcutSource.WINDOW) {
-        if (!shortcutTwins.admit(shortcut, source)) return
+        if (quitting || !shortcutTwins.admit(shortcut, source)) return
         when (shortcut) {
             BrowserShortcut.Search -> toggleSearch()
             BrowserShortcut.Inbox -> select(Selection.Inbox)
