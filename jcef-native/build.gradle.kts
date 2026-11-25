@@ -124,6 +124,10 @@ abstract class BuildJcef @Inject constructor(private val exec: ExecOperations) :
     @get:Internal
     abstract val javaHome: DirectoryProperty
 
+    /** The JDK's path, which makes the task run again when the JDK changes: [javaHome] is not an input as a whole, which would hash the JDK. */
+    @get:Input
+    abstract val javaHomePath: Property<String>
+
     /** Where [DownloadAnt] put Ant. */
     @get:InputDirectory
     @get:PathSensitive(PathSensitivity.NONE)
@@ -144,6 +148,25 @@ abstract class BuildJcef @Inject constructor(private val exec: ExecOperations) :
 
     @TaskAction
     fun build() {
+        // The toolchain's JDK must not have JCEF: its `jcef` module would win over the `jcef.jar` built here (see JbrToolchainPlugin). Gradle keeps
+        // using a `jbrsdk_jcef` that an earlier build downloaded, as it satisfies "the JetBrains Runtime": it has to be deleted to get the right one.
+        val jdk = javaHome.get().asFile
+        val modules = jdk.resolve("release").takeIf { it.isFile }?.readLines()?.firstOrNull { it.startsWith("MODULES=") }.orEmpty()
+        check(!Regex("""[ "]jcef[ "]""").containsMatchIn(modules)) {
+            "$jdk has JCEF, and KaSH needs a JetBrains Runtime without it. Delete ${jdk.parentFile.parentFile.parentFile} " +
+                "(rm -rf), and Gradle downloads the right one."
+        }
+        // CMake keeps the paths of the JDK it was configured with (`Java_JAVA_EXECUTABLE`, the JNI headers and libraries…) and fails when it is not
+        // there any more ("Java version check failed"), as after a new JetBrains Runtime. The whole file goes, never some of its lines: CMake
+        // writes it again, and Ninja rebuilds only what changed.
+        val cache = outputDirectory.get().asFile.resolve("CMakeCache.txt")
+        val configuredJava = cache.takeIf { it.isFile }
+            ?.useLines { lines -> lines.firstOrNull { it.startsWith("Java_JAVA_EXECUTABLE:") } }
+            ?.substringAfter('=')
+        if (configuredJava != null && !configuredJava.startsWith(jdk.absolutePath)) {
+            logger.lifecycle("Deleted the CMake cache of another JDK: $configuredJava")
+            check(cache.delete()) { "Could not delete $cache" }
+        }
         // What Homebrew installs, and the bison that it does not link (macOS has a bison 2.3, and vcpkg needs 2.7 or newer). The PATH that Gradle
         // has does not always have Homebrew's directory: it is not the one of a shell when the IDE starts Gradle.
         val path = listOf(
@@ -200,6 +223,7 @@ val buildJcef = tasks.register<BuildJcef>("buildJcef") {
         languageVersion = JavaLanguageVersion.of(findProperty("jvm.toolchain")!!.toString().toInt())
         vendor = JvmVendorSpec.JETBRAINS
     }.map { it.metadata.installationPath }
+    javaHomePath = javaHome.asFile.map { it.absolutePath }
     antDirectory = downloadAnt.flatMap { it.outputDirectory }
     pythonPath = layout.projectDirectory.dir("python")
     architecture = when (val arch = System.getProperty("os.arch")) {

@@ -1,4 +1,7 @@
 pluginManagement {
+    // The JetBrains Runtime without JCEF, for the toolchains that ask for the JetBrains vendor (see JbrToolchainPlugin).
+    includeBuild("build-logic")
+
     repositories {
         gradlePluginPortal()
         google()
@@ -15,6 +18,9 @@ dependencyResolutionManagement {
 }
 
 plugins {
+    // Must come before Foojay: the toolchain resolvers are asked in the order they are applied, and Foojay's JetBrains Runtime has JCEF.
+    id("app.kash.jbr-toolchain")
+
     // Downloads the JDKs the subprojects' toolchains ask for. Pinned here rather than in
     // gradle/libs.versions.toml because a settings plugin can't resolve a version-catalog alias -
     // the catalog isn't built yet at this point.
