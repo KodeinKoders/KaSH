@@ -10,15 +10,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.DialogModalityType
+import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.WindowDecoration
+import androidx.compose.ui.window.rememberDialogState
 import app.kash.ui.Kash
 import app.kash.ui.UiScaled
 import app.kash.ui.strings
@@ -32,8 +35,10 @@ import javax.swing.RootPaneContainer
  * did nothing.
  *
  * A window of its own, exactly over [owner]'s content pane, as the search is: a service's page is a native view, drawn over anything that Compose
- * draws in the main window.
+ * draws in the main window. Called in the main window's content, whose window ([owner]) is the dialog's owner.
  */
+// Experimental: the overload that takes the modality (the others are document modal) and the decoration.
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun QuittingWindow(owner: java.awt.Window?) {
     val bounds = remember(owner) {
@@ -41,19 +46,21 @@ fun QuittingWindow(owner: java.awt.Window?) {
         val origin = pane?.let { runCatching { it.locationOnScreen }.getOrNull() }
         if (pane == null || origin == null) null else java.awt.Rectangle(origin.x, origin.y, pane.width, pane.height)
     }
-    val state = rememberWindowState(
+    val state = rememberDialogState(
         size = if (bounds == null) DpSize(480.dp, 320.dp) else DpSize(bounds.width.dp, bounds.height.dp),
         position = if (bounds == null) WindowPosition(Alignment.Center) else WindowPosition(bounds.x.dp, bounds.y.dp),
     )
-    Window(
+    // A dialog of the main window (its owner, LocalWindow), modeless, which AppKit keeps right above it, and which goes behind another application
+    // with it: always on top, it stayed over the application that ⌘Tab went to while KaSH quit.
+    DialogWindow(
         onCloseRequest = {},
         state = state,
         title = strings.quittingKash,
-        undecorated = true,
+        decoration = WindowDecoration.Undecorated(),
         transparent = true,
         resizable = false,
-        alwaysOnTop = true,
         focusable = false,
+        modalityType = DialogModalityType.Modeless,
     ) {
         // The size of the text that Settings › Appearance gives, inside the window (UiScaled).
         UiScaled { QuittingContent() }
