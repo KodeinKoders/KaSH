@@ -287,6 +287,11 @@ tasks.withType<JavaExec>().matching { it.name == "run" }.configureEach {
 
 // Compose's task that copies the resources reads the directory, not the task that fills it.
 tasks.matching { it.name == "prepareAppResources" }.configureEach { dependsOn(jcefResources) }
+// jpackage's tasks do not take the resources as an input (`appResourcesDir` is internal): a JCEF built again left KaSH.app with the libjcef
+// before it, the task being up to date.
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
+    inputs.files(jcefResources).withPropertyName("jcefBundle").withPathSensitivity(PathSensitivity.RELATIVE)
+}
 
 // jpackage copies the resources into the bundle without their permissions: the helpers of Chromium and its framework lost their executable bit,
 // and Chromium could not start its processes. This gives it back to every file that has it in the JCEF bundle. A signature does not cover the
