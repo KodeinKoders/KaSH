@@ -1,17 +1,39 @@
 diff --git a/native/util_mac.mm b/native/util_mac.mm
-index 4b3baca..2ecbc87 100644
+index 4b3baca..36f2b42 100644
 --- a/native/util_mac.mm
 +++ b/native/util_mac.mm
-@@ -258,6 +258,18 @@ - (void)_swizzled_sendEvent:(NSEvent*)event {
+@@ -118,6 +118,7 @@ - (BOOL)isHandlingSendEvent;
+ - (void)setHandlingSendEvent:(BOOL)handlingSendEvent;
+ - (void)_swizzled_sendEvent:(NSEvent*)event;
+ - (void)_swizzled_terminate:(id)sender;
++- (void)_terminateNow:(id)sender;
+ - (BOOL)_swizzled_NSMenuItem_accessibilityIsAttributeSettable:(NSAccessibilityAttributeName)attribute;
  
+ @end
+@@ -256,8 +257,32 @@ - (void)_swizzled_sendEvent:(NSEvent*)event {
+   [self _swizzled_sendEvent:event];
+ }
+ 
++// Whether terminate: was called by _terminateNow:, from the top of the run loop.
++static bool g_terminate_now = false;
++
++// Calls terminate: from the run loop, outside of what asked for it.
++- (void)_terminateNow:(id)sender {
++  g_terminate_now = true;
++  [self terminate:sender];
++}
++
  // This method will be called via Cmd+Q.
  - (void)_swizzled_terminate:(id)sender {
-+  // Cmd+Q comes while its key event is being sent (a key equivalent), and an application that answers the Quit later (NSTerminateLater)
-+  // quits inside that event: Chromium did not close its browsers until it ended, which it did only once the application had answered
-+  // (KaSH: Chromium never stopped, and quitting took 20 s; from the Dock or the menu, with the mouse, it took 2 s). Terminating once the
-+  // event was sent quits as the Dock does.
-+  if (g_handling_send_event) {
-+    [self performSelector:@selector(terminate:)
++  // An application that answers the Quit later (NSTerminateLater) quits inside terminate:, in a run loop of AppKit's own, and inside what
++  // called it: Cmd+Q's key event (a key equivalent), or a task of Chromium (its handler of SIGINT and SIGTERM, Ctrl+C in a terminal),
++  // where Chromium did not close its browsers nor write its cookies until it ended, which it did only once the application had answered
++  // (KaSH: Chromium never stopped, and quitting took 20 to 25 s; from the Dock or the menu, with the mouse, it took 2 s). terminate: is
++  // called again from the top of the run loop, as the Dock's Quit.
++  const bool now = g_terminate_now;
++  g_terminate_now = false;
++  if (!now) {
++    [self performSelector:@selector(_terminateNow:)
 +               withObject:sender
 +               afterDelay:0
 +                  inModes:@[ NSDefaultRunLoopMode, NSEventTrackingRunLoopMode, NSModalPanelRunLoopMode ]];
