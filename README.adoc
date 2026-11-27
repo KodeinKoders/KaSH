@@ -81,6 +81,11 @@ The Xcode command line tools are enough: full Xcode is not needed.
 Gradle downloads Apache Ant and the JetBrains Runtime itself.
 The first build of JCEF downloads CEF and builds the dependencies of JCEF with vcpkg, which takes several minutes.
 
+CEF is not the official build, which leaves the proprietary codecs out, but Kodein's, https://github.com/KodeinKoders/BoCEFwPC[BoCEFwPC], which has them: the services can play their MP4 videos (H.264, AAC).
+Its version is `cef` in `gradle/libs.versions.toml`, and its SHA-256 is in `jcef-native/build.gradle.kts`.
+It is only built for Apple silicon for now: KaSH does not build on an Intel Mac.
+H.264, AAC and HEVC are covered by patents in many countries: whoever distributes KaSH is responsible for the patent licences that apply to them.
+
 `./gradlew :app:createDistributable` makes `KaSH.app`, in `app/build/compose/binaries/main/app`.
 The notifications of the macOS Notification Center and the launch at login only work in it.
 

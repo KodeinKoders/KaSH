@@ -64,6 +64,81 @@ val downloadAnt = tasks.register<DownloadAnt>("downloadAnt") {
     outputDirectory = layout.buildDirectory.dir("tools/ant")
 }
 
+// CEF, built with the proprietary codecs (H.264, AAC: the MP4 videos of the services) by github.com/KodeinKoders/BoCEFwPC. The builds that JCEF's
+// CMake downloads (JetBrains' or Spotify's) do not have them, so this distribution is put where that CMake looks for it, the directory
+// `third_party/cef/cef_binary_<version>_<platform>_minimal` of the submodule, before it runs: CMake downloads nothing when it is there.
+// It is only put there whole (extracted next to it, then moved), as CMake would take a half-extracted one for a complete one.
+abstract class DownloadCef @Inject constructor(private val exec: ExecOperations) : DefaultTask() {
+    /** CEF's version, as in the names of the official archives. */
+    @get:Input
+    abstract val version: Property<String>
+
+    /** CEF's name of the platform: `macosarm64`. */
+    @get:Input
+    abstract val platform: Property<String>
+
+    /** The SHA-256 of the archive, which BoCEFwPC publishes next to it (`….tar.bz2.sha256`). */
+    @get:Input
+    abstract val sha256: Property<String>
+
+    /** Where CMake looks for the distribution: `third_party/cef/cef_binary_<version>_<platform>_minimal` in the submodule. */
+    @get:OutputDirectory
+    abstract val distributionDirectory: DirectoryProperty
+
+    @TaskAction
+    fun download() {
+        val distribution = distributionDirectory.get().asFile
+        val name = "${distribution.name}.tar.bz2"
+        // The tag of the release is the version, and `+` has to be escaped in the URL.
+        val url = "https://github.com/KodeinKoders/BoCEFwPC/releases/download/${version.get()}/$name".replace("+", "%2B")
+        val archive = temporaryDir.resolve(name)
+        logger.lifecycle("Downloading $url")
+        URI(url).toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+        val digest = MessageDigest.getInstance("SHA-256")
+        archive.inputStream().use { input ->
+            val buffer = ByteArray(1 shl 20)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        check(actual == sha256.get()) { "$name has the SHA-256 $actual, not the expected ${sha256.get()}" }
+        // macOS's tar, which keeps the modes and the links of the framework. The archive has everything in `<its name>/`. What is deleted here is
+        // deleted with `rm -rf`, never deleteRecursively, which follows the links (see AGENTS.md › Running the app).
+        val extracted = temporaryDir.resolve("extracted")
+        exec.exec { commandLine("rm", "-rf", extracted.absolutePath) }
+        extracted.mkdirs()
+        exec.exec { commandLine("tar", "-xjf", archive.absolutePath, "-C", extracted.absolutePath) }
+        val root = extracted.resolve(distribution.name)
+        check(root.resolve("Release/Chromium Embedded Framework.framework").isDirectory) { "$name has no Release/Chromium Embedded Framework.framework" }
+        // Gradle makes the output directory before the task runs (empty), and an earlier extraction may have left one.
+        if (distribution.exists()) exec.exec { commandLine("rm", "-rf", distribution.absolutePath) }
+        check(root.renameTo(distribution)) { "Could not move $root to $distribution" }
+        archive.delete()
+        extracted.delete()
+    }
+}
+
+val downloadCef = tasks.register<DownloadCef>("downloadCef") {
+    group = "build"
+    description = "Downloads CEF with the proprietary codecs (KodeinKoders/BoCEFwPC) where the build of JCEF takes it."
+    version = libs.versions.cef
+    platform = when (val arch = System.getProperty("os.arch")) {
+        "aarch64", "arm64" -> "macosarm64"
+        // BoCEFwPC has no other platform yet: add it there (platforms.json) first, then its SHA-256 below.
+        else -> error("KodeinKoders/BoCEFwPC has no build of CEF for macOS on $arch")
+    }
+    // By platform, as BoCEFwPC's release of the version publishes them. To change with the version.
+    sha256 = platform.map {
+        mapOf(
+            "macosarm64" to "f3fd539c86b7bd0fd42220169b1573532ec1c11451e66714e28352d543486e1d",
+        ).getValue(it)
+    }
+    distributionDirectory = jcefDirectory.dir(version.zip(platform) { version, platform -> "third_party/cef/cef_binary_${version}_${platform}_minimal" })
+}
+
 // KaSH's fixes to JetBrains' JCEF: the files of `patches/` (made with `git -C jcef diff`), applied to the submodule's checkout before it is built,
 // in the order of their names. One that is already applied (`git apply --reverse --check`) is left as it is; one that does not apply any more
 // (after the submodule moved) fails the build, and has to be made again or dropped when JetBrains fixed it.
@@ -138,6 +213,14 @@ abstract class BuildJcef @Inject constructor(private val exec: ExecOperations) :
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val pythonPath: DirectoryProperty
 
+    /** The CEF distribution that [DownloadCef] put where CMake looks for it. Not an input as a whole (hundreds of MB to hash): [cefVersion] is. */
+    @get:Internal
+    abstract val cefDistribution: DirectoryProperty
+
+    /** CEF's version, which CMake is given (`CEF_VERSION`, which says which distribution it takes). */
+    @get:Input
+    abstract val cefVersion: Property<String>
+
     /** The CPU of the build: `arm64` or `x86_64`. */
     @get:Input
     abstract val architecture: Property<String>
@@ -199,6 +282,8 @@ abstract class BuildJcef @Inject constructor(private val exec: ExecOperations) :
                 // The oldest macOS that JetBrains builds it for.
                 "-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0",
                 "-DPROJECT_ARCH=${architecture.get()}",
+                // Not the one that JCEF's CMakeLists.txt pins: the distribution with the codecs, which is there (see DownloadCef).
+                "-DCEF_VERSION=${cefVersion.get()}",
             )
         }
         exec.exec {
@@ -212,8 +297,8 @@ val buildJcef = tasks.register<BuildJcef>("buildJcef") {
     group = "build"
     description = "Builds JetBrains' JCEF (libjcef, its helpers, jcef.jar) from the jcef submodule, with CMake and Ninja."
     sourceDirectory = jcefDirectory
-    // Its sources with KaSH's fixes.
-    dependsOn(patchJcef)
+    // Its sources with KaSH's fixes, and CEF where CMake takes it (cefDistribution is internal: no dependency is inferred from it).
+    dependsOn(patchJcef, downloadCef)
     sources.from(jcefDirectory.asFileTree.matching {
         // What the build downloads and generates in the submodule, which would make the task run again each time.
         exclude("third_party/cef/cef_binary_*", "third_party/cef/cef_binary_*/**", "third_party/vcpkg/**", "third_party/thrift_compiler/**")
@@ -225,6 +310,8 @@ val buildJcef = tasks.register<BuildJcef>("buildJcef") {
     }.map { it.metadata.installationPath }
     javaHomePath = javaHome.asFile.map { it.absolutePath }
     antDirectory = downloadAnt.flatMap { it.outputDirectory }
+    cefDistribution = downloadCef.flatMap { it.distributionDirectory }
+    cefVersion = downloadCef.flatMap { it.version }
     pythonPath = layout.projectDirectory.dir("python")
     architecture = when (val arch = System.getProperty("os.arch")) {
         "aarch64", "arm64" -> "arm64"

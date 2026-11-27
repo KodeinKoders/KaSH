@@ -1,6 +1,7 @@
 [versions]
 ant = "1.10.15"                     # https://ant.apache.org/bindownload.cgi (only the build of JCEF uses it, see jcef-native)
 buildConfig = "6.1.2"               # https://github.com/gmazzo/gradle-buildconfig-plugin/releases
+cef = "150.0.24+g62e98ba+chromium-150.0.7871.289"  # https://github.com/KodeinKoders/BoCEFwPC/releases (CEF with the proprietary codecs, on the CEF branch of the jcef submodule; see jcef-native)
 composeMultiplatform = "1.12.2"     # https://github.com/JetBrains/compose-multiplatform/releases
 coroutines = "1.11.0"               # https://github.com/Kotlin/kotlinx.coroutines/releases
 jewel = "0.42.0-263.7307.200"       # https://github.com/JetBrains/intellij-community/releases (Jewel is in the platform/jewel directory; its Maven versions are on https://central.sonatype.com/artifact/org.jetbrains.jewel/jewel-int-ui-standalone)
