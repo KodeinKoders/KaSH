@@ -335,6 +335,13 @@ val jcefJvmArgs = listOf(
     "--enable-native-access=ALL-UNNAMED",
 )
 
+// The Java heap of the application, which G1 otherwise keeps at what it once needed: it starts at 1/64 of the memory of the machine, gives back
+// only after a collection, and leaves up to 70 % of it free then (a KaSH that had run for an hour kept 64 MB of heap for 22 MB used). A small
+// initial heap, a collection every 15 s when nothing else made one (`G1PeriodicGCInterval`, which also gives back what is free), and at most 30 %
+// of it free after a collection keep it near what is used, for a collection of a few milliseconds every 15 s at rest. Most of KaSH's memory is
+// Chromium's and the pages' drawing, which this does not change. The same settings as KaTTY's.
+val heapJvmArgs = listOf("-Xms32m", "-XX:G1PeriodicGCInterval=15000", "-XX:MinHeapFreeRatio=10", "-XX:MaxHeapFreeRatio=30")
+
 compose {
     desktop.application {
         mainClass = "app.kash.MainKt"
@@ -346,6 +353,7 @@ compose {
         }.get().metadata.installationPath.asFile.absolutePath
 
         jvmArgs += jcefJvmArgs
+        jvmArgs += heapJvmArgs
         // The name of the process in the Dock and the application switcher (⌘Tab), which is `java` otherwise when it is run by Gradle; the
         // packaged application has its bundle's name. The menu bar's name is set in `main` (AppName.kt).
         jvmArgs += "-Xdock:name=KaSH"
